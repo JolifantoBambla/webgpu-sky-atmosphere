@@ -1,0 +1,47 @@
+{
+  "name": "webgpu-sky-atmosphere",
+  "version": "1.0.0",
+  "description": "A WebGPU implementation of Hillaire's atmosphere model.",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "/dist/**"
+  ],
+  "scripts": {
+    "docs": "typedoc src/index.ts",
+    "build": "rollup -c",
+    "lint": "eslint \"src/**/*.{js,ts,tsx}\""
+  },
+  "keywords": [
+    "WebGPU",
+    "Sky",
+    "Atmosphere",
+    "GPU",
+    "Graphics"
+  ],
+  "author": "Lukas Herzberger",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/JolifantoBambla/webgpu-sky-atmosphere/issues"
+  },
+  "homepage": "https://github.com/JolifantoBambla/webgpu-sky-atmosphere#readme",
+  "devDependencies": {
+    "@rollup/plugin-node-resolve": "^15.2.3",
+    "@rollup/plugin-terser": "^0.4.4",
+    "@rollup/plugin-typescript": "^11.1.6",
+    "@tsconfig/recommended": "1.0.6",
+    "@typescript-eslint/eslint-plugin": "^6.21.0",
+    "@typescript-eslint/parser": "^6.21.0",
+    "@webgpu/types": "^0.1.42",
+    "eslint": "^8.56.0",
+    "eslint-plugin-html": "^8.1.1",
+    "eslint-plugin-one-variable-per-var": "0.0.3",
+    "eslint-plugin-optional-comma-spacing": "^0.0.4",
+    "eslint-plugin-require-trailing-comma": "0.0.1",
+    "rollup": "^4.18.0",
+    "tslib": "^2.6.2",
+    "typedoc": "^0.25.13",
+    "typescript": "^5.4.5"
+  }
+}
