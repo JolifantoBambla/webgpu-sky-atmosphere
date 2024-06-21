@@ -13,19 +13,91 @@
     <script type="module">
         import { SkyAtmospherePasses, foo } from '../dist/1.x/webgpu-sky-atmosphere.module.min.js';
 
-        foo();
-
         async function main() {
             const adapter = await navigator.gpu.requestAdapter();
             const device = await adapter.requestDevice();
 
             const canvas = document.querySelector('canvas');
+            canvas.width = 1920;
+            canvas.height = 1080;
+
             const context = canvas.getContext('webgpu');
             const presentationFormat = navigator.gpu.getPreferredCanvasFormat();
             context.configure({
                 device,
                 format: presentationFormat,
             });
+
+            const transmittanceLutView = foo(device);
+
+            function makePipeline() {
+                const module = device.createShaderModule({
+                    code: `
+                    @group(0) @binding(0) var texture: texture_2d<f32>;
+                        
+                    @vertex
+                    fn vertex(@builtin(vertex_index) vertex_index: u32) -> @builtin(position) vec4<f32> {
+                        return vec4(vec2(f32((vertex_index << 1) & 2), f32(vertex_index & 2)) * 2 - 1, 0, 1);
+                    }
+                    
+                    @fragment
+                    fn fragment(@builtin(position) coord: vec4<f32>) -> @location(0) vec4<f32> {
+                        let texture_size = textureDimensions(texture, 0);
+                        let texture_coords = vec2<u32>(floor(coord.xy));
+                        if texture_coords.x < texture_size.x && texture_coords.y < texture_size.y {
+                            return vec4(vec3<f32>(textureLoad(texture, vec2<i32>(floor(coord.xy)), 0).rgb), 1.0);
+                        } else {
+                            return vec4(0.0, 0.0, 0.0, 1.0);
+                        }
+                    }
+                    `,
+                });
+                return device.createRenderPipeline({
+                    layout: 'auto',
+                    vertex: {
+                        module,
+                        entryPoint: 'vertex',
+                    },
+                    fragment: {
+                        module,
+                        entryPoint: 'fragment',
+                        targets: [{ format: presentationFormat }],
+                    },
+                });
+            }
+
+            const presentPipeline = makePipeline();
+            const bindGroup = device.createBindGroup({
+                layout: presentPipeline.getBindGroupLayout(0),
+                entries: [
+                    {
+                        binding: 0,
+                        resource: transmittanceLutView,
+                    },
+                ],
+            });
+
+            const render = () => {
+                const encoder = device.createCommandEncoder();
+
+                const pass = encoder.beginRenderPass({
+                    colorAttachments: [{
+                        view: context.getCurrentTexture().createView(),
+                        clearValue: [0,0,0,0],
+                        loadOp: 'clear',
+                        storeOp: 'store',
+                    }],
+                });
+                pass.setPipeline(presentPipeline);
+                pass.setBindGroup(0, bindGroup);
+                pass.draw(3);
+                pass.end();
+
+                device.queue.submit([encoder.finish()]);
+
+                requestAnimationFrame(render);
+            };
+            render();
         }
         main();
     </script>
