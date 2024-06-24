@@ -1,4 +1,6 @@
-// requires pi
+// requires constants.wgsl
+
+const isotropic_phase: f32 = 1.0 / sphere_solid_angle;
 
 fn cornette_shanks_phase(g: f32, cos_theta: f32) -> f32 {
     let k: f32 = 3.0 / (8.0 * pi) * (1.0 - g * g) / (2.0 + g * g);
