@@ -2,6 +2,10 @@ fn from_sub_uvs_to_unit(u: f32, resolution: f32) -> f32 {
     return (u - 0.5 / resolution) * (resolution / (resolution - 1.0));
 }
 
+fn from_unit_to_sub_uvs(u: f32, resolution: f32) -> f32 {
+    return (u + 0.5 / resolution) * (resolution / (resolution + 1.0));
+}
+
 fn transmittance_lut_params_to_uv(atmosphere: Atmosphere, view_height: f32, cos_view_zenith: f32) -> vec2<f32> {
 	let height_sq = view_height * view_height;
 	let bottom_radius_sq = atmosphere.bottom_radius * atmosphere.bottom_radius;
