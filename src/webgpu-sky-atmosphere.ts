@@ -30,6 +30,7 @@ export const DEFAULT_SKY_VIEW_LUT_SIZE: [number, number] = [192, 108];
 export const DEFAULT_AERIAL_PERSPECTIVE_LUT_SIZE: [number, number, number] = [32, 32, 32];
 
 export const DEFAULT_TRANSMITTANCE_LUT_SAMPLE_COUNT: number = 40;
+export const DEFAULT_MULTI_SCATTERING_LUT_SAMPLE_COUNT: number = 20;
 
 export interface SkyAtmosphereLutConfig {
     /**
@@ -47,6 +48,12 @@ export interface SkyAtmosphereLutConfig {
      * Defaults to 32
      */
     multiScatteringLutSize?: number,
+
+    /**
+     * Defaults to 20
+     * Clamped to max(10, multiScatteringLutSampleCount)
+     */
+    multiScatteringLutSampleCount?: number,
 
     /**
      * Defaults to [192, 108]
@@ -239,14 +246,22 @@ function atmosphereToFloatArray(atmosphere: Atmosphere) {
     ]);
 }
 
-export function foo(device: GPUDevice, lutConfig: SkyAtmosphereLutConfig = {transmittanceLutSize: DEFAULT_TRANSMITTANCE_LUT_SIZE,}): GPUTextureView {
+export function foo(device: GPUDevice, lutConfig: SkyAtmosphereLutConfig = {transmittanceLutSize: DEFAULT_TRANSMITTANCE_LUT_SIZE,}): GPUTextureView[] {
     const transmittanceLut = device.createTexture({
-        label: 'transmittance_lut',
-        size: lutConfig.transmittanceLutSize || DEFAULT_TRANSMITTANCE_LUT_SIZE,
+        label: 'transmittance LUT',
+        size: lutConfig.transmittanceLutSize || DEFAULT_TRANSMITTANCE_LUT_SIZE, // todo: validate / clamp
         format: TRANSMITTANCE_LUT_FORMAT,
         usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING,
     });
     const transmittanceLutView = transmittanceLut.createView();
+
+    const multiScatteringLut = device.createTexture({
+        label: 'multi scattering LUT',
+        size: new Array(2).fill(lutConfig.multiScatteringLutSize || DEFAULT_MULTISCATTERING_LUT_SIZE), // todo: validate / clamp
+        format: MULTI_SCATTERING_LUT_FORMAT,
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING,
+    });
+    const multiScatteringLutView = multiScatteringLut.createView();
 
     const atmosphereBufferBindGroupLayout = device.createBindGroupLayout({
         label: 'Atmosphere buffer bind group layout',
@@ -260,6 +275,19 @@ export function foo(device: GPUDevice, lutConfig: SkyAtmosphereLutConfig = {tran
                     minBindingSize: ATMOSPHERE_BUFFER_SIZE,
                 },
             },
+        ],
+    });
+
+    const samplerBindGroupLayout = device.createBindGroupLayout({
+        label: 'Sampler bind group layout',
+        entries: [
+            {
+                binding: 0,
+                visibility: GPUShaderStage.COMPUTE,
+                sampler: {
+                    type: 'filtering',
+                },
+            }
         ],
     });
 
@@ -299,9 +327,51 @@ export function foo(device: GPUDevice, lutConfig: SkyAtmosphereLutConfig = {tran
     });
 
     // Multiscattering start
-    device.createShaderModule({
-        code: makeMultiScatteringLutShaderCode(),
+    const multiScatteringLutBindGroupLayout = device.createBindGroupLayout({
+        label: 'Multi Scattering LUT Output BindGroup Layout',
+        entries: [
+            {
+                binding: 0,
+                visibility: GPUShaderStage.COMPUTE,
+                texture: {
+                    sampleType: 'float',
+                    viewDimension: transmittanceLut.dimension,
+                    multisampled: false,
+                },
+            },
+            {
+                binding: 1,
+                visibility: GPUShaderStage.COMPUTE,
+                storageTexture: {
+                    access: 'write-only',
+                    format: multiScatteringLut.format,
+                    viewDimension: multiScatteringLut.dimension,
+                },
+            },
+        ],
     });
+
+    const multiScatteringLutPipeline = device.createComputePipeline({
+        label: 'Multi-Scattering LUT pipeline',
+        layout: device.createPipelineLayout({
+            label: 'Multi-Scattering LUT pipeline layout',
+            bindGroupLayouts: [
+                atmosphereBufferBindGroupLayout,
+                samplerBindGroupLayout,
+                multiScatteringLutBindGroupLayout,
+            ],
+        }),
+        compute: {
+            module: device.createShaderModule({
+                code: makeMultiScatteringLutShaderCode(),
+            }),
+            entryPoint: 'render_multi_scattering_lut',
+            constants: {
+                SAMPLE_COUNT: lutConfig.multiScatteringLutSampleCount || DEFAULT_MULTI_SCATTERING_LUT_SAMPLE_COUNT,
+            },
+        },
+    });
+
     // Multiscattering end
 
     // todo: use for later passes
@@ -347,6 +417,28 @@ export function foo(device: GPUDevice, lutConfig: SkyAtmosphereLutConfig = {tran
         }],
     });
 
+    const lutSampler = device.createSampler({
+        label: 'LUT sampler',
+        addressModeU: 'clamp-to-edge',
+        addressModeV: 'clamp-to-edge',
+        addressModeW: 'clamp-to-edge',
+        minFilter: 'linear',
+        magFilter: 'linear',
+        mipmapFilter: 'linear',
+        lodMinClamp: 0,
+        lodMaxClamp: 32,
+        maxAnisotropy: 1,
+    });
+
+    const samplerBindGroup = device.createBindGroup({
+        label: 'Sampler BindGroup',
+        layout: samplerBindGroupLayout,
+        entries: [{
+            binding: 0,
+            resource: lutSampler,
+        }],
+    });
+
     const transmittanceLutOutputBindGroup = device.createBindGroup({
         label: 'Transmittance LUT Ouptut BindGroup',
         layout: transmittanceLutOutputBindGroupLayout,
@@ -356,21 +448,48 @@ export function foo(device: GPUDevice, lutConfig: SkyAtmosphereLutConfig = {tran
         }],
     });
 
-    const commandEncoder = device.createCommandEncoder({
-        label: 'Transmittance LUT command encoder',
+    const multiScatteringLutBindGroup = device.createBindGroup({
+        label: 'Multi scattering LUT BindGroup',
+        layout: multiScatteringLutBindGroupLayout,
+        entries: [
+            {
+                binding: 0,
+                resource: transmittanceLutView,
+            },
+            {
+                binding: 1,
+                resource: multiScatteringLutView,
+            }
+        ],
     });
-    const computePass = commandEncoder.beginComputePass({
+
+    const commandEncoder = device.createCommandEncoder({
+        label: 'Atmosphere command encoder',
+    });
+
+    const transmittanceLutComputePass = commandEncoder.beginComputePass({
         label: 'Transmittance LUT pass',
     });
-    computePass.setPipeline(transmittanceLutPipeline);
-    computePass.setBindGroup(0, atmosphereBufferBindGroup);
-    computePass.setBindGroup(1, transmittanceLutOutputBindGroup);
-    computePass.dispatchWorkgroups(Math.ceil(transmittanceLut.width / 16.0), Math.ceil(transmittanceLut.height / 16.0));
-    computePass.end();
+    transmittanceLutComputePass.setPipeline(transmittanceLutPipeline);
+    transmittanceLutComputePass.setBindGroup(0, atmosphereBufferBindGroup);
+    transmittanceLutComputePass.setBindGroup(1, transmittanceLutOutputBindGroup);
+    transmittanceLutComputePass.dispatchWorkgroups(Math.ceil(transmittanceLut.width / 16.0), Math.ceil(transmittanceLut.height / 16.0));
+    transmittanceLutComputePass.end();
+
+    const multiScatteringComputePass = commandEncoder.beginComputePass({
+        label: 'Multi Scattering LUT pass',
+    });
+    multiScatteringComputePass.setPipeline(multiScatteringLutPipeline);
+    multiScatteringComputePass.setBindGroup(0, atmosphereBufferBindGroup);
+    multiScatteringComputePass.setBindGroup(1, samplerBindGroup);
+    multiScatteringComputePass.setBindGroup(2, multiScatteringLutBindGroup);
+    multiScatteringComputePass.dispatchWorkgroups(multiScatteringLut.width, multiScatteringLut.height, 1);
+    multiScatteringComputePass.end();
 
     device.queue.submit([commandEncoder.finish()]);
 
-    console.log(transmittanceLutPipeline);
-
-    return transmittanceLutView;
+    return [
+        transmittanceLutView,
+        multiScatteringLutView,
+    ];
 }
