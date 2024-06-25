@@ -1,31 +1,16 @@
-import testWgslCode from './test.wgsl';
+import { Atmosphere } from './atmosphere.js';
+import { Camera, Config } from './config.js';
 
-import configWgsl from './shaders/common/config.wgsl';
-import constantsWgsl from './shaders/common/constants.wgsl';
-import intersectionWgsl from './shaders/common/intersection.wgsl';
-import mediumWgsl from './shaders/common/medium.wgsl';
-import phaseWgsl from './shaders/common/phase.wgsl';
-import uvWgsl from './shaders/common/uv.wgsl';
-
-import renderTransmittanceLutWgsl from './shaders/render_transmittance_lut.wgsl';
-import renderMultiScatteringLutWgsl from './shaders/render_multi_scattering_lut.wgsl';
-import renderSkyViewLutWgsl from './shaders/render_sky_view_lut.wgsl';
-
-function makeTransmittanceLutShaderCode() {
-    return `${constantsWgsl}\n${intersectionWgsl}\n${mediumWgsl}\n${renderTransmittanceLutWgsl}`;
-}
-
-function makeMultiScatteringLutShaderCode() {
-    return `${constantsWgsl}\n${intersectionWgsl}\n${mediumWgsl}\n${phaseWgsl}\n${uvWgsl}\n${renderMultiScatteringLutWgsl}`;
-}
-
-function makeSkyViewLutShaderCode() {
-    return `${constantsWgsl}\n${intersectionWgsl}\n${mediumWgsl}\n${phaseWgsl}\n${uvWgsl}\n${configWgsl}\n${renderSkyViewLutWgsl}`;
-}
+import {
+    makeTransmittanceLutShaderCode,
+    makeMultiScatteringLutShaderCode,
+    makeSkyViewLutShaderCode,
+} from './shaders.js';
 
 const TRANSMITTANCE_LUT_FORMAT: GPUTextureFormat = 'rgba16float';
 const MULTI_SCATTERING_LUT_FORMAT: GPUTextureFormat = TRANSMITTANCE_LUT_FORMAT;
 const SKY_VIEW_LUT_FORMAT: GPUTextureFormat = TRANSMITTANCE_LUT_FORMAT;
+const AERIAL_PERSPECTIVE_LUT_FORMAT: GPUTextureFormat = TRANSMITTANCE_LUT_FORMAT;
 
 const ATMOSPHERE_BUFFER_SIZE: number = 112;
 const CONFIG_BUFFER_SIZE: number = 192;
@@ -72,153 +57,6 @@ export interface SkyAtmosphereLutConfig {
     aerialPerspectiveLutSize?: [number, number, number],
 }
 
-export class SkyAtmospherePasses {
-    /*
-    readonly transmittanceLut: GPUTexture;
-    readonly multiScatteringLut: GPUTexture;
-    readonly skyViewLut: GPUTexture;
-    readonly aerialPerspectiveLut: GPUTexture;
-    */
-}
-
-export class Rayleigh {
-	/** 
-     * Rayleigh scattering exponential distribution scale in the atmosphere
-     */
-	public densityExpScale: number;
-	/**
-     * Rayleigh scattering coefficients (per kilometer)
-     */
-	public scattering: [number, number, number];
-
-    constructor(densityExpScale: number, scattering: [number, number, number]) {
-        this.densityExpScale = densityExpScale;
-        this.scattering = scattering;
-    }
-}
-
-export class Mie {
-	/**
-     * Mie scattering exponential distribution scale in the atmosphere
-     */
-	public densityExpScale: number;
-	/**
-     * Mie scattering coefficients (per kilometer)
-     */
-	public scattering: [number, number, number];
-	/**
-     * Mie extinction coefficients (per kilometer)
-     */
-	public extinction: [number, number, number];
-	/**
-     * Mie absorption coefficients (per kilometer)
-     */
-	//public absorption: [number, number, number];
-	/**
-     * Mie phase function excentricity
-     */
-	public phaseG: number;
-
-    constructor(densityExpScale: number, scattering: [number, number, number], extinction: [number, number, number], phaseG: number) {
-        this.densityExpScale = densityExpScale;
-        this.scattering = scattering;
-        this.extinction = extinction;
-        this.phaseG = phaseG;
-    }
-}
-
-export class AbsorptionLayer0 {
-    /**
-     * In kilometers
-     */
-    public width: number;
-    public constantTerm: number;
-    public linearTerm: number;
-
-    constructor(width: number, constantTerm: number, linearTerm: number) {
-        this.width = width;
-        this.constantTerm = constantTerm;
-        this.linearTerm = linearTerm;
-    }
-}
-
-export class AbsorptionLayer1 {
-    public constantTerm: number;
-    public linearTerm: number;
-
-    constructor(constantTerm: number, linearTerm: number) {
-        this.constantTerm = constantTerm;
-        this.linearTerm = linearTerm;
-    }
-}
-    
-/**
- * Another medium type in the atmosphere
- */
-export class Absorption {
-    public layer0: AbsorptionLayer0;
-    public layer1: AbsorptionLayer1;
-    /**
-    * This other medium only absorb light, e.g. useful to represent ozone in the earth atmosphere (per kilometer)
-    */
-   public extinction: [number, number, number];
-
-    constructor(layer0: AbsorptionLayer0, layer1: AbsorptionLayer1, extinction: [number, number, number]) {
-        this.layer0 = layer0;
-        this.layer1 = layer1;
-        this.extinction = extinction;
-    }
-}
-
-export class Atmosphere {
-    /**
-     * Radius of the planet in kilometers (center to ground)
-     */ 
-	public bottomRadius: number;
-    /**
-     * Height of atmosphere in kilometers (distance from {@link bottomRadius} to atmosphere top)
-     * Clamped to max(height, 0)
-     */
-	public height: number;
-
-    public rayleighComponent: Rayleigh;
-    public mieComponent: Mie;
-	public apsorptionComponent: Absorption;
-
-	/**
-     * The albedo of the ground.
-     */
-	public groundAlbedo: [number, number, number];
-
-    constructor(bottomRadius: number, height: number, rayleighComponent: Rayleigh, mieComponent: Mie, absorptionComponent: Absorption, groundAlbedo: [number, number, number]) {
-        this.bottomRadius = bottomRadius;
-        this.height = Math.max(height, 0.0);
-        this.rayleighComponent = rayleighComponent;
-        this.mieComponent = mieComponent;
-        this.apsorptionComponent = absorptionComponent;
-        this.groundAlbedo = groundAlbedo;
-    }
-
-    // todo: interfaces are nicer I guess?
-    public static earth(): Atmosphere {
-        const rayleighScaleHeight = 8.0;
-        const mieScaleHeight = 1.2;
-        return new Atmosphere(
-            6360.0,
-            100.0,
-            new Rayleigh(-1.0 / rayleighScaleHeight, [0.005802, 0.013558, 0.033100]),
-            new Mie(-1.0 / mieScaleHeight, [0.003996, 0.003996, 0.003996], [0.004440, 0.004440, 0.004440], 0.8),
-            new Absorption(
-                new AbsorptionLayer0(25.0, -2.0 / 3.0, 1.0 / 15.0),
-                new AbsorptionLayer1(8.0 / 3.0, -1.0 / 15.0),
-                [0.000650, 0.001881, 0.000085],
-            ),
-            [0.0, 0.0, 0.0],
-        );
-    }
-}
-
-
 function atmosphereToFloatArray(atmosphere: Atmosphere) {
     return new Float32Array([
         atmosphere.rayleighComponent.scattering[0],
@@ -252,65 +90,6 @@ function atmosphereToFloatArray(atmosphere: Atmosphere) {
     ]);
 }
 
-export class Camera {
-    // World position of the current camera view
-    public position: [number, number, number];
-
-    // Inverse view matrix for the current camera view
-    public inverseView: number[];
-    
-    // Inverse projection matrix for the current camera view
-    public inverseProjection: number[];
-
-    constructor(position: [number, number, number], inverseView: number[], inverseProjection: number[]) {
-        this.position = position;
-        this.inverseView = inverseView;
-        this.inverseProjection = inverseProjection;
-    }
-}
-
-export class Sun {
-    // Illuminance of the sun
-    public illuminance: [number, number, number];
-
-    // Direction to the sun (inverse sun light direction)
-    public direction: [number, number, number];
-
-    constructor(illuminance: [number, number, number], direction: [number, number, number]) {
-        this.illuminance = illuminance;
-        this.direction = direction;
-    }
-}
-
-export class Config {
-    public sun: Sun;
-    public camera: Camera;
-
-    // Minimum number of ray marching samples per pixel
-    public rayMarchMinSPP: number;
-
-    // Maximum number of ray marching samples per pixel
-    public rayMarchMaxSPP: number;
-
-    // Resolution of the output texture
-    public screenResolution: [number, number];
-
-    // todo: interface?
-    // todo: actually set these
-    constructor() {
-        this.camera = new Camera(
-            [0.0, 0.0, 1.0],
-            // todo: set these from outside, include math lib in demo but not in lib
-            Array(16).fill(0.0),
-            Array(16).fill(0.0),
-        );
-        this.sun = new Sun([10.0, 10.0, 10.0], [0.0, 0.0, 1.0]);
-        this.screenResolution = [1920, 1080];
-        this.rayMarchMinSPP = 30;
-        this.rayMarchMaxSPP = 31;
-    }
-}
-
 function configToFloatArray(config: Config) {
     return new Float32Array([
         ...config.camera.inverseProjection,
@@ -326,7 +105,117 @@ function configToFloatArray(config: Config) {
     ]);
 }
 
-export function foo(device: GPUDevice, lutConfig: SkyAtmosphereLutConfig = {transmittanceLutSize: DEFAULT_TRANSMITTANCE_LUT_SIZE,}): GPUTextureView[] {
+export class LookUpTable {
+    readonly texture: GPUTexture;
+    readonly view: GPUTextureView;
+
+    constructor(texture: GPUTexture) {
+        this.texture = texture;
+        this.view = texture.createView();
+    }
+}
+
+export class SkyAtmospherePasses {
+    readonly device: GPUDevice;
+
+    readonly atmosphereBuffer: GPUBuffer;
+    readonly configBuffer: GPUBuffer;
+
+    readonly lutSampler: GPUSampler;
+
+    readonly transmittanceLut: LookUpTable;
+    readonly multiScatteringLut: LookUpTable;
+    readonly skyViewLut: LookUpTable;
+    readonly aerialPerspectiveLut: LookUpTable;
+
+
+    constructor(device: GPUDevice, atmosphere: Atmosphere = Atmosphere.earth(), lutConfig: SkyAtmosphereLutConfig = {}) {
+        this.device = device;
+
+        // init buffers
+        {
+            this.atmosphereBuffer = device.createBuffer({
+                label: 'atmosphere buffer',
+                size: ATMOSPHERE_BUFFER_SIZE,
+                usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+            });
+            this.updateAtmosphere(atmosphere);
+
+            this.configBuffer = device.createBuffer({
+                label: 'config buffer',
+                size: CONFIG_BUFFER_SIZE,
+                usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+            });
+            this.updateConfig(new Config());
+        }
+
+        // init samplers
+        {
+            this.lutSampler = device.createSampler({
+                label: 'LUT sampler',
+                addressModeU: 'clamp-to-edge',
+                addressModeV: 'clamp-to-edge',
+                addressModeW: 'clamp-to-edge',
+                minFilter: 'linear',
+                magFilter: 'linear',
+                mipmapFilter: 'linear',
+                lodMinClamp: 0,
+                lodMaxClamp: 32,
+                maxAnisotropy: 1,
+            });
+        }
+
+        // init look up tables
+        {
+            this.transmittanceLut = new LookUpTable(device.createTexture({
+                label: 'transmittance LUT',
+                size: lutConfig.transmittanceLutSize || DEFAULT_TRANSMITTANCE_LUT_SIZE, // todo: validate / clamp
+                format: TRANSMITTANCE_LUT_FORMAT,
+                usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING,
+            }));
+
+            this.multiScatteringLut = new LookUpTable(device.createTexture({
+                label: 'multi scattering LUT',
+                size: new Array(2).fill(lutConfig.multiScatteringLutSize || DEFAULT_MULTISCATTERING_LUT_SIZE), // todo: validate / clamp
+                format: MULTI_SCATTERING_LUT_FORMAT,
+                usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING,
+            }));
+
+            this.skyViewLut = new LookUpTable(device.createTexture({
+                label: 'sky view LUT',
+                size: lutConfig.skyViewLutSize || DEFAULT_SKY_VIEW_LUT_SIZE, // todo: validate / clamp
+                format: SKY_VIEW_LUT_FORMAT,
+                usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING,
+            }));
+
+            this.aerialPerspectiveLut = new LookUpTable(device.createTexture({
+                label: 'aerial perspective LUT',
+                size: lutConfig.aerialPerspectiveLutSize || DEFAULT_AERIAL_PERSPECTIVE_LUT_SIZE, // todo: validate / clamp
+                format: AERIAL_PERSPECTIVE_LUT_FORMAT,
+                dimension: '3d',
+                usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING,
+            }));
+        }
+
+
+    }
+
+    public updateAtmosphere(atmosphere: Atmosphere) {
+        this.device.queue.writeBuffer(this.atmosphereBuffer, 0, new Float32Array(atmosphereToFloatArray(atmosphere)));
+    }
+
+    public updateConfig(config: Config) {
+        this.device.queue.writeBuffer(this.configBuffer, 0, new Float32Array(configToFloatArray(config)));
+    }
+
+    public renderTransmittanceLut(computePassEncoder: GPUComputePassEncoder) {}
+
+    public renderMultiScatteringLut(computePassEncoder: GPUComputePassEncoder) {}
+
+    public renderAerialPerspective(computePassEncoder: GPUComputePassEncoder) {}
+}
+
+export function foo(device: GPUDevice, viewMat: number[], projMat: number[], lutConfig: SkyAtmosphereLutConfig = {}): GPUTextureView[] {
     const transmittanceLut = device.createTexture({
         label: 'transmittance LUT',
         size: lutConfig.transmittanceLutSize || DEFAULT_TRANSMITTANCE_LUT_SIZE, // todo: validate / clamp
@@ -375,7 +264,7 @@ export function foo(device: GPUDevice, lutConfig: SkyAtmosphereLutConfig = {tran
                 sampler: {
                     type: 'filtering',
                 },
-            }
+            },
         ],
     });
 
@@ -487,7 +376,7 @@ export function foo(device: GPUDevice, lutConfig: SkyAtmosphereLutConfig = {tran
     });
 
     // Sky View start
-    
+
     const skyViewLutBindGroupLayout = device.createBindGroupLayout({
         label: 'Sky View LUT BindGroup Layout',
         entries: [
@@ -539,7 +428,7 @@ export function foo(device: GPUDevice, lutConfig: SkyAtmosphereLutConfig = {tran
             constants: {
                 SKY_VIEW_LUT_RES_X: skyViewLut.width,
                 SKY_VIEW_LUT_RES_Y: skyViewLut.height,
-                //MULTI_SCATTERING_LUT_RES: multiScatteringLut.width,
+                MULTI_SCATTERING_LUT_RES: multiScatteringLut.width,
             },
         },
     });
@@ -558,17 +447,22 @@ export function foo(device: GPUDevice, lutConfig: SkyAtmosphereLutConfig = {tran
         size: CONFIG_BUFFER_SIZE,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
-    device.queue.writeBuffer(configBuffer, 0, new Float32Array(configToFloatArray(new Config())));
+    const config = new Config();
+    config.camera.inverseView = viewMat;
+    config.camera.inverseProjection = projMat;
+    device.queue.writeBuffer(configBuffer, 0, new Float32Array(configToFloatArray(config)));
 
     const atmosphereBufferBindGroup = device.createBindGroup({
         label: 'Atmosphere buffer bind group',
         layout: atmosphereBufferBindGroupLayout,
-        entries: [{
-            binding: 0,
-            resource: {
-                buffer: atmosphereBuffer,
+        entries: [
+            {
+                binding: 0,
+                resource: {
+                    buffer: atmosphereBuffer,
+                },
             },
-        }],
+        ],
     });
 
     const uniformBufferBindGroup = device.createBindGroup({
@@ -606,19 +500,23 @@ export function foo(device: GPUDevice, lutConfig: SkyAtmosphereLutConfig = {tran
     const samplerBindGroup = device.createBindGroup({
         label: 'Sampler BindGroup',
         layout: samplerBindGroupLayout,
-        entries: [{
-            binding: 0,
-            resource: lutSampler,
-        }],
+        entries: [
+            {
+                binding: 0,
+                resource: lutSampler,
+            },
+        ],
     });
 
     const transmittanceLutOutputBindGroup = device.createBindGroup({
         label: 'Transmittance LUT Ouptut BindGroup',
         layout: transmittanceLutOutputBindGroupLayout,
-        entries: [{
-            binding: 0,
-            resource: transmittanceLutView,
-        }],
+        entries: [
+            {
+                binding: 0,
+                resource: transmittanceLutView,
+            },
+        ],
     });
 
     const multiScatteringLutBindGroup = device.createBindGroup({
@@ -632,7 +530,7 @@ export function foo(device: GPUDevice, lutConfig: SkyAtmosphereLutConfig = {tran
             {
                 binding: 1,
                 resource: multiScatteringLutView,
-            }
+            },
         ],
     });
 

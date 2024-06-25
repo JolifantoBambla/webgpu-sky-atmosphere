@@ -1,12 +1,12 @@
+override IS_Y_UP: bool = true;
+override IS_RIGHT_HANDED: bool = true;
+
 override SKY_VIEW_LUT_RES_X: f32 = 192.0;
 override SKY_VIEW_LUT_RES_Y: f32 = 108.0;
 override MULTI_SCATTERING_LUT_RES: f32 = 32.0;
 
 override WORKGROUP_SIZE_X: u32 = 16;
 override WORKGROUP_SIZE_Y: u32 = 16;
-
-// todo: on/off
-override MULTISCATAPPROX_ENABLED: bool = true;//false;
 
 @group(0) @binding(0) var<uniform> atmosphere_buffer: Atmosphere;
 @group(0) @binding(1) var<uniform> config_buffer: Config;
@@ -78,8 +78,8 @@ fn integrate_scattered_luminance(pix: vec2<f32>, world_pos: vec3<f32>, world_dir
         let earth_shadow = compute_earth_shadow(sample_pos, sun_dir, planet_center + planet_radius_offset * zenith, atmosphere.bottom_radius);
 
 		let phase_times_scattering = medium.mie_scattering * mie_phase_val + medium.rayleigh_scattering * rayleigh_phase_val;
-		// todo: why did I comment that out?
-        var multi_scattered_luminance = vec3<f32>();//= get_multiple_scattering(atmosphere, medium.scattering, medium.extinction, sample_pos, cos_sun_zenith);
+		
+		let multi_scattered_luminance = get_multiple_scattering(atmosphere, medium.scattering, medium.extinction, sample_pos, cos_sun_zenith);
 
 		let scattering = sun_illuminance * (earth_shadow * transmittance_to_sun * phase_times_scattering + multi_scattered_luminance * medium.scattering);
 
@@ -139,9 +139,6 @@ fn move_to_atmosphere_top(world_pos: ptr<function, vec3<f32>>, world_dir: vec3<f
 	return true; // ok to start tracing
 }
 
-override IS_Y_UP: bool = true;
-override IS_RIGHT_HANDED: bool = true;
-
 fn to_z_up_left_handed(v: vec3<f32>) -> vec3<f32> {
     if IS_Y_UP {
         if IS_RIGHT_HANDED {
@@ -156,21 +153,7 @@ fn to_z_up_left_handed(v: vec3<f32>) -> vec3<f32> {
             return v;
         }
     }
-    //return v;
 }
-
-fn get_atmosphere_offset(atmosphere: Atmosphere) -> vec3<f32> {
-    if IS_Y_UP {
-        return vec3<f32>(0.0, atmosphere.bottom_radius, 0.0);
-    } else {
-        return vec3<f32>(0.0, 0.0, atmosphere.bottom_radius);
-    }
-}
-
-fn cam_to_world_pos(cam: vec3<f32>, atmosphere: Atmosphere) -> vec3<f32> {
-    return to_z_up_left_handed(cam + get_atmosphere_offset(atmosphere));
-}
-
 
 @compute
 @workgroup_size(WORKGROUP_SIZE_X, WORKGROUP_SIZE_Y, 1)
@@ -192,8 +175,8 @@ fn render_sky_view_lut(@builtin(global_invocation_id) global_id: vec3<u32>) {
 	let max_sample_count = config_buffer.ray_march_max_spp;
 	let sun_illuminance = config_buffer.sun_illuminance;
 
-	let view_world_pos = cam_to_world_pos(config_buffer.camera_world_position, atmosphere);//to_z_up_left_handed(vec3(0.0065, 0.9850, 0.4620) + vec3(0.0, 6360.0, 0.0)); //cam_to_world_pos(vec3(0.0065, 0.9850, 0.4620), GetAtmosphereDebug());//SKYATMOSPHERE_BUFFER.camera, atmosphere);
-	let world_sun_dir = to_z_up_left_handed(normalize(config_buffer.sun_direction));//vec3(0,1,0));//
+	let view_world_pos = to_z_up_left_handed(config_buffer.camera_world_position) + vec3(0.0, 0.0, atmosphere.bottom_radius);
+	let world_sun_dir = to_z_up_left_handed(normalize(config_buffer.sun_direction));
 
 	let view_height = length(view_world_pos);
 

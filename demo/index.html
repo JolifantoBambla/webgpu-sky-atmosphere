@@ -13,17 +13,20 @@
     <script src="https://wgpu-matrix.org/dist/3.x/wgpu-matrix.min.js"></script>
 
     <script type="module">
-        import { vec3, mat4 } from 'https://wgpu-matrix.org/dist/3.x/wgpu-matrix.module.min.js';
+        import { vec3n, mat4n } from 'https://wgpu-matrix.org/dist/3.x/wgpu-matrix.module.min.js';
+        import { Pane } from 'https://cdn.jsdelivr.net/npm/tweakpane@4.0.3/dist/tweakpane.min.js';
 
         import { SkyAtmospherePasses, foo } from '../dist/1.x/webgpu-sky-atmosphere.module.min.js';
 
         async function main() {
+            const resolution = [1920, 1080];
+
             const adapter = await navigator.gpu.requestAdapter();
             const device = await adapter.requestDevice();
 
             const canvas = document.querySelector('canvas');
-            canvas.width = 1920;
-            canvas.height = 1080;
+            canvas.width = resolution[0];
+            canvas.height = resolution[1];
 
             const context = canvas.getContext('webgpu');
             const presentationFormat = navigator.gpu.getPreferredCanvasFormat();
@@ -32,7 +35,52 @@
                 format: presentationFormat,
             });
 
-            const [transmittanceLutView, multiScatterngLutView, skyViewLutView] = foo(device);
+            const params = {
+                showTransmittanceLut: true,
+
+                showMultiScatteringLut: true,
+                multiScatteringLutFactor: 50.0,
+                
+                showSkyViewLut: true,
+                skyViewLutFactor: 50.0,
+                
+                showAerialPerspectiveLut: true,
+                aerialPerspectiveLutFactor: 50.0,
+                aerialPerspectiveSlice: 0,
+
+                sunIlluminance: {r: 1.0, g: 1.0, b: 1.0},
+                sunIlluminanceFactor: 1.0,
+
+                rayMarchingMinSpp: 14,
+                rayMarchingMaxSpp: 30,
+
+                // todo: atmosphere
+            };
+
+            const pane = new Pane();
+            pane.addBinding(params, 'aerialPerspectiveSlice', {min: 0, max: 31, step: 1, label: 'Aerial persp. slice'});
+
+            const projection = mat4n.perspectiveReverseZ(
+                90.0 * (Math.PI / 180.0),
+                resolution[0] / resolution[1],
+                1.0,
+            );
+
+            function getCameraView(origin = vec3n.fromValues(0, 1, 0), upVector = vec3n.fromValues(0, 1, 0)) {
+                const targetPosition = vec3n.fromValues(0, 50, -100);
+
+                const rad = Math.PI * (Date.now() / 2000);
+                const rotation = mat4n.rotateY(mat4n.translation(origin), rad);
+                vec3n.transformMat4(targetPosition, rotation, targetPosition);
+
+                return mat4n.lookAt(origin, targetPosition, upVector);
+            }
+
+            const [transmittanceLutView, multiScatterngLutView, skyViewLutView] = foo(
+                device,
+                mat4n.inverse(getCameraView()),
+                mat4n.inverse(projection),
+            );
 
             function makePipeline() {
                 const module = device.createShaderModule({
@@ -46,6 +94,10 @@
                         return vec4(vec2(f32((vertex_index << 1) & 2), f32(vertex_index & 2)) * 2 - 1, 0, 1);
                     }
                     
+                    fn coords_in_rect(coords: vec2<u32>, rect_min: vec2<u32>, rect_max: vec2<u32>) -> bool {
+                        return all(coords >= rect_min) && all(coords < rect_max);
+                    }
+
                     @fragment
                     fn fragment(@builtin(position) coord: vec4<f32>) -> @location(0) vec4<f32> {
                         let texture_coords = vec2<u32>(floor(coord.xy));
@@ -53,15 +105,19 @@
                         let transmittance_lut_size = textureDimensions(transmittance_lut, 0);
                         let multi_scattering_lut_size = textureDimensions(multi_scattering_lut, 0);
                         let sky_view_lut_size = textureDimensions(sky_view_lut, 0);
+
+                        let transmittance_lut_min_rect = vec2<u32>();
+                        let multi_scattering_lut_min_rect = transmittance_lut_min_rect + vec2<u32>(0, transmittance_lut_size.y);
+                        let sky_view_lut_min_rect = multi_scattering_lut_min_rect + vec2<u32>(0, multi_scattering_lut_size.y);
                         
-                        if texture_coords.x < transmittance_lut_size.x && texture_coords.y < transmittance_lut_size.y {
+                        if coords_in_rect(texture_coords, transmittance_lut_min_rect, transmittance_lut_min_rect + transmittance_lut_size) {
                             return vec4(vec3<f32>(textureLoad(transmittance_lut, texture_coords, 0).rgb), 1.0);
-                        } else if texture_coords.x < multi_scattering_lut_size.x && texture_coords.y < transmittance_lut_size.y + multi_scattering_lut_size.y {
+                        } else if coords_in_rect(texture_coords, multi_scattering_lut_min_rect, multi_scattering_lut_min_rect + multi_scattering_lut_size) {
                             return vec4(vec3<f32>(textureLoad(multi_scattering_lut, vec2<u32>(texture_coords.x, texture_coords.y - transmittance_lut_size.y), 0).rgb) * 50.0, 1.0);
-                        } else if texture_coords.x < sky_view_lut_size.x && texture_coords.y < transmittance_lut_size.y + multi_scattering_lut_size.y + sky_view_lut_size.y {
+                        } else if coords_in_rect(texture_coords, sky_view_lut_min_rect, sky_view_lut_min_rect + sky_view_lut_size) {
                             return vec4(vec3<f32>(textureLoad(sky_view_lut, vec2<u32>(texture_coords.x, texture_coords.y - transmittance_lut_size.y - multi_scattering_lut_size.y), 0).rgb) * 50.0, 1.0);
                         } else {
-                            return vec4(0.0, 0.0, 0.0, 1.0);
+                            return vec4(0.5, 0.5, 0.5, 1.0);
                         }
                     }
                     `,
