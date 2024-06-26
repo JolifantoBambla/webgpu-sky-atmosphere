@@ -76,41 +76,41 @@ struct MediumSample {
  * origin is the planet's center
  */
 fn sample_medium_extinction(height: f32, atmosphere: Atmosphere) -> vec3<f32> {
-    let densityMie: f32 = exp(atmosphere.mie_density_exp_scale * height);
-    let densityRayleigh: f32 = exp(atmosphere.rayleigh_density_exp_scale * height);
-    var densityOzone: f32;
+    let mie_density: f32 = exp(atmosphere.mie_density_exp_scale * height);
+    let rayleigh_density: f32 = exp(atmosphere.rayleigh_density_exp_scale * height);
+    var absorption_density: f32;
     if height < atmosphere.absorption_density_0_layer_width {
-        densityOzone = saturate(atmosphere.absorption_density_0_linear_term * height + atmosphere.absorption_density_0_constant_term);
+        absorption_density = saturate(atmosphere.absorption_density_0_linear_term * height + atmosphere.absorption_density_0_constant_term);
     } else {
-        densityOzone = saturate(atmosphere.absorption_density_1_linear_term * height + atmosphere.absorption_density_1_constant_term);
+        absorption_density = saturate(atmosphere.absorption_density_1_linear_term * height + atmosphere.absorption_density_1_constant_term);
     }
 
-    let extinctionMie = densityMie * atmosphere.mie_extinction;
-    let extinctionRayleigh = densityRayleigh * atmosphere.rayleigh_scattering;
-    let extinctionOzone = densityOzone * atmosphere.absorption_extinction;
+    let mie_extinction = mie_density * atmosphere.mie_extinction;
+    let rayleigh_extinction = rayleigh_density * atmosphere.rayleigh_scattering;
+    let absorption_extinction = absorption_density * atmosphere.absorption_extinction;
 
-    return extinctionMie + extinctionRayleigh + extinctionOzone;
+    return mie_extinction + rayleigh_extinction + absorption_extinction;
 }
 
 fn sample_medium(height: f32, atmosphere: Atmosphere) -> MediumSample {
-	let densityMie: f32 = exp(atmosphere.mie_density_exp_scale * height);
-	let densityRay: f32 = exp(atmosphere.rayleigh_density_exp_scale * height);
-	var densityOzo: f32;
+	let mie_density: f32 = exp(atmosphere.mie_density_exp_scale * height);
+	let rayleigh_density: f32 = exp(atmosphere.rayleigh_density_exp_scale * height);
+	var absorption_density: f32;
 	if height < atmosphere.absorption_density_0_layer_width {
-	    densityOzo = saturate(atmosphere.absorption_density_0_linear_term * height + atmosphere.absorption_density_0_constant_term);
+	    absorption_density = saturate(atmosphere.absorption_density_0_linear_term * height + atmosphere.absorption_density_0_constant_term);
 	} else {
-	    densityOzo = saturate(atmosphere.absorption_density_1_linear_term * height + atmosphere.absorption_density_1_constant_term);
+	    absorption_density = saturate(atmosphere.absorption_density_1_linear_term * height + atmosphere.absorption_density_1_constant_term);
 	}
 
 	var s: MediumSample;
-	s.mie_scattering = densityMie * atmosphere.mie_scattering;
-	s.rayleigh_scattering = densityRay * atmosphere.rayleigh_scattering;
+	s.mie_scattering = mie_density * atmosphere.mie_scattering;
+	s.rayleigh_scattering = rayleigh_density * atmosphere.rayleigh_scattering;
 	s.scattering = s.mie_scattering + s.rayleigh_scattering;
 
-	let extinctionMie = densityMie * atmosphere.mie_extinction;
-	let extinctionRay = s.rayleigh_scattering;
-	let extinctionOzo = densityOzo * atmosphere.absorption_extinction;
-	s.extinction = extinctionMie + extinctionRay + extinctionOzo;
+	let mie_extinction = mie_density * atmosphere.mie_extinction;
+	let rayleigh_extinction = s.rayleigh_scattering;
+	let absorption_extinction = absorption_density * atmosphere.absorption_extinction;
+	s.extinction = mie_extinction + rayleigh_extinction + absorption_extinction;
 
 	return s;
 }
