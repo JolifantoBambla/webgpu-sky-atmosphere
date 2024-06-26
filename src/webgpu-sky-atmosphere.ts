@@ -572,7 +572,7 @@ export class SkyAtmospherePasses {
                     module: device.createShaderModule({
                         code: makeAerialPerspectiveLutShaderCode(),
                     }),
-                    entryPoint: 'render_sky_atmosphere_camera_volume',
+                    entryPoint: 'render_aerial_perspective_lut',
                     constants: {
                         MULTI_SCATTERING_LUT_RES: this.multiScatteringLut.texture.width,
                     },
@@ -620,7 +620,9 @@ export class SkyAtmospherePasses {
         this.skyViewLutPass.encode(computePassEncoder);
     }
 
-    public renderAerialPerspective(computePassEncoder: GPUComputePassEncoder) {}
+    public renderAerialPerspective(computePassEncoder: GPUComputePassEncoder) {
+        this.aerialPerspectiveLutPass.encode(computePassEncoder);
+    }
 
     public renderSky(computePassEncoder: GPUComputePassEncoder) {}
 

@@ -89,7 +89,7 @@ fn thread_z_to_slice(thread_z: u32) -> f32 {
 
 @compute
 @workgroup_size(WORKGROUP_SIZE_X, WORKGROUP_SIZE_Y, 1)
-fn render_sky_atmosphere_camera_volume(@builtin(global_invocation_id) global_id: vec3<u32>) {
+fn render_aerial_perspective_lut(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let output_size = vec2<u32>(textureDimensions(aerial_perspective_lut).xy);
     if output_size.x <= global_id.x || output_size.y <= global_id.y {
         return;
