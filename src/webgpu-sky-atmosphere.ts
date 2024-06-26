@@ -165,7 +165,7 @@ export class SkyAtmospherePasses {
     private multiScatteringLutPass: ComputePass;
     private skyViewLutPass: ComputePass;
     private aerialPerspectiveLutPass: ComputePass;
-    
+
     constructor(device: GPUDevice, config2: SkyAtmosphereConfig = {}, atmosphere: Atmosphere = makeEarthAtmosphere(), lutConfig: SkyAtmosphereLutConfig = {}) {
         this.device = device;
 
@@ -315,7 +315,7 @@ export class SkyAtmospherePasses {
                     },
                 ],
             });
-        
+
             const transmittanceLutPipeline = device.createComputePipeline({
                 label: 'Transmittance LUT pipeline',
                 layout: device.createPipelineLayout({
@@ -393,7 +393,7 @@ export class SkyAtmospherePasses {
                     },
                 ],
             });
-        
+
             const multiScatteringLutPipeline = device.createComputePipeline({
                 label: 'Multi-Scattering LUT pipeline',
                 layout: device.createPipelineLayout({
@@ -414,7 +414,7 @@ export class SkyAtmospherePasses {
                     },
                 },
             });
-            
+
             this.multiScatteringLutPass = new ComputePass(
                 multiScatteringLutPipeline,
                 [uniformBufferBindGroup, samplerBindGroup, multiScatteringLutBindGroup],
@@ -474,7 +474,7 @@ export class SkyAtmospherePasses {
                     },
                 ],
             });
-        
+
             const skyViewLutPipeline = device.createComputePipeline({
                 label: 'Sky view LUT pipeline',
                 layout: device.createPipelineLayout({
@@ -557,7 +557,7 @@ export class SkyAtmospherePasses {
                     },
                 ],
             });
-        
+
             const aerialPerspectiveLutPipeline = device.createComputePipeline({
                 label: 'Aerial perspective LUT pipeline',
                 layout: device.createPipelineLayout({
@@ -633,7 +633,7 @@ export class SkyAtmospherePasses {
             this.renderTransmittanceLut(computePassEncoder);
             this.renderMultiScatteringLut(computePassEncoder);
         }
-        
+
         if (config) {
             this.updateConfig(config);
         }

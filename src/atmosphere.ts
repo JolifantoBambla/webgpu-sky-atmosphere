@@ -3,7 +3,7 @@ export interface Rayleigh {
      * Rayleigh scattering exponential distribution scale in the atmosphere
      */
 	densityExpScale: number,
-	
+
     /**
      * Rayleigh scattering coefficients (per kilometer)
      */
@@ -15,17 +15,17 @@ export interface Mie {
      * Mie scattering exponential distribution scale in the atmosphere
      */
 	densityExpScale: number,
-	
+
     /**
      * Mie scattering coefficients (per kilometer)
      */
 	scattering: [number, number, number],
-	
+
     /**
      * Mie extinction coefficients (per kilometer)
      */
 	extinction: [number, number, number],
-	
+
     /**
      * Mie phase function excentricity
      */
