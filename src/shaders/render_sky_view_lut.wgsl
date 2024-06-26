@@ -1,6 +1,3 @@
-override IS_Y_UP: bool = true;
-override IS_RIGHT_HANDED: bool = true;
-
 override SKY_VIEW_LUT_RES_X: f32 = 192.0;
 override SKY_VIEW_LUT_RES_Y: f32 = 108.0;
 override MULTI_SCATTERING_LUT_RES: f32 = 32.0;
@@ -17,13 +14,7 @@ override WORKGROUP_SIZE_Y: u32 = 16;
 @group(2) @binding(1) var multi_scattering_lut: texture_2d<f32>;
 @group(2) @binding(2) var sky_view_lut : texture_storage_2d<rgba16float, write>;
 
-fn get_multiple_scattering(atmosphere: Atmosphere, scattering: vec3<f32>, extinction: vec3<f32>, worl_pos: vec3<f32>, cos_view_zenith: f32) -> vec3<f32> {
-    var uv = saturate(vec2(cos_view_zenith * 0.5 + 0.5, (length(worl_pos) - atmosphere.bottom_radius) / (atmosphere.top_radius - atmosphere.bottom_radius)));
-	uv = vec2(from_unit_to_sub_uvs(uv.x, MULTI_SCATTERING_LUT_RES), from_unit_to_sub_uvs(uv.y, MULTI_SCATTERING_LUT_RES));
-	return textureSampleLevel(multi_scattering_lut, lut_sampler, uv, 0).rgb;
-}
-
-fn integrate_scattered_luminance(pix: vec2<f32>, world_pos: vec3<f32>, world_dir: vec3<f32>, sun_dir: vec3<f32>, atmosphere: Atmosphere, sun_illuminance: vec3<f32>, min_sample_count: f32, max_sample_count: f32) -> vec3<f32> {
+fn integrate_scattered_luminance(world_pos: vec3<f32>, world_dir: vec3<f32>, sun_dir: vec3<f32>, atmosphere: Atmosphere, sun_illuminance: vec3<f32>, min_sample_count: f32, max_sample_count: f32) -> vec3<f32> {
 	// Compute next intersection with atmosphere or ground
 	let planet_center = vec3<f32>();
     var t_max: f32 = 0.0;
@@ -75,13 +66,13 @@ fn integrate_scattered_luminance(pix: vec2<f32>, world_pos: vec3<f32>, world_dir
 		let medium = sample_medium(sample_height - atmosphere.bottom_radius, atmosphere);
 		let sample_transmittance = exp(-medium.extinction * dt);
 
-        let earth_shadow = compute_earth_shadow(sample_pos, sun_dir, planet_center + planet_radius_offset * zenith, atmosphere.bottom_radius);
+        let planet_shadow = compute_planet_shadow(sample_pos, sun_dir, planet_center + planet_radius_offset * zenith, atmosphere.bottom_radius);
 
 		let phase_times_scattering = medium.mie_scattering * mie_phase_val + medium.rayleigh_scattering * rayleigh_phase_val;
 		
 		let multi_scattered_luminance = get_multiple_scattering(atmosphere, medium.scattering, medium.extinction, sample_pos, cos_sun_zenith);
 
-		let scattering = sun_illuminance * (earth_shadow * transmittance_to_sun * phase_times_scattering + multi_scattered_luminance * medium.scattering);
+		let scattering = sun_illuminance * (planet_shadow * transmittance_to_sun * phase_times_scattering + multi_scattered_luminance * medium.scattering);
 
         let scattering_int = (scattering - scattering * sample_transmittance) / medium.extinction;	// integrate along the current step segment
         luminance += throughput * scattering_int;														// accumulate and also take into account the transmittance from previous steps
@@ -123,38 +114,6 @@ fn compute_world_dir(uv_in: vec2<f32>, sky_view_res: vec2<f32>, view_height: f32
     );
 }
 
-fn move_to_atmosphere_top(world_pos: ptr<function, vec3<f32>>, world_dir: vec3<f32>, top_radius: f32) -> bool {
-	let view_height = length(*world_pos);
-	if view_height > top_radius {
-		let t_top = find_closest_ray_sphere_intersection(*world_pos, world_dir, vec3(), top_radius);
-		if t_top >= 0.0 {
-			let zenith = *world_pos / view_height;
-			let zenith_offset = zenith * -planet_radius_offset;
-			*world_pos = *world_pos + world_dir * t_top + zenith_offset;
-		} else {
-			// Ray is not intersecting the atmosphere
-			return false;
-		}
-	}
-	return true; // ok to start tracing
-}
-
-fn to_z_up_left_handed(v: vec3<f32>) -> vec3<f32> {
-    if IS_Y_UP {
-        if IS_RIGHT_HANDED {
-            return vec3<f32>(v.x, v.z, v.y);
-        } else {
-            return vec3<f32>(v.x, -v.z, v.y);
-        }
-    } else {
-        if IS_RIGHT_HANDED {
-            return vec3<f32>(v.x, -v.y, v.z);
-        } else {
-            return v;
-        }
-    }
-}
-
 @compute
 @workgroup_size(WORKGROUP_SIZE_X, WORKGROUP_SIZE_Y, 1)
 fn render_sky_view_lut(@builtin(global_invocation_id) global_id: vec3<u32>) {
@@ -191,7 +150,7 @@ fn render_sky_view_lut(@builtin(global_invocation_id) global_id: vec3<u32>) {
         return;
 	}
 
-	let luminance = integrate_scattered_luminance(pix, world_pos, world_dir, sun_dir, atmosphere, sun_illuminance, min_sample_count, max_sample_count);
+	let luminance = integrate_scattered_luminance(world_pos, world_dir, sun_dir, atmosphere, sun_illuminance, min_sample_count, max_sample_count);
 
     textureStore(sky_view_lut, global_id.xy, vec4<f32>(luminance, 1));
 }

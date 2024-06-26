@@ -1,136 +1,114 @@
-export class Rayleigh {
+export interface Rayleigh {
 	/**
      * Rayleigh scattering exponential distribution scale in the atmosphere
      */
-	public densityExpScale: number;
-	/**
+	densityExpScale: number,
+	
+    /**
      * Rayleigh scattering coefficients (per kilometer)
      */
-	public scattering: [number, number, number];
-
-    constructor(densityExpScale: number, scattering: [number, number, number]) {
-        this.densityExpScale = densityExpScale;
-        this.scattering = scattering;
-    }
+	scattering: [number, number, number],
 }
 
-export class Mie {
+export interface Mie {
 	/**
      * Mie scattering exponential distribution scale in the atmosphere
      */
-	public densityExpScale: number;
-	/**
+	densityExpScale: number,
+	
+    /**
      * Mie scattering coefficients (per kilometer)
      */
-	public scattering: [number, number, number];
-	/**
+	scattering: [number, number, number],
+	
+    /**
      * Mie extinction coefficients (per kilometer)
      */
-	public extinction: [number, number, number];
-	/**
-     * Mie absorption coefficients (per kilometer)
-     */
-	//public absorption: [number, number, number];
-	/**
+	extinction: [number, number, number],
+	
+    /**
      * Mie phase function excentricity
      */
-	public phaseG: number;
-
-    constructor(densityExpScale: number, scattering: [number, number, number], extinction: [number, number, number], phaseG: number) {
-        this.densityExpScale = densityExpScale;
-        this.scattering = scattering;
-        this.extinction = extinction;
-        this.phaseG = phaseG;
-    }
+	phaseG: number,
 }
 
-export class AbsorptionLayer0 {
+export interface AbsorptionLayer0 {
     /**
      * In kilometers
      */
-    public width: number;
-    public constantTerm: number;
-    public linearTerm: number;
-
-    constructor(width: number, constantTerm: number, linearTerm: number) {
-        this.width = width;
-        this.constantTerm = constantTerm;
-        this.linearTerm = linearTerm;
-    }
+    width: number,
+    constantTerm: number,
+    linearTerm: number,
 }
 
-export class AbsorptionLayer1 {
-    public constantTerm: number;
-    public linearTerm: number;
-
-    constructor(constantTerm: number, linearTerm: number) {
-        this.constantTerm = constantTerm;
-        this.linearTerm = linearTerm;
-    }
+export interface AbsorptionLayer1 {
+    constantTerm: number,
+    linearTerm: number,
 }
 
 /**
  * Another medium type in the atmosphere
  */
-export class Absorption {
-    public layer0: AbsorptionLayer0;
-    public layer1: AbsorptionLayer1;
+export interface Absorption {
+    layer0: AbsorptionLayer0,
+    layer1: AbsorptionLayer1,
+
     /**
     * This other medium only absorb light, e.g. useful to represent ozone in the earth atmosphere (per kilometer)
     */
-   public extinction: [number, number, number];
-
-    constructor(layer0: AbsorptionLayer0, layer1: AbsorptionLayer1, extinction: [number, number, number]) {
-        this.layer0 = layer0;
-        this.layer1 = layer1;
-        this.extinction = extinction;
-    }
+   extinction: [number, number, number],
 }
 
-export class Atmosphere {
+export interface Atmosphere {
     /**
      * Radius of the planet in kilometers (center to ground)
      */
-	public bottomRadius: number;
+	bottomRadius: number,
+
     /**
      * Height of atmosphere in kilometers (distance from {@link bottomRadius} to atmosphere top)
      * Clamped to max(height, 0)
      */
-	public height: number;
+	height: number,
 
-    public rayleighComponent: Rayleigh;
-    public mieComponent: Mie;
-	public apsorptionComponent: Absorption;
+    rayleigh: Rayleigh,
+    mie: Mie,
+	absorption: Absorption,
 
 	/**
      * The albedo of the ground.
      */
-	public groundAlbedo: [number, number, number];
+	groundAlbedo: [number, number, number],
+}
 
-    constructor(bottomRadius: number, height: number, rayleighComponent: Rayleigh, mieComponent: Mie, absorptionComponent: Absorption, groundAlbedo: [number, number, number]) {
-        this.bottomRadius = bottomRadius;
-        this.height = Math.max(height, 0.0);
-        this.rayleighComponent = rayleighComponent;
-        this.mieComponent = mieComponent;
-        this.apsorptionComponent = absorptionComponent;
-        this.groundAlbedo = groundAlbedo;
-    }
-
-    // todo: interfaces are nicer I guess?
-    public static earth(): Atmosphere {
-        const rayleighScaleHeight = 8.0;
-        const mieScaleHeight = 1.2;
-        return new Atmosphere(
-            6360.0,
-            100.0,
-            new Rayleigh(-1.0 / rayleighScaleHeight, [0.005802, 0.013558, 0.033100]),
-            new Mie(-1.0 / mieScaleHeight, [0.003996, 0.003996, 0.003996], [0.004440, 0.004440, 0.004440], 0.8),
-            new Absorption(
-                new AbsorptionLayer0(25.0, -2.0 / 3.0, 1.0 / 15.0),
-                new AbsorptionLayer1(8.0 / 3.0, -1.0 / 15.0),
-                [0.000650, 0.001881, 0.000085],
-            ),
-            [0.0, 0.0, 0.0],
-        );
-    }
+export function makeEarthAtmosphere(): Atmosphere {
+    const rayleighScaleHeight = 8.0;
+    const mieScaleHeight = 1.2;
+    return {
+        bottomRadius: 6360.0,
+        height: 100.0,
+        rayleigh: {
+            densityExpScale: -1.0 / rayleighScaleHeight,
+            scattering: [0.005802, 0.013558, 0.033100],
+        },
+        mie: {
+            densityExpScale: -1.0 / mieScaleHeight,
+            scattering: [0.003996, 0.003996, 0.003996],
+            extinction: [0.004440, 0.004440, 0.004440],
+            phaseG: 0.8,
+        },
+        absorption: {
+            layer0: {
+                width: 25.0,
+                constantTerm: -2.0 / 3.0,
+                linearTerm: 1.0 / 15.0,
+            },
+            layer1: {
+                constantTerm: 8.0 / 3.0,
+                linearTerm: -1.0 / 15.0,
+            },
+            extinction: [0.000650, 0.001881, 0.000085],
+        },
+        groundAlbedo: [0.0, 0.0, 0.0],
+    };
 }
