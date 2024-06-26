@@ -312,6 +312,11 @@
                 const config = makeDefaultConfig();
                 config.camera.inverseView = mat4n.inverse(getCameraView());
                 config.camera.inverseProjection = mat4n.inverse(projection);
+                config.sun.illuminance = [
+                    params.renderSettings.sun.illuminance.r,
+                    params.renderSettings.sun.illuminance.g,
+                    params.renderSettings.sun.illuminance.b,
+                ].map(c => c * params.renderSettings.sun.illuminanceFactor);
 
                 const computePass = encoder.beginComputePass();
                 skyAtmospherePasses.renderSkyAtmosphere(computePass, false, false, config, params.atmosphere);

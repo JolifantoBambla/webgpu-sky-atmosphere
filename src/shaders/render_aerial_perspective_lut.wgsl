@@ -45,7 +45,7 @@ fn integrate_scattered_luminance(
 	let mie_phase_val: f32 = cornette_shanks_phase(atmosphere.mie_phase_g, -cos_theta);	// negate cos_theta because due to world_dir being a "in" direction.
 	let rayleigh_phase_val: f32 = rayleigh_phase(cos_theta);
 
-	result.luminance = vec3<f32>(1.0);
+	result.transmittance = vec3<f32>(1.0);
 	var t = 0.0;
 	var dt_exact = 0.0;
 	for (var s: f32 = 0.0; s < sample_count; s += 1.0) {
@@ -64,7 +64,7 @@ fn integrate_scattered_luminance(
 		let medium = sample_medium(sample_height - atmosphere.bottom_radius, atmosphere);
 		let sample_transmittance = exp(-medium.extinction * dt_exact);
 
-		let planet_shadow = f32(!ray_intersects_sphere(sample_pos, sun_dir, planet_center + planet_radius_offset * zenith, atmosphere.bottom_radius));
+		let planet_shadow = compute_planet_shadow(sample_pos, sun_dir, planet_center + planet_radius_offset * zenith, atmosphere.bottom_radius);
 
 		let phase_times_scattering = medium.mie_scattering * mie_phase_val + medium.rayleigh_scattering * rayleigh_phase_val;
 
