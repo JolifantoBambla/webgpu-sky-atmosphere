@@ -41,13 +41,13 @@
                     showTransmittanceLut: true,
 
                     showMultiScatteringLut: true,
-                    multiScatteringLutFactor: 50.0,
+                    multiScatteringLutFactor: 50,
                     
                     showSkyViewLut: true,
-                    skyViewLutFactor: 50.0,
+                    skyViewLutFactor: 50,
                     
                     showAerialPerspectiveLut: true,
-                    aerialPerspectiveLutFactor: 50.0,
+                    aerialPerspectiveLutFactor: 50,
                     aerialPerspectiveSlice: 0,
                 },
                 config: makeDefaultConfig(),
@@ -108,13 +108,13 @@
                 debugViewFolder.addBinding(params.debugViews, 'showTransmittanceLut', {label: 'Show transmittance LUT'});
 
                 debugViewFolder.addBinding(params.debugViews, 'showMultiScatteringLut', {label: 'Show multi. scat. LUT'});
-                debugViewFolder.addBinding(params.debugViews, 'multiScatteringLutFactor', {min: 1.0, max: 100.0, step: 1, label: 'Multi. scat. scale'});
+                debugViewFolder.addBinding(params.debugViews, 'multiScatteringLutFactor', {min: 1, max: 100, step: 1, label: 'Multi. scat. scale'});
                 
                 debugViewFolder.addBinding(params.debugViews, 'showSkyViewLut', {label: 'Show sky view LUT'});
-                debugViewFolder.addBinding(params.debugViews, 'skyViewLutFactor', {min: 1.0, max: 100.0, step: 1, label: 'Sky view scale'});
+                debugViewFolder.addBinding(params.debugViews, 'skyViewLutFactor', {min: 1, max: 100, step: 1, label: 'Sky view scale'});
                 
                 debugViewFolder.addBinding(params.debugViews, 'showAerialPerspectiveLut', {label: 'Show aerial persp. LUT'});
-                debugViewFolder.addBinding(params.debugViews, 'aerialPerspectiveLutFactor', {min: 1.0, max: 100.0, step: 1, label: 'Aerial persp. scale'});
+                debugViewFolder.addBinding(params.debugViews, 'aerialPerspectiveLutFactor', {min: 1, max: 100, step: 1, label: 'Aerial persp. scale'});
                 debugViewFolder.addBinding(params.debugViews, 'aerialPerspectiveSlice', {min: 0, max: 31, step: 1, label: 'Aerial persp. slice'});
 
                 const renderSettingsFolder = pane.addFolder({
@@ -196,6 +196,13 @@
                 const module = device.createShaderModule({
                     code: `
                     struct Config {
+                        show_transmittance_lut: u32,
+                        show_multi_scattering_lut: u32,
+                        multi_scattering_scale: u32,
+                        show_sky_view_lut: u32,
+                        sky_view_lut_scale: u32,
+                        show_aerial_perspective: u32,
+                        aerial_perspective_scale: u32,
                         aerial_perspective_slice: u32,
                     }
                     @group(0) @binding(0) var<uniform> config: Config;
@@ -227,14 +234,14 @@
                         let sky_view_lut_min_rect = multi_scattering_lut_min_rect + vec2<u32>(0, multi_scattering_lut_size.y);
                         let aerial_perspective_lut_min_rect = sky_view_lut_min_rect + vec2<u32>(0, sky_view_lut_size.y);
                         
-                        if coords_in_rect(texture_coords, transmittance_lut_min_rect, transmittance_lut_min_rect + transmittance_lut_size) {
+                        if config.show_transmittance_lut == 1 && coords_in_rect(texture_coords, transmittance_lut_min_rect, transmittance_lut_min_rect + transmittance_lut_size) {
                             return vec4(vec3<f32>(textureLoad(transmittance_lut, texture_coords, 0).rgb), 1.0);
-                        } else if coords_in_rect(texture_coords, multi_scattering_lut_min_rect, multi_scattering_lut_min_rect + multi_scattering_lut_size) {
-                            return vec4(vec3<f32>(textureLoad(multi_scattering_lut, vec2<u32>(texture_coords.x, texture_coords.y - transmittance_lut_size.y), 0).rgb) * 50.0, 1.0);
-                        } else if coords_in_rect(texture_coords, sky_view_lut_min_rect, sky_view_lut_min_rect + sky_view_lut_size) {
-                            return vec4(vec3<f32>(textureLoad(sky_view_lut, vec2<u32>(texture_coords.x, texture_coords.y - transmittance_lut_size.y - multi_scattering_lut_size.y), 0).rgb) * 50.0, 1.0);
-                        } else if coords_in_rect(texture_coords, aerial_perspective_lut_min_rect, aerial_perspective_lut_min_rect + aerial_perspective_lut_size) {
-                            return vec4(vec3<f32>(textureLoad(aerial_perspective_lut, vec3<u32>(texture_coords.x, texture_coords.y - transmittance_lut_size.y - multi_scattering_lut_size.y - sky_view_lut_size.y, config.aerial_perspective_slice), 0).rgb) * 50.0, 1.0);
+                        } else if config.show_multi_scattering_lut == 1 && coords_in_rect(texture_coords, multi_scattering_lut_min_rect, multi_scattering_lut_min_rect + multi_scattering_lut_size) {
+                            return vec4(vec3<f32>(textureLoad(multi_scattering_lut, vec2<u32>(texture_coords.x, texture_coords.y - transmittance_lut_size.y), 0).rgb) * f32(config.multi_scattering_scale), 1.0);
+                        } else if config.show_sky_view_lut == 1 && coords_in_rect(texture_coords, sky_view_lut_min_rect, sky_view_lut_min_rect + sky_view_lut_size) {
+                            return vec4(vec3<f32>(textureLoad(sky_view_lut, vec2<u32>(texture_coords.x, texture_coords.y - transmittance_lut_size.y - multi_scattering_lut_size.y), 0).rgb) * f32(config.sky_view_lut_scale), 1.0);
+                        } else if config.show_aerial_perspective == 1 && coords_in_rect(texture_coords, aerial_perspective_lut_min_rect, aerial_perspective_lut_min_rect + aerial_perspective_lut_size) {
+                            return vec4(vec3<f32>(textureLoad(aerial_perspective_lut, vec3<u32>(texture_coords.x, texture_coords.y - transmittance_lut_size.y - multi_scattering_lut_size.y - sky_view_lut_size.y, config.aerial_perspective_slice), 0).rgb) * f32(config.aerial_perspective_scale), 1.0);
                         } else {
                             return vec4(0.5, 0.5, 0.5, 1.0);
                         }
@@ -257,7 +264,7 @@
 
             const presentPipeline = makePipeline();
             const debugViewConfigBuffer = device.createBuffer({
-                size: 4,
+                size: 32,
                 usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
             });
             const bindGroup = device.createBindGroup({
@@ -291,14 +298,23 @@
             const render = () => {
                 const encoder = device.createCommandEncoder();
 
-                device.queue.writeBuffer(debugViewConfigBuffer, 0, new Uint32Array([params.debugViews.aerialPerspectiveSlice]));
+                device.queue.writeBuffer(debugViewConfigBuffer, 0, new Uint32Array([
+                    params.debugViews.showTransmittanceLut,
+                    params.debugViews.showMultiScatteringLut,
+                    params.debugViews.multiScatteringLutFactor,
+                    params.debugViews.showSkyViewLut,
+                    params.debugViews.skyViewLutFactor,
+                    params.debugViews.showAerialPerspectiveLut,
+                    params.debugViews.aerialPerspectiveLutFactor,
+                    params.debugViews.aerialPerspectiveSlice,
+                ]));
 
                 const config = makeDefaultConfig();
                 config.camera.inverseView = mat4n.inverse(getCameraView());
                 config.camera.inverseProjection = mat4n.inverse(projection);
 
                 const computePass = encoder.beginComputePass();
-                skyAtmospherePasses.renderSkyAtmosphere(computePass, false, true, config, params.atmosphere);
+                skyAtmospherePasses.renderSkyAtmosphere(computePass, false, false, config, params.atmosphere);
                 computePass.end();
 
                 const pass = encoder.beginRenderPass({
