@@ -14,6 +14,7 @@ import {
     makeMultiScatteringLutShaderCode,
     makeSkyViewLutShaderCode,
     makeAerialPerspectiveLutShaderCode,
+    makeRenderSkyWithLutsShaderCode,
 } from './shaders.js';
 
 
@@ -588,6 +589,12 @@ export class SkyAtmospherePasses {
                     this.aerialPerspectiveLut.texture.depthOrArrayLayers,
                 ],
             );
+        }
+
+        {
+            device.createShaderModule({
+                code: makeRenderSkyWithLutsShaderCode(),
+            });
         }
 
         if (config2.initializeConstantLutsAtCreation) {

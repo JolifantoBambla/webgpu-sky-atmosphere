@@ -61,7 +61,7 @@ fn integrate_scattered_luminance(world_pos: vec3<f32>, world_dir: vec3<f32>, sun
 		let medium = sample_medium(sample_height - atmosphere.bottom_radius, atmosphere);
 		let sample_transmittance = exp(-medium.extinction * dt_exact);
 
-		let planet_shadow = f32(!ray_intersects_sphere(sample_pos, sun_dir, planet_center + planet_radius_offset * zenith, atmosphere.bottom_radius));
+		let planet_shadow = compute_planet_shadow(sample_pos, sun_dir, planet_center + planet_radius_offset * zenith, atmosphere.bottom_radius);
         let scat = planet_shadow * transmittance_to_sun * (medium.scattering * isotropic_phase);
 
         result.multi_scattering += throughput * (medium.scattering - medium.scattering * sample_transmittance) / medium.extinction;

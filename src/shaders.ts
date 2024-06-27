@@ -12,6 +12,8 @@ import renderMultiScatteringLutWgsl from './shaders/render_multi_scattering_lut.
 import renderSkyViewLutWgsl from './shaders/render_sky_view_lut.wgsl';
 import renderAerialPerspectiveWgsl from './shaders/render_aerial_perspective_lut.wgsl';
 
+import renderSkyWithLutsWgsl from './shaders/render_sky_with_luts.wgsl';
+
 export function makeTransmittanceLutShaderCode() {
     return `${constantsWgsl}\n${intersectionWgsl}\n${mediumWgsl}\n${renderTransmittanceLutWgsl}`;
 }
@@ -26,4 +28,8 @@ export function makeSkyViewLutShaderCode() {
 
 export function makeAerialPerspectiveLutShaderCode() {
     return `${constantsWgsl}\n${intersectionWgsl}\n${mediumWgsl}\n${phaseWgsl}\n${uvWgsl}\n${configWgsl}\n${coordinateSystemWgsl}\n${multipleScatteringWgsl}\n${renderAerialPerspectiveWgsl}`;
+}
+
+export function makeRenderSkyWithLutsShaderCode() {
+    return `${constantsWgsl}\n${intersectionWgsl}\n${mediumWgsl}\n${phaseWgsl}\n${uvWgsl}\n${configWgsl}\n${coordinateSystemWgsl}\n${renderSkyWithLutsWgsl}`;
 }
