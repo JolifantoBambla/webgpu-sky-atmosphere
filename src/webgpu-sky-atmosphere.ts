@@ -147,6 +147,24 @@ export interface SkyAtmosphereConfig {
     useYup?: boolean,
     useRightHanded?: boolean,
     useReverseZ?: boolean,
+    compute?: {
+        backBuffer: {
+            texture: GPUTexture,
+            // created if not supplied
+            view?: GPUTextureView,
+        },
+        depthBuffer: {
+            texture: GPUTexture,
+            // created if not supplied
+            view?: GPUTextureView,
+        },
+        renderTarget: {
+            texture: GPUTexture,
+            // created if not supplied
+            view?: GPUTextureView,
+        },
+    },
+    render?: {}
 }
 
 export class SkyAtmospherePasses {

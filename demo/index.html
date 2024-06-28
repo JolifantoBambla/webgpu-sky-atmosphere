@@ -190,7 +190,61 @@
                 return mat4n.lookAt(origin, targetPosition, upVector);
             }
 
-            const skyAtmospherePasses = new SkyAtmospherePasses(device, {initializeConstantLutsAtCreation: true});
+            const backBuffer = device.createTexture({
+                size: resolution,
+                format: 'rgba16float',
+                usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT,
+            });
+            const backBufferView = backBuffer.createView();
+            const depthBuffer = device.createTexture({
+                size: resolution,
+                format: 'depth24plus',
+                usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT,
+            });
+            const depthBufferView = depthBuffer.createView();
+
+            const geometryPipeline = device.createRenderPipeline({
+                layout: 'auto',
+                vertex: {
+                    // todo: actually draw geometry
+                    module: device.createShaderModule({
+                        code: `
+                        @vertex
+                        fn vertex(@builtin(vertex_index) vertex_index: u32) -> @builtin(position) vec4<f32> {
+                            return vec4(vec2(f32((vertex_index << 1) & 2), f32(vertex_index & 2)) * 2 - 1, 0, 1);
+                        }
+                        `,
+                    }),
+                    entryPoint: 'vertex',
+                },
+            });
+
+            const skyRenderTarget = device.createTexture({
+                size: resolution,
+                format: 'rgba16float',
+                usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING,
+            });
+
+            const skyAtmospherePasses = new SkyAtmospherePasses(device, {
+                initializeConstantLutsAtCreation: true,
+                useYup: true,
+                useRightHanded: true,
+                useReverseZ: true,
+                compute: {
+                    backBuffer: {
+                        texture: backBuffer,
+                        view: backBufferView,
+                    },
+                    depthBuffer: {
+                        texture: depthBuffer,
+                        view: depthBufferView,
+                    },
+                    renderTarget: {
+                        texture: skyRenderTarget,
+                        view: skyRenderTarget.createView(),
+                    }
+                }
+            });
 
             function makePipeline() {
                 const module = device.createShaderModule({
@@ -317,6 +371,22 @@
                     params.renderSettings.sun.illuminance.g,
                     params.renderSettings.sun.illuminance.b,
                 ].map(c => c * params.renderSettings.sun.illuminanceFactor);
+
+                const geometryPass = encoder.beginRenderPass({
+                    colorAttachments: [{
+                        view: backBufferView,
+                        clearValue: [0,0,0,1],
+                        loadOp: 'clear',
+                        storeOp: 'store',
+                    }],
+                    depthStencilAttachment: {
+                        view: depthBufferView,
+                        depthClearValue: 1.0, // reverse z
+                        depthLoadOp: 'clear',
+                        depthStoreOp: 'store',
+                    },
+                });
+                geometryPass.end();
 
                 const computePass = encoder.beginComputePass();
                 skyAtmospherePasses.renderSkyAtmosphere(computePass, false, false, config, params.atmosphere);
