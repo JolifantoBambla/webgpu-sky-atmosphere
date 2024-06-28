@@ -3,7 +3,6 @@ override RENDER_SUN_DISK: bool = true;
 
 override SKY_VIEW_LUT_RES_X: f32 = 192.0;
 override SKY_VIEW_LUT_RES_Y: f32 = 108.0;
-override MULTI_SCATTERING_LUT_RES: f32 = 32.0;
 
 override WORKGROUP_SIZE_X: u32 = 16;
 override WORKGROUP_SIZE_Y: u32 = 16;
@@ -82,7 +81,7 @@ fn blend(pix: vec2<u32>, src: vec4<f32>) {
 
 @compute
 @workgroup_size(WORKGROUP_SIZE_X, WORKGROUP_SIZE_Y, 1)
-fn render_sky_atmosphere_sky_aerial(@builtin(global_invocation_id) global_id: vec3<u32>) {
+fn render_sky_atmosphere(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let output_size = vec2<u32>(textureDimensions(render_target));
     if output_size.x <= global_id.x || output_size.y <= global_id.y {
         return;
