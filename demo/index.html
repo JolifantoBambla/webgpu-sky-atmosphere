@@ -299,7 +299,10 @@
                         } else if config.show_aerial_perspective == 1 && coords_in_rect(texture_coords, aerial_perspective_lut_min_rect, aerial_perspective_lut_min_rect + aerial_perspective_lut_size) {
                             return vec4(textureLoad(aerial_perspective_lut, vec3<u32>(texture_coords.x, texture_coords.y - transmittance_lut_size.y - multi_scattering_lut_size.y - sky_view_lut_size.y, config.aerial_perspective_slice), 0).rgb * f32(config.aerial_perspective_scale), 1.0);
                         } else if coords_in_rect(texture_coords, vec2<u32>(), backbuffer_size) {
-                            return vec4(textureLoad(backbuffer, texture_coords, 0).rgb, 1.0);
+                            let white_point = vec3(1.08241, 0.96756, 0.95003);
+                            let exposure = 10.0;
+                            let rgb = textureLoad(backbuffer, texture_coords, 0).rgb;
+                            return vec4(pow(vec3(1.0) - exp(-rgb / white_point * exposure), vec3(1.0 / 2.2)), 1.0);
                         } else {
                             return vec4(0.5, 0.5, 0.5, 1.0);
                         }
