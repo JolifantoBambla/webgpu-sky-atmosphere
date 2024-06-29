@@ -487,7 +487,7 @@
                 geometryPass.end();
 
                 const computePass = encoder.beginComputePass();
-                skyAtmospherePasses.renderSkyAtmosphere(computePass, false, true, config, params.atmosphere);
+                skyAtmospherePasses.renderSkyAtmosphere(computePass, false, false, config, params.atmosphere);
                 computePass.end();
 
                 const pass = encoder.beginRenderPass({

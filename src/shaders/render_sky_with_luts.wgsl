@@ -15,21 +15,11 @@ override WORKGROUP_SIZE_Y: u32 = 16;
 @group(3) @binding(1) var backbuffer : texture_2d<f32>;
 @group(3) @binding(2) var render_target : texture_storage_2d<rgba16float, write>;
 
-// todo: add a frament shader variant (which assumes the correct blend mode on the pipeline)
-
-@compute
-@workgroup_size(WORKGROUP_SIZE_X, WORKGROUP_SIZE_Y, 1)
-fn render_sky_atmosphere(@builtin(global_invocation_id) global_id: vec3<u32>) {
-    let output_size = vec2<u32>(textureDimensions(render_target));
-    if output_size.x <= global_id.x || output_size.y <= global_id.y {
-        return;
-    }
-
-	let pix = vec2<f32>(global_id.xy) + 0.5;
-	let uv = pix / vec2<f32>(textureDimensions(render_target).xy);
-
+fn render_sky(pix: vec2<u32>) -> vec4<f32> {
 	let atmosphere = atmosphere_buffer;
     let config = config_buffer;
+
+    let uv = (vec2<f32>(pix) + 0.5) / vec2<f32>(config.screen_resolution);
 
     let world_dir = uv_to_world_dir(uv, config.inverse_projection, config.inverse_view);
     var world_pos = to_z_up_left_handed(config.camera_world_position) + vec3(0.0, 0.0, atmosphere.bottom_radius);
@@ -37,7 +27,7 @@ fn render_sky_atmosphere(@builtin(global_invocation_id) global_id: vec3<u32>) {
 
 	let view_height = length(world_pos);
 	
-    let depth = textureLoad(depth_buffer, global_id.xy, 0).r;
+    let depth = textureLoad(depth_buffer, pix, 0).r;
     if view_height < atmosphere.top_radius && !is_valid_depth(depth) {
         let zenith = normalize(world_pos);
         let cos_view_zenith = dot(world_dir, zenith);
@@ -50,8 +40,7 @@ fn render_sky_atmosphere(@builtin(global_invocation_id) global_id: vec3<u32>) {
 
         let uv = sky_view_lut_params_to_uv(atmosphere, intersects_ground, cos_view_zenith, cos_light_view, view_height);
 
-        blend(global_id.xy, vec4(textureSampleLevel(sky_view_lut, lut_sampler, uv, 0).rgb + get_sun_luminance(world_pos, world_dir, sun_dir, atmosphere.bottom_radius), 1.0));
-        return;
+        return vec4(textureSampleLevel(sky_view_lut, lut_sampler, uv, 0).rgb + get_sun_luminance(world_pos, world_dir, sun_dir, atmosphere.bottom_radius), 1.0);
     }
 
     let depth_buffer_world_pos = uv_and_depth_to_world_pos(config.inverse_view * config.inverse_projection, uv, depth);
@@ -66,6 +55,21 @@ fn render_sky_atmosphere(@builtin(global_invocation_id) global_id: vec3<u32>) {
     }
     let w = sqrt(slice / AP_SLICE_COUNT);	// squared distribution
 
-    blend(global_id.xy, weight * textureSampleLevel(aerial_perspective_lut, lut_sampler, vec3<f32>(uv, w), 0));
+    return weight * textureSampleLevel(aerial_perspective_lut, lut_sampler, vec3<f32>(uv, w), 0);
+}
+
+@fragment
+fn fragment(@builtin(position) coord: vec4<f32>) -> @location(0) vec4<f32> {
+    return render_sky(vec2<u32>(floor(coord.xy)));
+}
+
+@compute
+@workgroup_size(WORKGROUP_SIZE_X, WORKGROUP_SIZE_Y, 1)
+fn render_sky_atmosphere(@builtin(global_invocation_id) global_id: vec3<u32>) {
+    let output_size = vec2<u32>(textureDimensions(render_target));
+    if output_size.x <= global_id.x || output_size.y <= global_id.y {
+        return;
+    }
+    blend(global_id.xy, render_sky(global_id.xy));
 }
 
