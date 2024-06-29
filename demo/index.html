@@ -44,7 +44,6 @@
                         canvas.ownerDocument.removeEventListener('pointermove', this.#pointerMoveHandler);
                     }
                 });
-                console.log(this.position);
             }
 
             #onMouseMove(e) {
@@ -271,16 +270,6 @@
                 1.0,
             );
 
-            function getCameraView(origin = vec3n.fromValues(0, 1, 0), upVector = vec3n.fromValues(0, 1, 0)) {
-                const targetPosition = vec3n.fromValues(0, 50, -100);
-
-                const rad = Math.PI * (Date.now() / 2000);
-                const rotation = mat4n.rotateY(mat4n.translation(origin), rad);
-                vec3n.transformMat4(targetPosition, rotation, targetPosition);
-
-                return mat4n.lookAt(origin, targetPosition, upVector);
-            }
-
             const backBuffer = device.createTexture({
                 size: resolution,
                 format: 'rgba16float',
@@ -473,17 +462,13 @@
 
                 const config = makeDefaultConfig();
                 config.camera.position = cameraController.position;
-                config.camera.inverseView = mat4n.inverse(cameraController.view);//getCameraView());
+                config.camera.inverseView = mat4n.inverse(cameraController.view);
                 config.camera.inverseProjection = mat4n.inverse(projection);
                 config.sun.illuminance = [
                     params.renderSettings.sun.illuminance.r,
                     params.renderSettings.sun.illuminance.g,
                     params.renderSettings.sun.illuminance.b,
                 ].map(c => c * params.renderSettings.sun.illuminanceFactor);
-
-                if (config.camera.position.some(x => isNaN(x))) {
-                    console.log(config.camera);
-                }
 
                 const geometryPass = encoder.beginRenderPass({
                     colorAttachments: [{
@@ -502,7 +487,7 @@
                 geometryPass.end();
 
                 const computePass = encoder.beginComputePass();
-                skyAtmospherePasses.renderSkyAtmosphere(computePass, false, false, config, params.atmosphere);
+                skyAtmospherePasses.renderSkyAtmosphere(computePass, false, true, config, params.atmosphere);
                 computePass.end();
 
                 const pass = encoder.beginRenderPass({

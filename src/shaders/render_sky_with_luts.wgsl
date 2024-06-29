@@ -1,22 +1,5 @@
-// todo: add sun disk config to params
-override RENDER_SUN_DISK: bool = true;
-
-override SKY_VIEW_LUT_RES_X: f32 = 192.0;
-override SKY_VIEW_LUT_RES_Y: f32 = 108.0;
-
 override WORKGROUP_SIZE_X: u32 = 16;
 override WORKGROUP_SIZE_Y: u32 = 16;
-
-override AP_SLICE_COUNT: f32 = 32.0;
-override AP_KM_PER_SLICE: f32 = 4.0;
-
-fn aerial_perspective_depth_to_slice(depth: f32) -> f32 {
-	return depth * (1.0 / AP_KM_PER_SLICE);
-}
-fn aerial_perspective_slice_to_depth(slice: f32) -> f32 {
-	return slice * AP_KM_PER_SLICE;
-}
-
 
 @group(0) @binding(0) var<uniform> atmosphere_buffer: Atmosphere;
 @group(0) @binding(1) var<uniform> config_buffer: Config;
@@ -31,51 +14,6 @@ fn aerial_perspective_slice_to_depth(slice: f32) -> f32 {
 @group(3) @binding(0) var depth_buffer: texture_2d<f32>;
 @group(3) @binding(1) var backbuffer : texture_2d<f32>;
 @group(3) @binding(2) var render_target : texture_storage_2d<rgba16float, write>;
-
-fn uv_and_depth_to_world_pos(inverse_view_projection: mat4x4<f32>, uv: vec2<f32>, depth: f32) -> vec3<f32> {
-    let clip_pos = vec3(uv * vec2(2.0, -2.0) - vec2(1.0, -1.0), depth);
-    let world_pos = inverse_view_projection * vec4(clip_pos, 1.0);
-    return to_z_up_left_handed(world_pos.xyz / world_pos.w);
-}
-
-fn sky_view_lut_params_to_uv(atmosphere: Atmosphere, intersects_ground: bool, cos_view_zenith: f32, cos_light_view: f32, view_height: f32) -> vec2<f32> {
-	let v_horizon = sqrt(max(view_height * view_height - atmosphere.bottom_radius * atmosphere.bottom_radius, 0.0));
-	let ground_to_horizon = acos(v_horizon / view_height);
-	let zenith_horizon_angle = pi - ground_to_horizon;
-
-    var uv = vec2<f32>();
-	if !intersects_ground {
-		let coord = 1.0 - sqrt(max(1.0 - acos(cos_view_zenith) / zenith_horizon_angle, 0.0));
-		uv.y = coord * 0.5;
-	} else {
-		let coord = (acos(cos_view_zenith) - zenith_horizon_angle) / ground_to_horizon;
-		uv.y = sqrt(max(coord, 0.0)) * 0.5 + 0.5;
-	}
-    uv.x = sqrt(-cos_light_view * 0.5 + 0.5);
-
-	return vec2(from_unit_to_sub_uvs(uv.x, SKY_VIEW_LUT_RES_X), from_unit_to_sub_uvs(uv.y, SKY_VIEW_LUT_RES_Y));
-}
-
-fn get_sun_luminance(world_pos: vec3<f32>, world_dir: vec3<f32>, sun_dir: vec3<f32>, planet_radius: f32) -> vec3<f32> {
-    if RENDER_SUN_DISK {
-        // todo: get rid of of this hard coded value
-        if dot(world_dir, sun_dir) > cos(0.5 * 0.505 * 3.14159 / 180.0) {
-            if !ray_intersects_sphere(world_pos, world_dir, vec3<f32>(), planet_radius) { // no intersection
-                // todo: get rid of of this hard coded value
-                return vec3<f32>(1000000.0);
-            }
-        }
-	}
-	return vec3<f32>();
-}
-
-fn blend(pix: vec2<u32>, src: vec4<f32>) {
-    let dst = textureLoad(backbuffer, pix, 0);
-    // blend op:        src*1 + dst * (1.0 - srcA)
-    // alpha blend op:  src*0 + dst * (1.0 - srcA)
-    let rgba = vec4<f32>(src.rgb, 0.0) + dst * (1.0 - clamp(src.a, 0.0, 1.0));
-    textureStore(render_target, pix, rgba);
-}
 
 // todo: add a frament shader variant (which assumes the correct blend mode on the pipeline)
 

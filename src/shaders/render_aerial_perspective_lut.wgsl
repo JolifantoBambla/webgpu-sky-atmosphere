@@ -3,13 +3,6 @@ override MULTI_SCATTERING_LUT_RES: f32 = 32.0;
 override WORKGROUP_SIZE_X: u32 = 16;
 override WORKGROUP_SIZE_Y: u32 = 16;
 
-override AP_SLICE_COUNT: f32 = 32.0;
-override AP_KM_PER_SLICE: f32 = 4.0;
-
-fn aerial_perspective_slice_to_depth(slice: f32) -> f32 {
-	return slice * AP_KM_PER_SLICE;
-}
-
 @group(0) @binding(0) var<uniform> atmosphere_buffer: Atmosphere;
 @group(0) @binding(1) var<uniform> config_buffer: Config;
 

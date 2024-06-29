@@ -15,6 +15,7 @@ import {
     makeSkyViewLutShaderCode,
     makeAerialPerspectiveLutShaderCode,
     makeRenderSkyWithLutsShaderCode,
+    makeRenderSkyRaymarchingShaderCode,
 } from './shaders.js';
 
 
@@ -187,6 +188,7 @@ export class SkyAtmospherePasses {
     private aerialPerspectiveLutPass: ComputePass;
 
     private renderSkyWithLutsPass: ComputePass;
+    private renderSkyRaymarchingPass: ComputePass;
 
     constructor(device: GPUDevice, config2: SkyAtmosphereConfig = {}, atmosphere: Atmosphere = makeEarthAtmosphere(), lutConfig: SkyAtmosphereLutConfig = {}) {
         this.device = device;
@@ -737,6 +739,132 @@ export class SkyAtmospherePasses {
             );
         }
 
+        // render sky raymarching - compute
+        {
+            const renderSkyRaymarchingBindGroupLayout = device.createBindGroupLayout({
+                label: 'Render sky raymarching bind group layout',
+                entries: [
+                    {
+                        binding: 0,
+                        visibility: GPUShaderStage.COMPUTE,
+                        texture: {
+                            sampleType: 'float',
+                            viewDimension: this.transmittanceLut.texture.dimension,
+                            multisampled: false,
+                        },
+                    },
+                    {
+                        binding: 1,
+                        visibility: GPUShaderStage.COMPUTE,
+                        texture: {
+                            sampleType: 'float',
+                            viewDimension: this.multiScatteringLut.texture.dimension,
+                            multisampled: false,
+                        },
+                    },
+                ],
+            });
+
+            // todo: reuse from render sky with luts
+            const externalResourcesBindGroupLayout = device.createBindGroupLayout({
+                label: 'Render sky raymarching external bind group layout',
+                entries: [
+                    {
+                        binding: 0,
+                        visibility: GPUShaderStage.COMPUTE,
+                        texture: {
+                            sampleType: 'unfilterable-float',
+                            viewDimension: config2.compute!.depthBuffer.texture.dimension,
+                            multisampled: false,
+                        },
+                    },
+                    {
+                        binding: 1,
+                        visibility: GPUShaderStage.COMPUTE,
+                        texture: {
+                            sampleType: 'unfilterable-float',
+                            viewDimension: config2.compute!.backBuffer.texture.dimension,
+                            multisampled: false,
+                        },
+                    },
+                    {
+                        binding: 2,
+                        visibility: GPUShaderStage.COMPUTE,
+                        storageTexture: {
+                            access: 'write-only',
+                            format: config2.compute!.renderTarget.texture.format,
+                            viewDimension: config2.compute!.renderTarget.texture.dimension,
+                        },
+                    },
+                ],
+            });
+
+            const renderSkyRaymarchingBindGroup = device.createBindGroup({
+                label: 'Render sky raymarching bind group',
+                layout: renderSkyRaymarchingBindGroupLayout,
+                entries: [
+                    {
+                        binding: 0,
+                        resource: this.transmittanceLut.view,
+                    },
+                    {
+                        binding: 1,
+                        resource: this.multiScatteringLut.view,
+                    },
+                ],
+            });
+
+            const externalResourcesBindGroup = device.createBindGroup({
+                label: 'External resources bind group',
+                layout: externalResourcesBindGroupLayout,
+                entries: [
+                    {
+                        binding: 0,
+                        resource: config2.compute!.depthBuffer.view!,
+                    },
+                    {
+                        binding: 1,
+                        resource: config2.compute!.backBuffer.view!,
+                    },
+                    {
+                        binding: 2,
+                        resource: config2.compute!.renderTarget.view!,
+                    },
+                ],
+            });
+
+            const renderSkyPipeline = device.createComputePipeline({
+                label: 'Render sky raymarching pipeline',
+                layout: device.createPipelineLayout({
+                    label: 'Render sky raymarching pipeline layout',
+                    bindGroupLayouts: [
+                        uniformBufferBindGroupLayout,
+                        samplerBindGroupLayout,
+                        renderSkyRaymarchingBindGroupLayout,
+                        externalResourcesBindGroupLayout,
+                    ],
+                }),
+                compute: {
+                    module: device.createShaderModule({
+                        code: makeRenderSkyRaymarchingShaderCode(),
+                    }),
+                    entryPoint: 'render_sky_atmosphere',
+                    constants: {
+                    },
+                },
+            });
+
+            this.renderSkyRaymarchingPass = new ComputePass(
+                renderSkyPipeline,
+                [uniformBufferBindGroup, samplerBindGroup, renderSkyRaymarchingBindGroup, externalResourcesBindGroup],
+                [
+                    Math.ceil(config2.compute!.renderTarget.texture.width / 16.0),
+                    Math.ceil(config2.compute!.renderTarget.texture.height / 16.0),
+                    1,
+                ],
+            );
+        }
+
         if (config2.initializeConstantLutsAtCreation) {
             const commandEncoder = device.createCommandEncoder();
             const computePassEncoder = commandEncoder.beginComputePass();
@@ -775,6 +903,10 @@ export class SkyAtmospherePasses {
         this.renderSkyWithLutsPass.encode(computePassEncoder);
     }
 
+    public renderSkyRaymarching(computePassEncoder: GPUComputePassEncoder) {
+        this.renderSkyRaymarchingPass.encode(computePassEncoder);
+    }
+
     public renderSkyAtmosphere(computePassEncoder: GPUComputePassEncoder, isCameraInSpace: boolean, useColoredTransmittance: boolean, config?: Config, atmosphere?: Atmosphere) {
         if (atmosphere) {
             this.updateAtmosphere(atmosphere);
@@ -789,12 +921,14 @@ export class SkyAtmospherePasses {
 
         // todo: only update these luts if camera is within atmosphere
         if (isCameraInSpace) {
-            // todo: render using ray marching
+            this.renderSkyRaymarching(computePassEncoder);
         } else {
             this.renderSkyViewLut(computePassEncoder);
 
             if (useColoredTransmittance) {
                 // render using sky view lut & ray marching
+                // todo: sky view + ray marching
+                this.renderSkyRaymarching(computePassEncoder);
             } else {
                 this.renderAerialPerspective(computePassEncoder);
 
