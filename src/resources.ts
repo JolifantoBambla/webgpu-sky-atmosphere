@@ -12,7 +12,7 @@ export const MULTI_SCATTERING_LUT_FORMAT: GPUTextureFormat = TRANSMITTANCE_LUT_F
 export const SKY_VIEW_LUT_FORMAT: GPUTextureFormat = TRANSMITTANCE_LUT_FORMAT;
 export const AERIAL_PERSPECTIVE_LUT_FORMAT: GPUTextureFormat = TRANSMITTANCE_LUT_FORMAT;
 
-export const ATMOSPHERE_BUFFER_SIZE: number = 112;
+export const ATMOSPHERE_BUFFER_SIZE: number = 128;
 export const CONFIG_BUFFER_SIZE: number = 192;
 
 export interface SkyAtmosphereLutConfig {
@@ -164,6 +164,8 @@ function atmosphereToFloatArray(atmosphere: Atmosphere) {
         atmosphere.groundAlbedo[1],
         atmosphere.groundAlbedo[2],
         atmosphere.bottomRadius + Math.max(atmosphere.height, 0.0),
+        0.0, 0.0, 0.0, // todo: center from atmosphere and y-up/z-up
+        0.0, // padding
     ]);
 }
 
