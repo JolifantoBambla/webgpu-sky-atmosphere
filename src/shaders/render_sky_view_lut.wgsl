@@ -7,12 +7,10 @@ override WORKGROUP_SIZE_Y: u32 = 16;
 
 @group(0) @binding(0) var<uniform> atmosphere_buffer: Atmosphere;
 @group(0) @binding(1) var<uniform> config_buffer: Config;
-
-@group(1) @binding(0) var lut_sampler: sampler;
-
-@group(2) @binding(0) var transmittance_lut: texture_2d<f32>;
-@group(2) @binding(1) var multi_scattering_lut: texture_2d<f32>;
-@group(2) @binding(2) var sky_view_lut : texture_storage_2d<rgba16float, write>;
+@group(0) @binding(2) var lut_sampler: sampler;
+@group(0) @binding(3) var transmittance_lut: texture_2d<f32>;
+@group(0) @binding(4) var multi_scattering_lut: texture_2d<f32>;
+@group(0) @binding(5) var sky_view_lut : texture_storage_2d<rgba16float, write>;
 
 fn integrate_scattered_luminance(world_pos: vec3<f32>, world_dir: vec3<f32>, sun_dir: vec3<f32>, atmosphere: Atmosphere, sun_illuminance: vec3<f32>, min_sample_count: f32, max_sample_count: f32) -> vec3<f32> {
 	// Compute next intersection with atmosphere or ground

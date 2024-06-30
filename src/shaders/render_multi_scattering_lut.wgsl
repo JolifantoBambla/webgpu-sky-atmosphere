@@ -4,11 +4,9 @@ override SAMPLE_COUNT: u32 = 20; // a minimum set of step is required for accura
 override MULTI_SCATTERING_FACTOR: f32 = 1.0;
 
 @group(0) @binding(0) var<uniform> atmosphere_buffer: Atmosphere;
-
-@group(1) @binding(0) var lut_sampler: sampler;
-
-@group(2) @binding(0) var transmittance_lut: texture_2d<f32>;
-@group(2) @binding(1) var multi_scattering_lut: texture_storage_2d<rgba16float, write>;
+@group(0) @binding(1) var lut_sampler: sampler;
+@group(0) @binding(2) var transmittance_lut: texture_2d<f32>;
+@group(0) @binding(3) var multi_scattering_lut: texture_storage_2d<rgba16float, write>;
 
 const sqrt_direction_sample_count: u32 = 8;
 const sqrt_direction_sample_count_f: f32 = f32(sqrt_direction_sample_count);

@@ -1,5 +1,6 @@
 import { Atmosphere, makeEarthAtmosphere } from './atmosphere.js';
 import { Camera, Config, makeDefaultConfig } from './config.js';
+import { ATMOSPHERE_BUFFER_SIZE, CONFIG_BUFFER_SIZE, SkyAtmosphereLutConfig, SkyAtmosphereResources } from './resources.js';
 
 export {
     Atmosphere,
@@ -10,140 +11,20 @@ export {
 };
 
 import {
-    makeTransmittanceLutShaderCode,
-    makeMultiScatteringLutShaderCode,
-    makeSkyViewLutShaderCode,
-    makeAerialPerspectiveLutShaderCode,
     makeRenderSkyWithLutsShaderCode,
     makeRenderSkyRaymarchingShaderCode,
 } from './shaders.js';
-
-
-const TRANSMITTANCE_LUT_FORMAT: GPUTextureFormat = 'rgba16float';
-const MULTI_SCATTERING_LUT_FORMAT: GPUTextureFormat = TRANSMITTANCE_LUT_FORMAT;
-const SKY_VIEW_LUT_FORMAT: GPUTextureFormat = TRANSMITTANCE_LUT_FORMAT;
-const AERIAL_PERSPECTIVE_LUT_FORMAT: GPUTextureFormat = TRANSMITTANCE_LUT_FORMAT;
-
-const ATMOSPHERE_BUFFER_SIZE: number = 112;
-const CONFIG_BUFFER_SIZE: number = 192;
-
-export const DEFAULT_TRANSMITTANCE_LUT_SIZE: [number, number] = [256, 64];
-export const DEFAULT_MULTISCATTERING_LUT_SIZE: number = 32;
-export const DEFAULT_SKY_VIEW_LUT_SIZE: [number, number] = [192, 108];
-export const DEFAULT_AERIAL_PERSPECTIVE_LUT_SIZE: [number, number, number] = [32, 32, 32];
-
-export const DEFAULT_TRANSMITTANCE_LUT_SAMPLE_COUNT: number = 40;
-export const DEFAULT_MULTI_SCATTERING_LUT_SAMPLE_COUNT: number = 20;
-
-export interface SkyAtmosphereLutConfig {
-    /**
-     * Defaults to [256, 64]
-     */
-    transmittanceLutSize?: [number, number],
-
-    /**
-     * Defaults to 40
-     * Clamped to max(40, transmittanceLutSampleCount)
-     */
-    transmittanceLutSampleCount?: number,
-
-    /**
-     * Defaults to 32
-     */
-    multiScatteringLutSize?: number,
-
-    /**
-     * Defaults to 20
-     * Clamped to max(10, multiScatteringLutSampleCount)
-     */
-    multiScatteringLutSampleCount?: number,
-
-    /**
-     * Defaults to [192, 108]
-     */
-    skyViewLutSize?: [number, number],
-
-    /**
-     * Defaults to [32, 32, 32]
-     */
-    aerialPerspectiveLutSize?: [number, number, number],
-}
-
-function atmosphereToFloatArray(atmosphere: Atmosphere) {
-    return new Float32Array([
-        atmosphere.rayleigh.scattering[0],
-        atmosphere.rayleigh.scattering[1],
-        atmosphere.rayleigh.scattering[2],
-        atmosphere.rayleigh.densityExpScale,
-        atmosphere.mie.scattering[0],
-        atmosphere.mie.scattering[1],
-        atmosphere.mie.scattering[2],
-        atmosphere.mie.densityExpScale,
-        atmosphere.mie.extinction[0],
-        atmosphere.mie.extinction[1],
-        atmosphere.mie.extinction[2],
-        atmosphere.mie.phaseG,
-        Math.max(atmosphere.mie.extinction[0] - atmosphere.mie.scattering[0], 0.0),
-        Math.max(atmosphere.mie.extinction[1] - atmosphere.mie.scattering[1], 0.0),
-        Math.max(atmosphere.mie.extinction[2] - atmosphere.mie.scattering[2], 0.0),
-        atmosphere.absorption.layer0.width,
-        atmosphere.absorption.layer0.constantTerm,
-        atmosphere.absorption.layer0.linearTerm,
-        atmosphere.absorption.layer1.constantTerm,
-        atmosphere.absorption.layer1.linearTerm,
-        atmosphere.absorption.extinction[0],
-        atmosphere.absorption.extinction[1],
-        atmosphere.absorption.extinction[2],
-        atmosphere.bottomRadius,
-        atmosphere.groundAlbedo[0],
-        atmosphere.groundAlbedo[1],
-        atmosphere.groundAlbedo[2],
-        atmosphere.bottomRadius + Math.max(atmosphere.height, 0.0),
-    ]);
-}
-
-function configToFloatArray(config: Config) {
-    return new Float32Array([
-        ...config.camera.inverseProjection,
-        ...config.camera.inverseView,
-        ...config.sun.illuminance,
-        config.rayMarchMinSPP,
-        ...config.sun.direction,
-        config.rayMarchMaxSPP,
-        ...config.camera.position,
-        DEFAULT_MULTISCATTERING_LUT_SIZE,
-        ...DEFAULT_SKY_VIEW_LUT_SIZE,
-        ...config.screenResolution,
-    ]);
-}
-
-export class LookUpTable {
-    readonly texture: GPUTexture;
-    readonly view: GPUTextureView;
-
-    constructor(texture: GPUTexture) {
-        this.texture = texture;
-        this.view = texture.createView();
-    }
-}
-
-class ComputePass {
-    constructor(readonly pipeline: GPUComputePipeline, readonly bindGroups: GPUBindGroup[], readonly dispatchDimensions: [number, number, number]) {}
-    encode(computePassEncoder: GPUComputePassEncoder, resetBindGroups: boolean = false) {
-        computePassEncoder.setPipeline(this.pipeline);
-        for (let i = 0; i < this.bindGroups.length; ++i) {
-            computePassEncoder.setBindGroup(i, this.bindGroups[i]);
-        }
-        computePassEncoder.dispatchWorkgroups(...this.dispatchDimensions);
-        if (resetBindGroups) {
-            for (let i = 0; i < this.bindGroups.length; ++i) {
-                computePassEncoder.setBindGroup(i, null);
-            }
-        }
-    }
-}
+import { SkyAtmospherePipelines } from './pipelines.js';
+import { ComputePass } from './util.js';
 
 export interface SkyAtmosphereConfig {
+    /**
+     * Defaults to 'atmosphere'
+     */
+    label?: string,
+    /**
+     * Defaults to true
+     */
     initializeConstantLutsAtCreation?: boolean,
     useYup?: boolean,
     useRightHanded?: boolean,
@@ -166,21 +47,32 @@ export interface SkyAtmosphereConfig {
             view?: GPUTextureView,
         },
     },
-    render?: {}
+    render?: {
+        renderTargetFormat: GPUTextureFormat,
+        depthBuffer: {
+            texture: GPUTexture,
+            // created if not supplied
+            // must be a depth only view
+            view?: GPUTextureView,
+        },
+    },
+    shadow?: {
+        bindGroupLayout: GPUBindGroupLayout,
+        bindGroup: GPUBindGroup,
+        /**
+         * Needs to provide a function
+         * fn get_shadow(world_space_pos: vec3<f32>) -> f32
+         * returns 1.0 for no shadow, 0.0 <= x < 1.0 for shadow
+         */
+        wgslCode: string,
+    }
+    lookUpTables?: SkyAtmosphereLutConfig,
 }
 
-export class SkyAtmospherePasses {
-    readonly device: GPUDevice;
+export class SkyAtmosphereRenderer {
+    readonly resources: SkyAtmosphereResources;
 
-    readonly atmosphereBuffer: GPUBuffer;
-    readonly configBuffer: GPUBuffer;
-
-    readonly lutSampler: GPUSampler;
-
-    readonly transmittanceLut: LookUpTable;
-    readonly multiScatteringLut: LookUpTable;
-    readonly skyViewLut: LookUpTable;
-    readonly aerialPerspectiveLut: LookUpTable;
+    readonly skyAtmospherePipelines: SkyAtmospherePipelines;
 
     private transmittanceLutPass: ComputePass;
     private multiScatteringLutPass: ComputePass;
@@ -190,73 +82,26 @@ export class SkyAtmospherePasses {
     private renderSkyWithLutsPass: ComputePass;
     private renderSkyRaymarchingPass: ComputePass;
 
-    constructor(device: GPUDevice, config2: SkyAtmosphereConfig = {}, atmosphere: Atmosphere = makeEarthAtmosphere(), lutConfig: SkyAtmosphereLutConfig = {}) {
-        this.device = device;
-
-        // init buffers
-        {
-            this.atmosphereBuffer = device.createBuffer({
-                label: 'atmosphere buffer',
-                size: ATMOSPHERE_BUFFER_SIZE,
-                usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-            });
-            this.updateAtmosphere(atmosphere);
-
-            this.configBuffer = device.createBuffer({
-                label: 'config buffer',
-                size: CONFIG_BUFFER_SIZE,
-                usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-            });
-            this.updateConfig(makeDefaultConfig());
+    constructor(device: GPUDevice, config: SkyAtmosphereConfig = {}, atmosphere: Atmosphere = makeEarthAtmosphere(), existingPipelines?: SkyAtmospherePipelines) {
+        if ((existingPipelines?.transmittanceLutPipeline.device || device) !== device) {
+            this.skyAtmospherePipelines = new SkyAtmospherePipelines(device);
+        } else {
+            this.skyAtmospherePipelines = existingPipelines || new SkyAtmospherePipelines(device);
         }
 
-        // init samplers
-        {
-            this.lutSampler = device.createSampler({
-                label: 'LUT sampler',
-                addressModeU: 'clamp-to-edge',
-                addressModeV: 'clamp-to-edge',
-                addressModeW: 'clamp-to-edge',
-                minFilter: 'linear',
-                magFilter: 'linear',
-                mipmapFilter: 'linear',
-                lodMinClamp: 0,
-                lodMaxClamp: 32,
-                maxAnisotropy: 1,
-            });
-        }
+        this.resources = new SkyAtmosphereResources(
+            config.label || 'atmosphere',
+            device,
+            atmosphere,
+            config.lookUpTables,
+            this.skyAtmospherePipelines.lutSampler,
+        );
 
-        // init look up tables
-        {
-            this.transmittanceLut = new LookUpTable(device.createTexture({
-                label: 'transmittance LUT',
-                size: lutConfig.transmittanceLutSize || DEFAULT_TRANSMITTANCE_LUT_SIZE, // todo: validate / clamp
-                format: TRANSMITTANCE_LUT_FORMAT,
-                usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING,
-            }));
+        this.transmittanceLutPass = this.skyAtmospherePipelines.transmittanceLutPipeline.makeComputePass(this.resources);
+        this.multiScatteringLutPass = this.skyAtmospherePipelines.multiScatteringLutPipeline.makeComputePass(this.resources);
+        this.skyViewLutPass = this.skyAtmospherePipelines.skyViewLutPipeline.makeComputePass(this.resources);
+        this.aerialPerspectiveLutPass = this.skyAtmospherePipelines.aerialPerspectiveLutPipeline.makeComputePass(this.resources);
 
-            this.multiScatteringLut = new LookUpTable(device.createTexture({
-                label: 'multi scattering LUT',
-                size: new Array(2).fill(lutConfig.multiScatteringLutSize || DEFAULT_MULTISCATTERING_LUT_SIZE), // todo: validate / clamp
-                format: MULTI_SCATTERING_LUT_FORMAT,
-                usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING,
-            }));
-
-            this.skyViewLut = new LookUpTable(device.createTexture({
-                label: 'sky view LUT',
-                size: lutConfig.skyViewLutSize || DEFAULT_SKY_VIEW_LUT_SIZE, // todo: validate / clamp
-                format: SKY_VIEW_LUT_FORMAT,
-                usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING,
-            }));
-
-            this.aerialPerspectiveLut = new LookUpTable(device.createTexture({
-                label: 'aerial perspective LUT',
-                size: lutConfig.aerialPerspectiveLutSize || DEFAULT_AERIAL_PERSPECTIVE_LUT_SIZE, // todo: validate / clamp
-                format: AERIAL_PERSPECTIVE_LUT_FORMAT,
-                dimension: '3d',
-                usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING,
-            }));
-        }
 
         const uniformBufferBindGroupLayout = device.createBindGroupLayout({
             label: 'sky atmosphere uniform bind group layout',
@@ -288,13 +133,13 @@ export class SkyAtmospherePasses {
                 {
                     binding: 0,
                     resource: {
-                        buffer: this.atmosphereBuffer,
+                        buffer: this.resources.atmosphereBuffer,
                     },
                 },
                 {
                     binding: 1,
                     resource: {
-                        buffer: this.configBuffer,
+                        buffer: this.resources.configBuffer,
                     },
                 },
             ],
@@ -318,301 +163,10 @@ export class SkyAtmospherePasses {
             entries: [
                 {
                     binding: 0,
-                    resource: this.lutSampler,
+                    resource: this.resources.lutSampler,
                 },
             ],
         });
-
-        // transmittance lut pass
-        {
-            const transmittanceLutOutputBindGroupLayout = device.createBindGroupLayout({
-                label: 'Transmittance LUT Output BindGroup Layout',
-                entries: [
-                    {
-                        binding: 0,
-                        visibility: GPUShaderStage.COMPUTE,
-                        storageTexture: {
-                            access: 'write-only',
-                            format: this.transmittanceLut.texture.format,
-                            viewDimension: this.transmittanceLut.texture.dimension,
-                        },
-                    },
-                ],
-            });
-
-            const transmittanceLutPipeline = device.createComputePipeline({
-                label: 'Transmittance LUT pipeline',
-                layout: device.createPipelineLayout({
-                    label: 'Transmittance LUT pipeline layout',
-                    bindGroupLayouts: [
-                        uniformBufferBindGroupLayout,
-                        transmittanceLutOutputBindGroupLayout,
-                    ],
-                }),
-                compute: {
-                    module: device.createShaderModule({
-                        code: makeTransmittanceLutShaderCode(),
-                    }),
-                    entryPoint: 'render_transmittance_lut',
-                    constants: {
-                        SAMPLE_COUNT: lutConfig.transmittanceLutSampleCount || DEFAULT_TRANSMITTANCE_LUT_SAMPLE_COUNT,
-                    },
-                },
-            });
-
-            const transmittanceLutOutputBindGroup = device.createBindGroup({
-                label: 'Transmittance LUT Ouptut BindGroup',
-                layout: transmittanceLutOutputBindGroupLayout,
-                entries: [
-                    {
-                        binding: 0,
-                        resource: this.transmittanceLut.view,
-                    },
-                ],
-            });
-
-            this.transmittanceLutPass = new ComputePass(
-                transmittanceLutPipeline,
-                [uniformBufferBindGroup, transmittanceLutOutputBindGroup],
-                [Math.ceil(this.transmittanceLut.texture.width / 16.0), Math.ceil(this.transmittanceLut.texture.height / 16.0), 1],
-            );
-        }
-
-        // multi scattering lut pass
-        {
-            const multiScatteringLutBindGroupLayout = device.createBindGroupLayout({
-                label: 'Multi Scattering LUT Output BindGroup Layout',
-                entries: [
-                    {
-                        binding: 0,
-                        visibility: GPUShaderStage.COMPUTE,
-                        texture: {
-                            sampleType: 'float',
-                            viewDimension: this.transmittanceLut.texture.dimension,
-                            multisampled: false,
-                        },
-                    },
-                    {
-                        binding: 1,
-                        visibility: GPUShaderStage.COMPUTE,
-                        storageTexture: {
-                            access: 'write-only',
-                            format: this.multiScatteringLut.texture.format,
-                            viewDimension: this.multiScatteringLut.texture.dimension,
-                        },
-                    },
-                ],
-            });
-            const multiScatteringLutBindGroup = device.createBindGroup({
-                label: 'Multi scattering LUT BindGroup',
-                layout: multiScatteringLutBindGroupLayout,
-                entries: [
-                    {
-                        binding: 0,
-                        resource: this.transmittanceLut.view,
-                    },
-                    {
-                        binding: 1,
-                        resource: this.multiScatteringLut.view,
-                    },
-                ],
-            });
-
-            const multiScatteringLutPipeline = device.createComputePipeline({
-                label: 'Multi-Scattering LUT pipeline',
-                layout: device.createPipelineLayout({
-                    label: 'Multi-Scattering LUT pipeline layout',
-                    bindGroupLayouts: [
-                        uniformBufferBindGroupLayout,
-                        samplerBindGroupLayout,
-                        multiScatteringLutBindGroupLayout,
-                    ],
-                }),
-                compute: {
-                    module: device.createShaderModule({
-                        code: makeMultiScatteringLutShaderCode(),
-                    }),
-                    entryPoint: 'render_multi_scattering_lut',
-                    constants: {
-                        SAMPLE_COUNT: lutConfig.multiScatteringLutSampleCount || DEFAULT_MULTI_SCATTERING_LUT_SAMPLE_COUNT,
-                    },
-                },
-            });
-
-            this.multiScatteringLutPass = new ComputePass(
-                multiScatteringLutPipeline,
-                [uniformBufferBindGroup, samplerBindGroup, multiScatteringLutBindGroup],
-                [this.multiScatteringLut.texture.width, this.multiScatteringLut.texture.height, 1],
-            );
-        }
-
-        // sky view lut pass
-        {
-            const skyViewLutBindGroupLayout = device.createBindGroupLayout({
-                label: 'Sky View LUT BindGroup Layout',
-                entries: [
-                    {
-                        binding: 0,
-                        visibility: GPUShaderStage.COMPUTE,
-                        texture: {
-                            sampleType: 'float',
-                            viewDimension: this.transmittanceLut.texture.dimension,
-                            multisampled: false,
-                        },
-                    },
-                    {
-                        binding: 1,
-                        visibility: GPUShaderStage.COMPUTE,
-                        texture: {
-                            sampleType: 'float',
-                            viewDimension: this.multiScatteringLut.texture.dimension,
-                            multisampled: false,
-                        },
-                    },
-                    {
-                        binding: 2,
-                        visibility: GPUShaderStage.COMPUTE,
-                        storageTexture: {
-                            access: 'write-only',
-                            format: this.skyViewLut.texture.format,
-                            viewDimension: this.skyViewLut.texture.dimension,
-                        },
-                    },
-                ],
-            });
-            const skyViewwLutBindGroup = device.createBindGroup({
-                label: 'Sky view LUT BindGroup',
-                layout: skyViewLutBindGroupLayout,
-                entries: [
-                    {
-                        binding: 0,
-                        resource: this.transmittanceLut.view,
-                    },
-                    {
-                        binding: 1,
-                        resource: this.multiScatteringLut.view,
-                    },
-                    {
-                        binding: 2,
-                        resource: this.skyViewLut.view,
-                    },
-                ],
-            });
-
-            const skyViewLutPipeline = device.createComputePipeline({
-                label: 'Sky view LUT pipeline',
-                layout: device.createPipelineLayout({
-                    label: 'Sky view LUT pipeline layout',
-                    bindGroupLayouts: [
-                        uniformBufferBindGroupLayout,
-                        samplerBindGroupLayout,
-                        skyViewLutBindGroupLayout,
-                    ],
-                }),
-                compute: {
-                    module: device.createShaderModule({
-                        code: makeSkyViewLutShaderCode(),
-                    }),
-                    entryPoint: 'render_sky_view_lut',
-                    constants: {
-                        SKY_VIEW_LUT_RES_X: this.skyViewLut.texture.width,
-                        SKY_VIEW_LUT_RES_Y: this.skyViewLut.texture.height,
-                        MULTI_SCATTERING_LUT_RES: this.multiScatteringLut.texture.width,
-                    },
-                },
-            });
-
-            this.skyViewLutPass = new ComputePass(
-                skyViewLutPipeline,
-                [uniformBufferBindGroup, samplerBindGroup, skyViewwLutBindGroup],
-                [Math.ceil(this.skyViewLut.texture.width / 16.0), Math.ceil(this.skyViewLut.texture.height / 16.0), 1],
-            );
-        }
-
-        // aerial perspective lut pass
-        {
-            const aerialPerspectiveLutBindGroupLayout = device.createBindGroupLayout({
-                label: 'Aerial perspective LUT BindGroup Layout',
-                entries: [
-                    {
-                        binding: 0,
-                        visibility: GPUShaderStage.COMPUTE,
-                        texture: {
-                            sampleType: 'float',
-                            viewDimension: this.transmittanceLut.texture.dimension,
-                            multisampled: false,
-                        },
-                    },
-                    {
-                        binding: 1,
-                        visibility: GPUShaderStage.COMPUTE,
-                        texture: {
-                            sampleType: 'float',
-                            viewDimension: this.multiScatteringLut.texture.dimension,
-                            multisampled: false,
-                        },
-                    },
-                    {
-                        binding: 2,
-                        visibility: GPUShaderStage.COMPUTE,
-                        storageTexture: {
-                            access: 'write-only',
-                            format: this.aerialPerspectiveLut.texture.format,
-                            viewDimension: this.aerialPerspectiveLut.texture.dimension,
-                        },
-                    },
-                ],
-            });
-            const aerialPerspectiveLutBindGroup = device.createBindGroup({
-                label: 'Aerial perspective LUT BindGroup',
-                layout: aerialPerspectiveLutBindGroupLayout,
-                entries: [
-                    {
-                        binding: 0,
-                        resource: this.transmittanceLut.view,
-                    },
-                    {
-                        binding: 1,
-                        resource: this.multiScatteringLut.view,
-                    },
-                    {
-                        binding: 2,
-                        resource: this.aerialPerspectiveLut.view,
-                    },
-                ],
-            });
-
-            const aerialPerspectiveLutPipeline = device.createComputePipeline({
-                label: 'Aerial perspective LUT pipeline',
-                layout: device.createPipelineLayout({
-                    label: 'Aerial perspective LUT pipeline layout',
-                    bindGroupLayouts: [
-                        uniformBufferBindGroupLayout,
-                        samplerBindGroupLayout,
-                        aerialPerspectiveLutBindGroupLayout,
-                    ],
-                }),
-                compute: {
-                    module: device.createShaderModule({
-                        code: makeAerialPerspectiveLutShaderCode(),
-                    }),
-                    entryPoint: 'render_aerial_perspective_lut',
-                    constants: {
-                        MULTI_SCATTERING_LUT_RES: this.multiScatteringLut.texture.width,
-                    },
-                },
-            });
-
-            this.aerialPerspectiveLutPass = new ComputePass(
-                aerialPerspectiveLutPipeline,
-                [uniformBufferBindGroup, samplerBindGroup, aerialPerspectiveLutBindGroup],
-                [
-                    Math.ceil(this.aerialPerspectiveLut.texture.width / 16.0),
-                    Math.ceil(this.aerialPerspectiveLut.texture.height / 16.0),
-                    this.aerialPerspectiveLut.texture.depthOrArrayLayers,
-                ],
-            );
-        }
 
         // render sky with luts pass - compute
         {
@@ -624,7 +178,7 @@ export class SkyAtmospherePasses {
                         visibility: GPUShaderStage.COMPUTE,
                         texture: {
                             sampleType: 'float',
-                            viewDimension: this.skyViewLut.texture.dimension,
+                            viewDimension: this.resources.skyViewLut.texture.dimension,
                             multisampled: false,
                         },
                     },
@@ -633,7 +187,7 @@ export class SkyAtmospherePasses {
                         visibility: GPUShaderStage.COMPUTE,
                         texture: {
                             sampleType: 'float',
-                            viewDimension: this.aerialPerspectiveLut.texture.dimension,
+                            viewDimension: this.resources.aerialPerspectiveLut.texture.dimension,
                             multisampled: false,
                         },
                     },
@@ -648,7 +202,7 @@ export class SkyAtmospherePasses {
                         visibility: GPUShaderStage.COMPUTE,
                         texture: {
                             sampleType: 'unfilterable-float',
-                            viewDimension: config2.compute!.depthBuffer.texture.dimension,
+                            viewDimension: config.compute!.depthBuffer.texture.dimension,
                             multisampled: false,
                         },
                     },
@@ -657,7 +211,7 @@ export class SkyAtmospherePasses {
                         visibility: GPUShaderStage.COMPUTE,
                         texture: {
                             sampleType: 'unfilterable-float',
-                            viewDimension: config2.compute!.backBuffer.texture.dimension,
+                            viewDimension: config.compute!.backBuffer.texture.dimension,
                             multisampled: false,
                         },
                     },
@@ -666,8 +220,8 @@ export class SkyAtmospherePasses {
                         visibility: GPUShaderStage.COMPUTE,
                         storageTexture: {
                             access: 'write-only',
-                            format: config2.compute!.renderTarget.texture.format,
-                            viewDimension: config2.compute!.renderTarget.texture.dimension,
+                            format: config.compute!.renderTarget.texture.format,
+                            viewDimension: config.compute!.renderTarget.texture.dimension,
                         },
                     },
                 ],
@@ -679,11 +233,11 @@ export class SkyAtmospherePasses {
                 entries: [
                     {
                         binding: 0,
-                        resource: this.skyViewLut.view,
+                        resource: this.resources.skyViewLut.view,
                     },
                     {
                         binding: 1,
-                        resource: this.aerialPerspectiveLut.view,
+                        resource: this.resources.aerialPerspectiveLut.view,
                     },
                 ],
             });
@@ -694,15 +248,15 @@ export class SkyAtmospherePasses {
                 entries: [
                     {
                         binding: 0,
-                        resource: config2.compute!.depthBuffer.view!,
+                        resource: config.compute!.depthBuffer.view!,
                     },
                     {
                         binding: 1,
-                        resource: config2.compute!.backBuffer.view!,
+                        resource: config.compute!.backBuffer.view!,
                     },
                     {
                         binding: 2,
-                        resource: config2.compute!.renderTarget.view!,
+                        resource: config.compute!.renderTarget.view!,
                     },
                 ],
             });
@@ -732,8 +286,8 @@ export class SkyAtmospherePasses {
                 renderSkyPipeline,
                 [uniformBufferBindGroup, samplerBindGroup, renderSkyWithLutsBindGroup, externalResourcesBindGroup],
                 [
-                    Math.ceil(config2.compute!.renderTarget.texture.width / 16.0),
-                    Math.ceil(config2.compute!.renderTarget.texture.height / 16.0),
+                    Math.ceil(config.compute!.renderTarget.texture.width / 16.0),
+                    Math.ceil(config.compute!.renderTarget.texture.height / 16.0),
                     1,
                 ],
             );
@@ -749,7 +303,7 @@ export class SkyAtmospherePasses {
                         visibility: GPUShaderStage.COMPUTE,
                         texture: {
                             sampleType: 'float',
-                            viewDimension: this.transmittanceLut.texture.dimension,
+                            viewDimension: this.resources.transmittanceLut.texture.dimension,
                             multisampled: false,
                         },
                     },
@@ -758,7 +312,7 @@ export class SkyAtmospherePasses {
                         visibility: GPUShaderStage.COMPUTE,
                         texture: {
                             sampleType: 'float',
-                            viewDimension: this.multiScatteringLut.texture.dimension,
+                            viewDimension: this.resources.multiScatteringLut.texture.dimension,
                             multisampled: false,
                         },
                     },
@@ -774,7 +328,7 @@ export class SkyAtmospherePasses {
                         visibility: GPUShaderStage.COMPUTE,
                         texture: {
                             sampleType: 'unfilterable-float',
-                            viewDimension: config2.compute!.depthBuffer.texture.dimension,
+                            viewDimension: config.compute!.depthBuffer.texture.dimension,
                             multisampled: false,
                         },
                     },
@@ -783,7 +337,7 @@ export class SkyAtmospherePasses {
                         visibility: GPUShaderStage.COMPUTE,
                         texture: {
                             sampleType: 'unfilterable-float',
-                            viewDimension: config2.compute!.backBuffer.texture.dimension,
+                            viewDimension: config.compute!.backBuffer.texture.dimension,
                             multisampled: false,
                         },
                     },
@@ -792,8 +346,8 @@ export class SkyAtmospherePasses {
                         visibility: GPUShaderStage.COMPUTE,
                         storageTexture: {
                             access: 'write-only',
-                            format: config2.compute!.renderTarget.texture.format,
-                            viewDimension: config2.compute!.renderTarget.texture.dimension,
+                            format: config.compute!.renderTarget.texture.format,
+                            viewDimension: config.compute!.renderTarget.texture.dimension,
                         },
                     },
                 ],
@@ -805,11 +359,11 @@ export class SkyAtmospherePasses {
                 entries: [
                     {
                         binding: 0,
-                        resource: this.transmittanceLut.view,
+                        resource: this.resources.transmittanceLut.view,
                     },
                     {
                         binding: 1,
-                        resource: this.multiScatteringLut.view,
+                        resource: this.resources.multiScatteringLut.view,
                     },
                 ],
             });
@@ -820,15 +374,15 @@ export class SkyAtmospherePasses {
                 entries: [
                     {
                         binding: 0,
-                        resource: config2.compute!.depthBuffer.view!,
+                        resource: config.compute!.depthBuffer.view!,
                     },
                     {
                         binding: 1,
-                        resource: config2.compute!.backBuffer.view!,
+                        resource: config.compute!.backBuffer.view!,
                     },
                     {
                         binding: 2,
-                        resource: config2.compute!.renderTarget.view!,
+                        resource: config.compute!.renderTarget.view!,
                     },
                 ],
             });
@@ -858,14 +412,14 @@ export class SkyAtmospherePasses {
                 renderSkyPipeline,
                 [uniformBufferBindGroup, samplerBindGroup, renderSkyRaymarchingBindGroup, externalResourcesBindGroup],
                 [
-                    Math.ceil(config2.compute!.renderTarget.texture.width / 16.0),
-                    Math.ceil(config2.compute!.renderTarget.texture.height / 16.0),
+                    Math.ceil(config.compute!.renderTarget.texture.width / 16.0),
+                    Math.ceil(config.compute!.renderTarget.texture.height / 16.0),
                     1,
                 ],
             );
         }
 
-        if (config2.initializeConstantLutsAtCreation) {
+        if (config.initializeConstantLutsAtCreation) {
             const commandEncoder = device.createCommandEncoder();
             const computePassEncoder = commandEncoder.beginComputePass();
             this.transmittanceLutPass.encode(computePassEncoder);
@@ -876,11 +430,11 @@ export class SkyAtmospherePasses {
     }
 
     public updateAtmosphere(atmosphere: Atmosphere) {
-        this.device.queue.writeBuffer(this.atmosphereBuffer, 0, new Float32Array(atmosphereToFloatArray(atmosphere)));
+        this.resources.updateAtmosphere(atmosphere);
     }
 
     public updateConfig(config: Config) {
-        this.device.queue.writeBuffer(this.configBuffer, 0, new Float32Array(configToFloatArray(config)));
+        this.resources.updateConfig(config);
     }
 
     public renderTransmittanceLut(computePassEncoder: GPUComputePassEncoder) {

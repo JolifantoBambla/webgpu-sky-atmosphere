@@ -4,8 +4,7 @@ override WORKGROUP_SIZE_X: u32 = 16;
 override WORKGROUP_SIZE_Y: u32 = 16;
 
 @group(0) @binding(0) var<uniform> atmosphere_buffer: Atmosphere;
-
-@group(1) @binding(0) var transmittance_lut : texture_storage_2d<rgba16float, write>;
+@group(0) @binding(1) var transmittance_lut : texture_storage_2d<rgba16float, write>;
 
 fn find_closest_ray_circle_intersection(o: vec2<f32>, d: vec2<f32>, r: f32) -> f32 {
     return solve_quadratic_for_positive_reals(dot(d, d), 2.0 * dot(d, o), dot(o, o) - (r * r));

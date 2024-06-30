@@ -5,12 +5,10 @@ override WORKGROUP_SIZE_Y: u32 = 16;
 
 @group(0) @binding(0) var<uniform> atmosphere_buffer: Atmosphere;
 @group(0) @binding(1) var<uniform> config_buffer: Config;
-
-@group(1) @binding(0) var lut_sampler: sampler;
-
-@group(2) @binding(0) var transmittance_lut: texture_2d<f32>;
-@group(2) @binding(1) var multi_scattering_lut: texture_2d<f32>;
-@group(2) @binding(2) var aerial_perspective_lut: texture_storage_3d<rgba16float, write>;
+@group(0) @binding(2) var lut_sampler: sampler;
+@group(0) @binding(3) var transmittance_lut: texture_2d<f32>;
+@group(0) @binding(4) var multi_scattering_lut: texture_2d<f32>;
+@group(0) @binding(5) var aerial_perspective_lut: texture_storage_3d<rgba16float, write>;
 
 struct SingleScatteringResult {
 	luminance: vec3<f32>,				// Scattered light (luminance)

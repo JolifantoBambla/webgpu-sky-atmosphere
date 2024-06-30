@@ -17,7 +17,7 @@
         import { Pane } from 'https://cdn.jsdelivr.net/npm/tweakpane@4.0.3/dist/tweakpane.min.js';
         import stanfordDragon from './stanford-dragon.js';
 
-        import { SkyAtmospherePasses, makeEarthAtmosphere, makeDefaultConfig } from '../dist/1.x/webgpu-sky-atmosphere.module.min.js';
+        import { SkyAtmosphereRenderer, makeEarthAtmosphere, makeDefaultConfig } from '../dist/1.x/webgpu-sky-atmosphere.module.min.js';
 
         class CameraController {
             #pitch = 0.0;
@@ -112,6 +112,8 @@
 
             const adapter = await navigator.gpu.requestAdapter();
             const device = await adapter.requestDevice();
+
+            console.log([...adapter.features]);
 
             const canvas = document.querySelector('canvas');
             canvas.width = resolution[0];
@@ -305,7 +307,7 @@
                 usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING,
             });
 
-            const skyAtmospherePasses = new SkyAtmospherePasses(device, {
+            const skyAtmosphereRenderer = new SkyAtmosphereRenderer(device, {
                 initializeConstantLutsAtCreation: true,
                 useYup: true,
                 useRightHanded: true,
@@ -419,19 +421,19 @@
                     },
                     {
                         binding: 1,
-                        resource: skyAtmospherePasses.transmittanceLut.view,
+                        resource: skyAtmosphereRenderer.resources.transmittanceLut.view,
                     },
                     {
                         binding: 2,
-                        resource: skyAtmospherePasses.multiScatteringLut.view,
+                        resource: skyAtmosphereRenderer.resources.multiScatteringLut.view,
                     },
                     {
                         binding: 3,
-                        resource: skyAtmospherePasses.skyViewLut.view,
+                        resource: skyAtmosphereRenderer.resources.skyViewLut.view,
                     },
                     {
                         binding: 4,
-                        resource: skyAtmospherePasses.aerialPerspectiveLut.view,
+                        resource: skyAtmosphereRenderer.resources.aerialPerspectiveLut.view,
                     },
                     {
                         binding: 5,
@@ -487,7 +489,7 @@
                 geometryPass.end();
 
                 const computePass = encoder.beginComputePass();
-                skyAtmospherePasses.renderSkyAtmosphere(computePass, false, false, config, params.atmosphere);
+                skyAtmosphereRenderer.renderSkyAtmosphere(computePass, false, false, config, params.atmosphere);
                 computePass.end();
 
                 const pass = encoder.beginRenderPass({

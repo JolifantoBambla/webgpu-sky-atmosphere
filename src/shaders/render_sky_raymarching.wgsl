@@ -19,7 +19,7 @@ override WORKGROUP_SIZE_Y: u32 = 16;
 @group(3) @binding(2) var render_target : texture_storage_2d<rgba16float, write>;
 
 // todo: this will be passed in by the user
-fn get_shadow(Atmosphere: Atmosphere, P: vec3<f32>) -> f32 {
+fn get_shadow(atmosphere: Atmosphere, sample_position: vec3<f32>) -> f32 {
 	return 1.0;
 }
 
