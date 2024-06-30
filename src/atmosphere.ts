@@ -61,6 +61,11 @@ export interface Absorption {
 
 export interface Atmosphere {
     /**
+     * Defaults to upDirection * -bottomRadius
+     */
+    center?: [number, number, number],
+
+    /**
      * Radius of the planet in kilometers (center to ground)
      */
 	bottomRadius: number,
@@ -81,10 +86,11 @@ export interface Atmosphere {
 	groundAlbedo: [number, number, number],
 }
 
-export function makeEarthAtmosphere(): Atmosphere {
+export function makeEarthAtmosphere(center?: [number, number, number]): Atmosphere {
     const rayleighScaleHeight = 8.0;
     const mieScaleHeight = 1.2;
     return {
+	center,
         bottomRadius: 6360.0,
         height: 100.0,
         rayleigh: {
