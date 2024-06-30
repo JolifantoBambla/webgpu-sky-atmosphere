@@ -32,6 +32,11 @@ struct Atmosphere {
 
 	// Maximum considered atmosphere height (center to atmosphere top)
 	top_radius: f32,
+
+    // planet center in world space (z up)
+    // used to transform the camera's position to the atmosphere's object space
+    planet_center: vec3<f32>,
+    padding: f32,
 }
 
 fn make_earth_atmosphere() -> Atmosphere {
