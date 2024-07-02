@@ -20,8 +20,7 @@ override WORKGROUP_SIZE_Y: u32 = 16;
 
 // todo: this will be passed in by the user
 fn get_sample_shadow(atmosphere: Atmosphere, sample_position: vec3<f32>) -> f32 {
-    let world_pos = sample_position - vec3(0, 0, atmosphere.bottom_radius);
-	return get_shadow(vec3(world_pos.x, world_pos.z, world_pos.y));
+	return get_shadow(vec3(sample_position.x, sample_position.z, sample_position.y) + atmosphere.planet_center);
 }
 
 struct SingleScatteringResult {
@@ -116,7 +115,7 @@ fn render_sky(pix: vec2<u32>) -> RenderSkyResult {
 	let uv = (vec2<f32>(pix) + 0.5) / vec2<f32>(config.screen_resolution);
 
     let world_dir = uv_to_world_dir(uv, config.inverse_projection, config.inverse_view);
-    var world_pos = to_z_up_left_handed(config.camera_world_position) + vec3(0.0, 0.0, atmosphere.bottom_radius);
+    var world_pos = to_z_up_left_handed(config.camera_world_position - atmosphere.planet_center);
     let sun_dir = to_z_up_left_handed(normalize(config.sun_direction));
 
 	let min_sample_count = config.ray_march_min_spp;
