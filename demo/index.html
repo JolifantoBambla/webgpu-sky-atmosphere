@@ -267,7 +267,7 @@
             makeUi();
 
             const projection = mat4n.perspectiveReverseZ(
-                90.0 * (Math.PI / 180.0),
+                45.0 * (Math.PI / 180.0),
                 resolution[0] / resolution[1],
                 1.0,
             );
@@ -476,9 +476,10 @@
                     params.renderSettings.sun.illuminance.b,
                 ].map(c => c * params.renderSettings.sun.illuminanceFactor);
 
+                const model = mat4n.translation([0.0, -45.0, 0.0]);
                 dragonRenderer.update(
                     {view: cameraView, projection},
-                    {model: mat4n.identity(), normal: mat4n.identity()},
+                    {model, normal: mat4n.transpose(mat4n.inverse(model))},
                     {direction: config.sun.direction, illuminance: config.sun.illuminance},
                 );
 

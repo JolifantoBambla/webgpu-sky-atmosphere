@@ -159,3 +159,4 @@ export function makeDragonRenderer(device, colorFormat = 'rgba16float', depthFor
         },
     };
 }
+
