@@ -15,7 +15,7 @@
     <script type="module">
         import { vec3n, mat4n, quatn } from 'https://wgpu-matrix.org/dist/3.x/wgpu-matrix.module.min.js';
         import { Pane } from 'https://cdn.jsdelivr.net/npm/tweakpane@4.0.3/dist/tweakpane.min.js';
-        import stanfordDragon from './stanford-dragon.js';
+        import { makeDragonRenderer } from './stanford-dragon.js';
 
         import { SkyAtmosphereRenderer, makeEarthAtmosphere, makeDefaultConfig } from '../dist/1.x/webgpu-sky-atmosphere.module.min.js';
 
@@ -442,6 +442,8 @@
                 ],
             });
 
+            const dragonRenderer = makeDragonRenderer(device, backBuffer.format, depthBuffer.format, true);
+
             let lastTime = new Date();
             const render = () => {
                 const now = new Date();
@@ -462,15 +464,23 @@
                     params.debugViews.aerialPerspectiveSlice,
                 ]));
 
+                const cameraView = cameraController.view;
+
                 const config = makeDefaultConfig();
                 config.camera.position = cameraController.position;
-                config.camera.inverseView = mat4n.inverse(cameraController.view);
+                config.camera.inverseView = mat4n.inverse(cameraView);
                 config.camera.inverseProjection = mat4n.inverse(projection);
                 config.sun.illuminance = [
                     params.renderSettings.sun.illuminance.r,
                     params.renderSettings.sun.illuminance.g,
                     params.renderSettings.sun.illuminance.b,
                 ].map(c => c * params.renderSettings.sun.illuminanceFactor);
+
+                dragonRenderer.update(
+                    {view: cameraView, projection},
+                    {model: mat4n.identity(), normal: mat4n.identity()},
+                    {direction: config.sun.direction, illuminance: config.sun.illuminance},
+                );
 
                 const geometryPass = encoder.beginRenderPass({
                     colorAttachments: [{
@@ -486,10 +496,11 @@
                         depthStoreOp: 'store',
                     },
                 });
+                dragonRenderer.encode(geometryPass);
                 geometryPass.end();
 
                 const computePass = encoder.beginComputePass();
-                skyAtmosphereRenderer.renderSkyAtmosphere(computePass, false, false, config, params.atmosphere);
+                skyAtmosphereRenderer.renderSkyAtmosphere(computePass, true, false, config, params.atmosphere);
                 computePass.end();
 
                 const pass = encoder.beginRenderPass({
