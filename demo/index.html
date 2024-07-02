@@ -29,7 +29,7 @@
             #pointerSensitivity = 0.002;
             #keys = [];
             #pointerMoveHandler;
-            #position = vec3n.create(0, 1, 0);
+            #position = vec3n.create(0, 20, 100);
             #rotation = quatn.identity();
 
             constructor(canvas) {
@@ -285,6 +285,14 @@
             });
             const depthBufferView = depthBuffer.createView();
 
+            const shadowMapSize = 1024;
+            const shadowMap = device.createTexture({
+                size: [shadowMapSize, shadowMapSize, 1],
+                usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+                format: 'depth32float',
+            });
+            const shadowMapView = shadowMap.createView();
+
             const geometryPipeline = device.createRenderPipeline({
                 layout: 'auto',
                 vertex: {
@@ -442,7 +450,9 @@
                 ],
             });
 
-            const dragonRenderer = makeDragonRenderer(device, backBuffer.format, depthBuffer.format, true);
+            const dragonRenderer = makeDragonRenderer(device, backBuffer.format, depthBuffer.format, true, shadowMap);
+
+            const sunProjection = mat4n.ortho(-80, 80, -80, 80, -200, 300);
 
             let lastTime = new Date();
             const render = () => {
@@ -476,12 +486,34 @@
                     params.renderSettings.sun.illuminance.b,
                 ].map(c => c * params.renderSettings.sun.illuminanceFactor);
 
-                const model = mat4n.translation([0.0, -45.0, 0.0]);
+                const model = mat4n.translation([0.0, -20.0, 0.0]);
+                const sunView = mat4n.lookAt(config.sun.direction, vec3n.fromValues(0, 0, 0), vec3n.normalize(vec3n.fromValues(0, 0, 1)));
                 dragonRenderer.update(
                     {view: cameraView, projection},
                     {model, normal: mat4n.transpose(mat4n.inverse(model))},
-                    {direction: config.sun.direction, illuminance: config.sun.illuminance},
+                    {
+                        direction: config.sun.direction,
+                        illuminance: config.sun.illuminance,
+                        invViewProjection: mat4n.inverse(mat4n.multiply(projection, cameraView)),
+                        lightViewProjection: mat4n.multiply(sunProjection, sunView),
+                    },
+                    {
+                        sunView,
+                        sunProjection,
+                    }
                 );
+
+                const shadowMapPass = encoder.beginRenderPass({
+                    colorAttachments: [],
+                    depthStencilAttachment: {
+                        view: shadowMapView,
+                        depthClearValue: 1.0,
+                        depthLoadOp: 'clear',
+                        depthStoreOp: 'store',
+                    },
+                });
+                dragonRenderer.encodeShadow(shadowMapPass);
+                shadowMapPass.end();
 
                 const geometryPass = encoder.beginRenderPass({
                     colorAttachments: [{

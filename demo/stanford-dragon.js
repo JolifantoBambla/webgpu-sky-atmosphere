@@ -22,32 +22,59 @@ struct Sun {
     pad0: f32,
     illuminance: vec3<f32>,
     pad1: f32,
+    inv_view_projection: mat4x4<f32>,
+    light_view_projection: mat4x4<f32>,
 }
 
 @group(0) @binding(0) var<uniform> camera: Camera;
 @group(0) @binding(1) var<uniform> model: Model;
 @group(0) @binding(2) var<uniform> sun: Sun;
+@group(0) @binding(3) var shadow_sampler: sampler_comparison;
+@group(0) @binding(4) var shadow_map: texture_depth_2d;
 
 struct VertexOut {
     @builtin(position) position: vec4<f32>,
-    @location(0) normal: vec3<f32>,
-    @location(1) uv: vec2<f32>,
+    @location(0) world_pos: vec3<f32>,
+    @location(1) normal: vec3<f32>,
+    @location(2) uv: vec2<f32>,
 }
 
 @vertex
 fn vertex(@location(0) position: vec3<f32>, @location(1) normal: vec3<f32>, @location(2) uv: vec2<f32>) -> VertexOut {
+    let world_pos = model.model * vec4(position, 1.0);
     return VertexOut(
-        camera.projection * camera.view * model.model * vec4(position, 1.0),
+        camera.projection * camera.view * world_pos,
+        world_pos.xyz,
         normalize((model.normal * vec4(normal, 0.0)).xyz),
         uv,
     );
 }
 
+override shadow_map_size: f32 = 1024.0;
+
 @fragment
-fn fragment(@location(0) normal: vec3<f32>, @location(1) uv: vec2<f32>) -> @location(0) vec4<f32> {
-    let flooredUv = floor(30.0 * uv);
-    let albedo = vec3(0.2 + 0.5 * ((flooredUv.x + flooredUv.y) - 2.0 * floor((flooredUv.x + flooredUv.y) / 2.0)));
-    return vec4(saturate(dot(normalize(sun.direction), normalize(normal))) * albedo * sun.illuminance, 1.0);
+fn fragment(frag_in: VertexOut) -> @location(0) vec4<f32> {
+    let ambient = 0.02;
+
+    let uv = floor(30.0 * frag_in.uv);
+    let albedo = vec3(0.2 + 0.5 * ((uv.x + uv.y) - 2.0 * floor((uv.x + uv.y) / 2.0)));
+
+    let shadow_pos = (sun.light_view_projection * vec4(frag_in.world_pos, 1.0)).xyz;
+
+    var shadow = 0.0;
+    let inv_shadow_map_size = 1.0 / shadow_map_size;
+    for (var y = -1; y <= 1; y++) {
+        for (var x = -1; x <= 1; x++) {
+        let offset = vec2f(vec2(x, y)) * inv_shadow_map_size;
+        shadow += textureSampleCompareLevel(
+            shadow_map, shadow_sampler,
+            shadow_pos.xy * vec2(0.5, -0.5) + vec2(0.5) + offset, shadow_pos.z - 0.007
+        );
+        }
+    }
+    shadow /= 9.0;
+
+    return vec4((ambient + shadow * saturate(dot(normalize(sun.direction), normalize(frag_in.normal))) * sun.illuminance) * albedo , 1.0);
 }
 `;
 
@@ -73,57 +100,86 @@ function makeIndexBuffer(device) {
     return indexBuffer;
 }
 
-function makeRenderPipeline(device, colorFormat, depthFormat, reverseZ) {
+function makeRenderPipeline(device, colorFormat, depthFormat, reverseZ, shadowMapFormat, shadowMapSize) {
     const module = device.createShaderModule({
         code: shader,
     });
-    return device.createRenderPipeline({
+    const vertex = {
+        module,
+        buffers: [{
+            arrayStride: Float32Array.BYTES_PER_ELEMENT * 8,
+            attributes: [
+                {
+                    shaderLocation: 0,
+                    offset: 0,
+                    format: 'float32x3',
+                },
+                {
+                    shaderLocation: 1,
+                    offset: Float32Array.BYTES_PER_ELEMENT * 3,
+                    format: 'float32x3',
+                },
+                {
+                    shaderLocation: 2,
+                    offset: Float32Array.BYTES_PER_ELEMENT * 6,
+                    format: 'float32x2',
+                },
+            ]
+        }],
+    };
+    const primitive = {
+        topology: 'triangle-list',
+        cullMode: 'back',
+    };
+
+    const pipeline = device.createRenderPipeline({
         layout: 'auto',
-        vertex: {
-            module,
-            buffers: [{
-                arrayStride: Float32Array.BYTES_PER_ELEMENT * 8,
-                attributes: [
-                    {
-                        shaderLocation: 0,
-                        offset: 0,
-                        format: 'float32x3',
-                    },
-                    {
-                        shaderLocation: 1,
-                        offset: Float32Array.BYTES_PER_ELEMENT * 3,
-                        format: 'float32x3',
-                    },
-                    {
-                        shaderLocation: 2,
-                        offset: Float32Array.BYTES_PER_ELEMENT * 6,
-                        format: 'float32x2',
-                    },
-                ]
-            }],
-        },
+        vertex,
+        primitive,
         fragment: {
             module,
             targets: [{format: colorFormat}],
+            constants: {
+                shadow_map_size: shadowMapSize,
+            }
         },
         depthStencil: {
             depthWriteEnabled: true,
             depthCompare: reverseZ ? 'greater' : 'less',
             format: depthFormat,
         },
-        primitive: {
-            topology: 'triangle-list',
-            cullMode: 'back',
+    });
+
+    const shadowPipeline = device.createRenderPipeline({
+        layout: 'auto',
+        vertex,
+        primitive,
+        depthStencil: {
+            depthWriteEnabled: true,
+            depthCompare: 'less',
+            format: shadowMapFormat,
         },
     });
+
+    return {
+        pipeline,
+        shadowPipeline,
+    };
 }
 
-export function makeDragonRenderer(device, colorFormat = 'rgba16float', depthFormat = 'depth24plus', reverseZ = true) {
+export function makeDragonRenderer(device, colorFormat = 'rgba16float', depthFormat = 'depth24plus', reverseZ = true, shadowMap) {
     const vertexBuffer = makeVertexBuffer(device);
     const indexBuffer = makeIndexBuffer(device);
-    const pipeline = makeRenderPipeline(device, colorFormat, depthFormat, reverseZ);
+    const {
+        pipeline,
+        shadowPipeline,
+    } = makeRenderPipeline(device, colorFormat, depthFormat, reverseZ, shadowMap.format, shadowMap.width);
 
     const cameraBuffer = device.createBuffer({
+        size: Float32Array.BYTES_PER_ELEMENT * 16 * 2,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+    const sunCameraBuffer = device.createBuffer({
         size: Float32Array.BYTES_PER_ELEMENT * 16 * 2,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
@@ -132,27 +188,45 @@ export function makeDragonRenderer(device, colorFormat = 'rgba16float', depthFor
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
     const sunBuffer = device.createBuffer({
-        size: Float32Array.BYTES_PER_ELEMENT * 4 * 2,
+        size: Float32Array.BYTES_PER_ELEMENT * (4 * 2 + 16 * 2),
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
+
     const bindGroup = device.createBindGroup({
         layout: pipeline.getBindGroupLayout(0),
         entries: [
             {binding: 0, resource: {buffer: cameraBuffer}},
             {binding: 1, resource: {buffer: modelBuffer}},
             {binding: 2, resource: {buffer: sunBuffer}},
+            {binding: 3, resource: device.createSampler({compare: 'less'})},
+            {binding: 4, resource: shadowMap.createView()},
+        ],
+    });
+    const shadowBindGroup = device.createBindGroup({
+        layout: shadowPipeline.getBindGroupLayout(0),
+        entries: [
+            {binding: 0, resource: {buffer: sunCameraBuffer}},
+            {binding: 1, resource: {buffer: modelBuffer}},
         ],
     });
 
     return {
-        update({view, projection}, {model, normal}, {direction, illuminance}) {
+        update({view, projection}, {model, normal}, {direction, illuminance, invViewProjection, lightViewProjection}, {sunView, sunProjection}) {
+            device.queue.writeBuffer(sunCameraBuffer, 0, new Float32Array([...sunView, ...sunProjection]));
             device.queue.writeBuffer(cameraBuffer, 0, new Float32Array([...view, ...projection]));
             device.queue.writeBuffer(modelBuffer, 0, new Float32Array([...model, ...normal]));
-            device.queue.writeBuffer(sunBuffer, 0, new Float32Array([...direction, 0.0, ...illuminance, 0.0]));
+            device.queue.writeBuffer(sunBuffer, 0, new Float32Array([...direction, 0.0, ...illuminance, 0.0, ...invViewProjection, ...lightViewProjection]));
         },
         encode(passEncoder) {
             passEncoder.setPipeline(pipeline);
             passEncoder.setBindGroup(0, bindGroup);
+            passEncoder.setVertexBuffer(0, vertexBuffer);
+            passEncoder.setIndexBuffer(indexBuffer, 'uint16');
+            passEncoder.drawIndexed(mesh.index.length);
+        },
+        encodeShadow(passEncoder) {
+            passEncoder.setPipeline(shadowPipeline);
+            passEncoder.setBindGroup(0, shadowBindGroup);
             passEncoder.setVertexBuffer(0, vertexBuffer);
             passEncoder.setIndexBuffer(indexBuffer, 'uint16');
             passEncoder.drawIndexed(mesh.index.length);

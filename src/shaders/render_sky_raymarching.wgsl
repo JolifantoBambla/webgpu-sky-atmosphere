@@ -38,7 +38,7 @@ fn integrate_scattered_luminance(uv: vec2<f32>, world_pos: vec3<f32>, world_dir:
     }
 
     if is_valid_depth(depth) {
-        let depth_buffer_world_pos: vec3<f32> = uv_and_depth_to_world_pos(config.inverse_view * config.inverse_projection, uv, depth);
+        let depth_buffer_world_pos = uv_and_depth_to_world_pos(config.inverse_view * config.inverse_projection, uv, depth);
         t_max = min(t_max, length(depth_buffer_world_pos - (world_pos - vec3(0.0, 0.0, atmosphere.bottom_radius))));
     }
 	t_max = min(t_max, t_max_max);
