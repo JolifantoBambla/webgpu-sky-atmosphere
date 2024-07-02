@@ -7,20 +7,21 @@ override WORKGROUP_SIZE_Y: u32 = 16;
 @group(0) @binding(0) var<uniform> atmosphere_buffer: Atmosphere;
 @group(0) @binding(1) var<uniform> config_buffer: Config;
 
-@group(1) @binding(0) var lut_sampler: sampler;
+@group(0) @binding(2) var lut_sampler: sampler;
 
-@group(2) @binding(0) var transmittance_lut: texture_2d<f32>;
-@group(2) @binding(1) var multi_scattering_lut: texture_2d<f32>;
+@group(0) @binding(3) var transmittance_lut: texture_2d<f32>;
+@group(0) @binding(4) var multi_scattering_lut: texture_2d<f32>;
 
 // group 3 is passed in and contains only resources controlled by the user (except for render target? let's see what makes sense)
 // todo: might be a depth texture
-@group(3) @binding(0) var depth_buffer: texture_2d<f32>;
-@group(3) @binding(1) var backbuffer : texture_2d<f32>;
-@group(3) @binding(2) var render_target : texture_storage_2d<rgba16float, write>;
+@group(1) @binding(0) var depth_buffer: texture_2d<f32>;
+@group(1) @binding(1) var backbuffer: texture_2d<f32>;
+@group(1) @binding(2) var render_target: texture_storage_2d<rgba16float, write>;
 
 // todo: this will be passed in by the user
-fn get_shadow(atmosphere: Atmosphere, sample_position: vec3<f32>) -> f32 {
-	return 1.0;
+fn get_sample_shadow(atmosphere: Atmosphere, sample_position: vec3<f32>) -> f32 {
+    let world_pos = sample_position - vec3(0, 0, atmosphere.bottom_radius);
+	return get_shadow(vec3(world_pos.x, world_pos.z, world_pos.y));
 }
 
 struct SingleScatteringResult {
@@ -90,7 +91,7 @@ fn integrate_scattered_luminance(uv: vec2<f32>, world_pos: vec3<f32>, world_dir:
 
 		let multi_scattered_luminance = get_multiple_scattering(atmosphere, medium.scattering, medium.extinction, sample_pos, cos_sun_zenith);
 
-		let shadow = get_shadow(atmosphere, sample_pos);
+		let shadow = get_sample_shadow(atmosphere, sample_pos);
 
 		let scattering = sun_illuminance * (planet_shadow * shadow * transmittance_to_sun * phase_times_scattering + multi_scattered_luminance * medium.scattering);
 

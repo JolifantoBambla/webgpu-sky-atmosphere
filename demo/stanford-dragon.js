@@ -22,7 +22,6 @@ struct Sun {
     pad0: f32,
     illuminance: vec3<f32>,
     pad1: f32,
-    inv_view_projection: mat4x4<f32>,
     light_view_projection: mat4x4<f32>,
 }
 
@@ -188,7 +187,7 @@ export function makeDragonRenderer(device, colorFormat = 'rgba16float', depthFor
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
     const sunBuffer = device.createBuffer({
-        size: Float32Array.BYTES_PER_ELEMENT * (4 * 2 + 16 * 2),
+        size: Float32Array.BYTES_PER_ELEMENT * (4 * 2 + 16),
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
@@ -211,11 +210,11 @@ export function makeDragonRenderer(device, colorFormat = 'rgba16float', depthFor
     });
 
     return {
-        update({view, projection}, {model, normal}, {direction, illuminance, invViewProjection, lightViewProjection}, {sunView, sunProjection}) {
+        update({view, projection}, {model, normal}, {direction, illuminance, lightViewProjection}, {sunView, sunProjection}) {
             device.queue.writeBuffer(sunCameraBuffer, 0, new Float32Array([...sunView, ...sunProjection]));
             device.queue.writeBuffer(cameraBuffer, 0, new Float32Array([...view, ...projection]));
             device.queue.writeBuffer(modelBuffer, 0, new Float32Array([...model, ...normal]));
-            device.queue.writeBuffer(sunBuffer, 0, new Float32Array([...direction, 0.0, ...illuminance, 0.0, ...invViewProjection, ...lightViewProjection]));
+            device.queue.writeBuffer(sunBuffer, 0, new Float32Array([...direction, 0.0, ...illuminance, 0.0, ...lightViewProjection]));
         },
         encode(passEncoder) {
             passEncoder.setPipeline(pipeline);

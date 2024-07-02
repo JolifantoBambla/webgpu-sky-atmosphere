@@ -301,6 +301,31 @@ export class SkyAtmosphereRenderer {
                     {
                         binding: 0,
                         visibility: GPUShaderStage.COMPUTE,
+                        buffer: {
+                            type: 'uniform',
+                            hasDynamicOffset: false,
+                            minBindingSize: ATMOSPHERE_BUFFER_SIZE,
+                        },
+                    },
+                    {
+                        binding: 1,
+                        visibility: GPUShaderStage.COMPUTE,
+                        buffer: {
+                            type: 'uniform',
+                            hasDynamicOffset: false,
+                            minBindingSize: CONFIG_BUFFER_SIZE,
+                        },
+                    },
+                    {
+                        binding: 2,
+                        visibility: GPUShaderStage.COMPUTE,
+                        sampler: {
+                            type: 'filtering',
+                        },
+                    },
+                    {
+                        binding: 3,
+                        visibility: GPUShaderStage.COMPUTE,
                         texture: {
                             sampleType: 'float',
                             viewDimension: this.resources.transmittanceLut.texture.dimension,
@@ -308,7 +333,7 @@ export class SkyAtmosphereRenderer {
                         },
                     },
                     {
-                        binding: 1,
+                        binding: 4,
                         visibility: GPUShaderStage.COMPUTE,
                         texture: {
                             sampleType: 'float',
@@ -359,10 +384,26 @@ export class SkyAtmosphereRenderer {
                 entries: [
                     {
                         binding: 0,
-                        resource: this.resources.transmittanceLut.view,
+                        resource: {
+                            buffer: this.resources.atmosphereBuffer,
+                        },
                     },
                     {
                         binding: 1,
+                        resource: {
+                            buffer: this.resources.configBuffer,
+                        },
+                    },
+                    {
+                        binding: 2,
+                        resource: this.resources.lutSampler,
+                    },
+                    {
+                        binding: 3,
+                        resource: this.resources.transmittanceLut.view,
+                    },
+                    {
+                        binding: 4,
                         resource: this.resources.multiScatteringLut.view,
                     },
                 ],
@@ -392,15 +433,16 @@ export class SkyAtmosphereRenderer {
                 layout: device.createPipelineLayout({
                     label: 'Render sky raymarching pipeline layout',
                     bindGroupLayouts: [
-                        uniformBufferBindGroupLayout,
-                        samplerBindGroupLayout,
+                        //uniformBufferBindGroupLayout,
+                        //samplerBindGroupLayout,
                         renderSkyRaymarchingBindGroupLayout,
                         externalResourcesBindGroupLayout,
+                        config.shadow!.bindGroupLayout,
                     ],
                 }),
                 compute: {
                     module: device.createShaderModule({
-                        code: makeRenderSkyRaymarchingShaderCode(),
+                        code: `${config.shadow!.wgslCode}\n${makeRenderSkyRaymarchingShaderCode()}`,
                     }),
                     entryPoint: 'render_sky_atmosphere',
                     constants: {
@@ -410,7 +452,7 @@ export class SkyAtmosphereRenderer {
 
             this.renderSkyRaymarchingPass = new ComputePass(
                 renderSkyPipeline,
-                [uniformBufferBindGroup, samplerBindGroup, renderSkyRaymarchingBindGroup, externalResourcesBindGroup],
+                [renderSkyRaymarchingBindGroup, externalResourcesBindGroup, config.shadow!.bindGroup],
                 [
                     Math.ceil(config.compute!.renderTarget.texture.width / 16.0),
                     Math.ceil(config.compute!.renderTarget.texture.height / 16.0),
