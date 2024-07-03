@@ -86,6 +86,11 @@ export interface Atmosphere {
 	groundAlbedo: [number, number, number],
 }
 
+/**
+ * Create a default atmosphere that corresponds to earth's atmosphere.
+ * @param center The center of the atmosphere.
+ * @returns Atmosphere parameters corresponding to earth's atmosphere.
+ */
 export function makeEarthAtmosphere(center?: [number, number, number]): Atmosphere {
     const rayleighScaleHeight = 8.0;
     const mieScaleHeight = 1.2;

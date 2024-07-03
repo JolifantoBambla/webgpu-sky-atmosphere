@@ -1,5 +1,26 @@
-import { Atmosphere, makeEarthAtmosphere } from './atmosphere.js';
-import { Camera, Config, makeDefaultConfig } from './uniforms.js';
+import {
+    Absorption,
+    AbsorptionLayer0,
+    AbsorptionLayer1,
+    Atmosphere,
+    makeEarthAtmosphere,
+    Mie,
+    Rayleigh,
+} from './atmosphere.js';
+
+import {
+    ComputeBackBufferConfig,
+    ComputeRenderTargetConfig,
+    CoordinateSystemConfig,
+    DepthBufferConfig,
+    SkyAtmosphereLutConfig,
+    SkyAtmosphereConfig,
+    SkyRendererComputeConfig,
+    SkyRendererRenderConfig,
+    SkyRendererShadowConfig,
+} from './config.js';
+
+import { Camera, Sun, Uniforms } from './uniforms.js';
 import { ATMOSPHERE_BUFFER_SIZE, CONFIG_BUFFER_SIZE, SkyAtmosphereResources } from './resources.js';
 
 import {
@@ -8,15 +29,33 @@ import {
 } from './shaders.js';
 import { SkyAtmospherePipelines } from './pipelines.js';
 import { ComputePass } from './util.js';
-import { SkyAtmosphereConfig } from './config.js';
 
 export {
+    Absorption,
+    AbsorptionLayer0,
+    AbsorptionLayer1,
     Atmosphere,
     makeEarthAtmosphere,
-    Camera,
-    Config,
-    makeDefaultConfig,
+    Mie,
+    Rayleigh,
+};
+
+export {
+    ComputeBackBufferConfig,
+    ComputeRenderTargetConfig,
+    CoordinateSystemConfig,
+    DepthBufferConfig,
+    SkyAtmosphereLutConfig,
     SkyAtmosphereConfig,
+    SkyRendererComputeConfig,
+    SkyRendererRenderConfig,
+    SkyRendererShadowConfig,
+};
+
+export {
+    Camera,
+    Sun,
+    Uniforms,
 };
 
 export class SkyAtmosphereRenderer {
@@ -417,7 +456,7 @@ export class SkyAtmosphereRenderer {
         this.resources.updateAtmosphere(atmosphere);
     }
 
-    public updateConfig(config: Config) {
+    public updateConfig(config: Uniforms) {
         this.resources.updateConfig(config);
     }
 
@@ -445,7 +484,7 @@ export class SkyAtmosphereRenderer {
         this.renderSkyRaymarchingPass.encode(computePassEncoder);
     }
 
-    public renderSkyAtmosphere(computePassEncoder: GPUComputePassEncoder, isCameraInSpace: boolean, useColoredTransmittance: boolean, config?: Config, atmosphere?: Atmosphere) {
+    public renderSkyAtmosphere(computePassEncoder: GPUComputePassEncoder, isCameraInSpace: boolean, useColoredTransmittance: boolean, config?: Uniforms, atmosphere?: Atmosphere) {
         if (atmosphere) {
             this.updateAtmosphere(atmosphere);
 

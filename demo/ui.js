@@ -1,4 +1,4 @@
-import { makeEarthAtmosphere, makeDefaultConfig } from '../dist/1.x/webgpu-sky-atmosphere.module.min.js';
+import { makeEarthAtmosphere } from '../dist/1.x/webgpu-sky-atmosphere.module.min.js';
 import { Pane } from 'https://cdn.jsdelivr.net/npm/tweakpane@4.0.3/dist/tweakpane.min.js';
 
 const params = {
@@ -15,7 +15,20 @@ const params = {
         aerialPerspectiveLutFactor: 50,
         aerialPerspectiveSlice: 0,
     },
-    config: makeDefaultConfig(),
+    config: {
+        camera: {
+            position: [0.0, 1.0, 0.0],
+            inverseView: Array(16).fill(0.0),
+            inverseProjection: Array(16).fill(0.0),
+        },
+        sun: {
+            illuminance: [1.0, 1.0, 1.0],
+            direction: [0.0, 1.0, 0.0],
+        },
+        screenResolution: [1920, 1080],
+        rayMarchMinSPP: 30,
+        rayMarchMaxSPP: 31,
+    },
     renderSettings: {
         sun: {
             illuminance: {r: 1.0, g: 1.0, b: 1.0},

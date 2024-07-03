@@ -17,7 +17,7 @@ export interface Sun {
     direction: [number, number, number],
 }
 
-export interface Config {
+export interface Uniforms {
     // todo: should allow for more suns? or at least sun+moon?
     sun: Sun,
     camera: Camera,
@@ -30,21 +30,4 @@ export interface Config {
 
     // Resolution of the output texture
     screenResolution: [number, number],
-}
-
-export function makeDefaultConfig(): Config {
-    return {
-        camera: {
-            position: [0.0, 1.0, 0.0],
-            inverseView: Array(16).fill(0.0),
-            inverseProjection: Array(16).fill(0.0),
-        },
-        sun: {
-            illuminance: [1.0, 1.0, 1.0],
-            direction: [0.0, 1.0, 0.0],
-        },
-        screenResolution: [1920, 1080],
-        rayMarchMinSPP: 30,
-        rayMarchMaxSPP: 31,
-    };
 }

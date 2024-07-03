@@ -1,6 +1,6 @@
 import { Atmosphere, makeEarthAtmosphere } from "./atmosphere.js";
 import { SkyAtmosphereConfig } from "./config.js";
-import { Config, makeDefaultConfig } from "./uniforms.js";
+import { Uniforms } from "./uniforms.js";
 import { LookUpTable } from "./util.js";
 
 export const DEFAULT_TRANSMITTANCE_LUT_SIZE: [number, number] = [256, 64];
@@ -50,7 +50,6 @@ export class SkyAtmosphereResources {
             size: CONFIG_BUFFER_SIZE,
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
         });
-        this.updateConfig(makeDefaultConfig());
 
         this.lutSampler = lutSampler || device.createSampler({
             label: 'LUT sampler',
@@ -99,7 +98,7 @@ export class SkyAtmosphereResources {
         this.device.queue.writeBuffer(this.atmosphereBuffer, 0, new Float32Array(atmosphereToFloatArray(atmosphere, this.config.coordinateSystem?.yUp ?? true)));
     }
 
-    public updateConfig(config: Config) {
+    public updateConfig(config: Uniforms) {
         this.device.queue.writeBuffer(this.configBuffer, 0, new Float32Array(configToFloatArray(config)));
     }
 }
@@ -139,7 +138,7 @@ function atmosphereToFloatArray(atmosphere: Atmosphere, yUp = true) {
     ]);
 }
 
-function configToFloatArray(config: Config) {
+function configToFloatArray(config: Uniforms) {
     return new Float32Array([
         ...config.camera.inverseProjection,
         ...config.camera.inverseView,

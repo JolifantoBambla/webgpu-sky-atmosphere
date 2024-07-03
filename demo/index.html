@@ -18,7 +18,7 @@
         import { makeDragonRenderer } from './stanford-dragon.js';
         import { makeUi } from './ui.js';
 
-        import { SkyAtmosphereRenderer, makeEarthAtmosphere, makeDefaultConfig } from '../dist/1.x/webgpu-sky-atmosphere.module.min.js';
+        import { SkyAtmosphereRenderer, makeEarthAtmosphere } from '../dist/1.x/webgpu-sky-atmosphere.module.min.js';
 
 
         async function main() {
@@ -368,22 +368,28 @@
 
                 const cameraView = cameraController.view;
 
-                const config = makeDefaultConfig();
-                config.camera.position = cameraController.position;
-                config.camera.inverseView = mat4n.inverse(cameraView);
-                config.camera.inverseProjection = mat4n.inverse(projection);
-                config.sun.illuminance = [
-                    params.renderSettings.sun.illuminance.r,
-                    params.renderSettings.sun.illuminance.g,
-                    params.renderSettings.sun.illuminance.b,
-                ].map(c => c * params.renderSettings.sun.illuminanceFactor);
-                config.sun.direction = vec3n.normalize([
-                    0.0,
-                    params.renderSettings.sun.direction.y,
-                    params.renderSettings.sun.direction.x,
-                ]);
-                config.rayMarchMinSPP = params.config.rayMarchMinSPP;
-                config.rayMarchMaxSPP = Math.max(config.rayMarchMinSPP + 1, config.rayMarchMaxSPP, 15);
+                const config = {
+                    camera: {
+                        position: cameraController.position,
+                        inverseView: mat4n.inverse(cameraView),
+                        inverseProjection: mat4n.inverse(projection),
+                    },
+                    sun: {
+                        illuminance: [
+                            params.renderSettings.sun.illuminance.r,
+                            params.renderSettings.sun.illuminance.g,
+                            params.renderSettings.sun.illuminance.b,
+                        ].map(c => c * params.renderSettings.sun.illuminanceFactor),
+                        direction: vec3n.normalize([
+                            0.0,
+                            params.renderSettings.sun.direction.y,
+                            params.renderSettings.sun.direction.x,
+                        ]),
+                    },
+                    screenResolution: resolution,
+                    rayMarchMinSPP: params.config.rayMarchMinSPP,
+                    rayMarchMaxSPP: Math.max(params.config.rayMarchMinSPP + 1, 31),
+                };
 
                 const model = mat4n.translation([0.0, -20.0, 0.0]);
                 const sunView = mat4n.lookAt(config.sun.direction, vec3n.fromValues(0, 0, 0), vec3n.normalize(vec3n.fromValues(0, 0, 1)));
