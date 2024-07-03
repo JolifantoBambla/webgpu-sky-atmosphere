@@ -99,7 +99,6 @@
                 usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING,
             });
 
-
             const shadowBindGroupLayout = device.createBindGroupLayout({
                 label: 'shadow',
                 entries: [
@@ -134,10 +133,10 @@
             });
 
             const skyAtmosphereRenderer = new SkyAtmosphereRenderer(device, {
-                initializeConstantLutsAtCreation: true,
-                useYup: true,
-                useRightHanded: true,
-                useReverseZ: true,
+                initializeConstantLuts: true,
+                coordinateSystem: {
+                    yUp: true,
+                },
                 compute: {
                     backBuffer: {
                         texture: backBuffer,
@@ -146,6 +145,7 @@
                     depthBuffer: {
                         texture: depthBuffer,
                         view: depthBufferView,
+                        reverseZ: true,
                     },
                     renderTarget: {
                         texture: skyRenderTarget,
@@ -181,10 +181,10 @@
             });
 
             const skyAtmosphereRenderer2 = new SkyAtmosphereRenderer(device, {
-                initializeConstantLutsAtCreation: true,
-                useYup: true,
-                useRightHanded: true,
-                useReverseZ: true,
+                initializeConstantLuts: true,
+                coordinateSystem: {
+                    yUp: true,
+                },
                 compute: {
                     backBuffer: {
                         texture: backBuffer,
@@ -193,6 +193,7 @@
                     depthBuffer: {
                         texture: depthBuffer,
                         view: depthBufferView,
+                        reverseZ: true,
                     },
                     renderTarget: {
                         texture: skyRenderTarget2,

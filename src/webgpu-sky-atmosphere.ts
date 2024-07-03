@@ -1,14 +1,6 @@
 import { Atmosphere, makeEarthAtmosphere } from './atmosphere.js';
-import { Camera, Config, makeDefaultConfig } from './config.js';
-import { ATMOSPHERE_BUFFER_SIZE, CONFIG_BUFFER_SIZE, SkyAtmosphereLutConfig, SkyAtmosphereResources } from './resources.js';
-
-export {
-    Atmosphere,
-    makeEarthAtmosphere,
-    Camera,
-    Config,
-    makeDefaultConfig,
-};
+import { Camera, Config, makeDefaultConfig } from './uniforms.js';
+import { ATMOSPHERE_BUFFER_SIZE, CONFIG_BUFFER_SIZE, SkyAtmosphereResources } from './resources.js';
 
 import {
     makeRenderSkyWithLutsShaderCode,
@@ -16,58 +8,16 @@ import {
 } from './shaders.js';
 import { SkyAtmospherePipelines } from './pipelines.js';
 import { ComputePass } from './util.js';
+import { SkyAtmosphereConfig } from './config.js';
 
-export interface SkyAtmosphereConfig {
-    /**
-     * Defaults to 'atmosphere'
-     */
-    label?: string,
-    /**
-     * Defaults to true
-     */
-    initializeConstantLutsAtCreation?: boolean,
-    useYup?: boolean,
-    useRightHanded?: boolean,
-    useReverseZ?: boolean,
-    compute?: {
-        backBuffer: {
-            texture: GPUTexture,
-            // created if not supplied
-            view?: GPUTextureView,
-        },
-        depthBuffer: {
-            texture: GPUTexture,
-            // created if not supplied
-            // must be a depth only view
-            view?: GPUTextureView,
-        },
-        renderTarget: {
-            texture: GPUTexture,
-            // created if not supplied
-            view?: GPUTextureView,
-        },
-    },
-    render?: {
-        renderTargetFormat: GPUTextureFormat,
-        depthBuffer: {
-            texture: GPUTexture,
-            // created if not supplied
-            // must be a depth only view
-            view?: GPUTextureView,
-        },
-    },
-    shadow?: {
-        bindGroupLayout: GPUBindGroupLayout,
-        bindGroup: GPUBindGroup,
-        /**
-         * Needs to provide a function
-         * fn get_shadow(world_space_pos: vec3<f32>) -> f32
-         * returns 1.0 for no shadow, 0.0 <= x < 1.0 for shadow
-         */
-        wgslCode: string,
-    }
-    lookUpTables?: SkyAtmosphereLutConfig,
-}
+export {
+    Atmosphere,
+    makeEarthAtmosphere,
+    Camera,
+    Config,
+    makeDefaultConfig,
+    SkyAtmosphereConfig,
+};
 
 export class SkyAtmosphereRenderer {
     readonly resources: SkyAtmosphereResources;
@@ -82,20 +32,14 @@ export class SkyAtmosphereRenderer {
     private renderSkyWithLutsPass: ComputePass;
     private renderSkyRaymarchingPass: ComputePass;
 
-    constructor(device: GPUDevice, config: SkyAtmosphereConfig = {}, atmosphere: Atmosphere = makeEarthAtmosphere(), existingPipelines?: SkyAtmospherePipelines) {
+    constructor(device: GPUDevice, config: SkyAtmosphereConfig = {}, existingPipelines?: SkyAtmospherePipelines) {
         if ((existingPipelines?.transmittanceLutPipeline.device || device) !== device) {
-            this.skyAtmospherePipelines = new SkyAtmospherePipelines(device);
+            this.skyAtmospherePipelines = new SkyAtmospherePipelines(device, config);
         } else {
-            this.skyAtmospherePipelines = existingPipelines || new SkyAtmospherePipelines(device);
+            this.skyAtmospherePipelines = existingPipelines || new SkyAtmospherePipelines(device, config);
         }
 
-        this.resources = new SkyAtmosphereResources(
-            config.label || 'atmosphere',
-            device,
-            atmosphere,
-            config.lookUpTables,
-            this.skyAtmospherePipelines.lutSampler,
-        );
+        this.resources = new SkyAtmosphereResources(device, config, this.skyAtmospherePipelines.lutSampler);
 
         this.transmittanceLutPass = this.skyAtmospherePipelines.transmittanceLutPipeline.makeComputePass(this.resources);
         this.multiScatteringLutPass = this.skyAtmospherePipelines.multiScatteringLutPipeline.makeComputePass(this.resources);
@@ -433,8 +377,6 @@ export class SkyAtmosphereRenderer {
                 layout: device.createPipelineLayout({
                     label: 'Render sky raymarching pipeline layout',
                     bindGroupLayouts: [
-                        //uniformBufferBindGroupLayout,
-                        //samplerBindGroupLayout,
                         renderSkyRaymarchingBindGroupLayout,
                         externalResourcesBindGroupLayout,
                         config.shadow!.bindGroupLayout,
@@ -461,7 +403,7 @@ export class SkyAtmosphereRenderer {
             );
         }
 
-        if (config.initializeConstantLutsAtCreation) {
+        if (config.initializeConstantLuts ?? true) {
             const commandEncoder = device.createCommandEncoder();
             const computePassEncoder = commandEncoder.beginComputePass();
             this.transmittanceLutPass.encode(computePassEncoder);

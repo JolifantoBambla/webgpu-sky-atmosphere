@@ -22,8 +22,8 @@ fn render_sky(pix: vec2<u32>) -> vec4<f32> {
     let uv = (vec2<f32>(pix) + 0.5) / vec2<f32>(config.screen_resolution);
 
     let world_dir = uv_to_world_dir(uv, config.inverse_projection, config.inverse_view);
-    var world_pos = to_z_up_left_handed(config.camera_world_position) + vec3(0.0, 0.0, atmosphere.bottom_radius);
-    let sun_dir = to_z_up_left_handed(normalize(config.sun_direction));
+    var world_pos = to_z_up(config.camera_world_position) + vec3(0.0, 0.0, atmosphere.bottom_radius);
+    let sun_dir = to_z_up(normalize(config.sun_direction));
 
 	let view_height = length(world_pos);
 	

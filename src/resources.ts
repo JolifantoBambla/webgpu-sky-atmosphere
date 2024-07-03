@@ -1,5 +1,6 @@
-import { Atmosphere } from "./atmosphere.js";
-import { Config, makeDefaultConfig } from "./config.js";
+import { Atmosphere, makeEarthAtmosphere } from "./atmosphere.js";
+import { SkyAtmosphereConfig } from "./config.js";
+import { Config, makeDefaultConfig } from "./uniforms.js";
 import { LookUpTable } from "./util.js";
 
 export const DEFAULT_TRANSMITTANCE_LUT_SIZE: [number, number] = [256, 64];
@@ -14,40 +15,6 @@ export const AERIAL_PERSPECTIVE_LUT_FORMAT: GPUTextureFormat = TRANSMITTANCE_LUT
 
 export const ATMOSPHERE_BUFFER_SIZE: number = 128;
 export const CONFIG_BUFFER_SIZE: number = 192;
-
-export interface SkyAtmosphereLutConfig {
-    /**
-     * Defaults to [256, 64]
-     */
-    transmittanceLutSize?: [number, number],
-
-    /**
-     * Defaults to 40
-     * Clamped to max(40, transmittanceLutSampleCount)
-     */
-    transmittanceLutSampleCount?: number,
-
-    /**
-     * Defaults to 32
-     */
-    multiScatteringLutSize?: number,
-
-    /**
-     * Defaults to 20
-     * Clamped to max(10, multiScatteringLutSampleCount)
-     */
-    multiScatteringLutSampleCount?: number,
-
-    /**
-     * Defaults to [192, 108]
-     */
-    skyViewLutSize?: [number, number],
-
-    /**
-     * Defaults to [32, 32, 32]
-     */
-    aerialPerspectiveLutSize?: [number, number, number],
-}
 
 export class SkyAtmosphereResources {
     readonly label: string;
@@ -64,19 +31,22 @@ export class SkyAtmosphereResources {
     readonly skyViewLut: LookUpTable;
     readonly aerialPerspectiveLut: LookUpTable;
 
-    constructor(label: string, device: GPUDevice, atmosphere: Atmosphere, config: SkyAtmosphereLutConfig = {}, lutSampler?: GPUSampler) {
-        this.label = label;
+    readonly config: SkyAtmosphereConfig;
+
+    constructor(device: GPUDevice, config: SkyAtmosphereConfig = {}, lutSampler?: GPUSampler) {
+        this.label = config.label ?? 'atmosphere';
         this.device = device;
+        this.config = config;
 
         this.atmosphereBuffer = device.createBuffer({
-            label: `atmosphere buffer [${label}]`,
+            label: `atmosphere buffer [${this.label}]`,
             size: ATMOSPHERE_BUFFER_SIZE,
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
         });
-        this.updateAtmosphere(atmosphere);
+        this.updateAtmosphere(config.atmosphere ?? makeEarthAtmosphere());
 
         this.configBuffer = device.createBuffer({
-            label: `config buffer [${label}]`,
+            label: `config buffer [${this.label}]`,
             size: CONFIG_BUFFER_SIZE,
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
         });
@@ -96,29 +66,29 @@ export class SkyAtmosphereResources {
         });
 
         this.transmittanceLut = new LookUpTable(device.createTexture({
-            label: `transmittance LUT [${label}]`,
-            size: config.transmittanceLutSize || DEFAULT_TRANSMITTANCE_LUT_SIZE, // todo: validate / clamp
+            label: `transmittance LUT [${this.label}]`,
+            size: config.lookUpTables?.transmittanceLutSize ?? DEFAULT_TRANSMITTANCE_LUT_SIZE, // todo: validate / clamp
             format: TRANSMITTANCE_LUT_FORMAT,
             usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING,
         }));
 
         this.multiScatteringLut = new LookUpTable(device.createTexture({
-            label: `multi scattering LUT [${label}]`,
-            size: new Array(2).fill(config.multiScatteringLutSize || DEFAULT_MULTISCATTERING_LUT_SIZE), // todo: validate / clamp
+            label: `multi scattering LUT [${this.label}]`,
+            size: new Array(2).fill(config.lookUpTables?.multiScatteringLutSize ?? DEFAULT_MULTISCATTERING_LUT_SIZE), // todo: validate / clamp
             format: MULTI_SCATTERING_LUT_FORMAT,
             usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING,
         }));
 
         this.skyViewLut = new LookUpTable(device.createTexture({
-            label: `sky view LUT [${label}]`,
-            size: config.skyViewLutSize || DEFAULT_SKY_VIEW_LUT_SIZE, // todo: validate / clamp
+            label: `sky view LUT [${this.label}]`,
+            size: config.lookUpTables?.skyViewLutSize ?? DEFAULT_SKY_VIEW_LUT_SIZE, // todo: validate / clamp
             format: SKY_VIEW_LUT_FORMAT,
             usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING,
         }));
 
         this.aerialPerspectiveLut = new LookUpTable(device.createTexture({
-            label: `aerial perspective LUT [${label}]`,
-            size: config.aerialPerspectiveLutSize || DEFAULT_AERIAL_PERSPECTIVE_LUT_SIZE, // todo: validate / clamp
+            label: `aerial perspective LUT [${this.label}]`,
+            size: config.lookUpTables?.aerialPerspectiveLutSize ?? DEFAULT_AERIAL_PERSPECTIVE_LUT_SIZE, // todo: validate / clamp
             format: AERIAL_PERSPECTIVE_LUT_FORMAT,
             dimension: '3d',
             usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING,
@@ -126,7 +96,7 @@ export class SkyAtmosphereResources {
     }
 
     public updateAtmosphere(atmosphere: Atmosphere) {
-        this.device.queue.writeBuffer(this.atmosphereBuffer, 0, new Float32Array(atmosphereToFloatArray(atmosphere)));
+        this.device.queue.writeBuffer(this.atmosphereBuffer, 0, new Float32Array(atmosphereToFloatArray(atmosphere, this.config.coordinateSystem?.yUp ?? true)));
     }
 
     public updateConfig(config: Config) {
@@ -134,7 +104,7 @@ export class SkyAtmosphereResources {
     }
 }
 
-function atmosphereToFloatArray(atmosphere: Atmosphere) {
+function atmosphereToFloatArray(atmosphere: Atmosphere, yUp = true) {
     return new Float32Array([
         atmosphere.rayleigh.scattering[0],
         atmosphere.rayleigh.scattering[1],
@@ -164,7 +134,7 @@ function atmosphereToFloatArray(atmosphere: Atmosphere) {
         atmosphere.groundAlbedo[1],
         atmosphere.groundAlbedo[2],
         atmosphere.bottomRadius + Math.max(atmosphere.height, 0.0),
-        ...(atmosphere.center || [0.0, 0.0, 0.0]), // todo: center from atmosphere and y-up/z-up
+        ...(atmosphere.center ?? [0.0, yUp ? -atmosphere.bottomRadius : 0.0, yUp ? 0.0: -atmosphere.bottomRadius]),
         0.0, // padding
     ]);
 }

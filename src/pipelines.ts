@@ -1,3 +1,4 @@
+import { CoordinateSystemConfig, SkyAtmosphereConfig } from "./config.js";
 import { AERIAL_PERSPECTIVE_LUT_FORMAT, ATMOSPHERE_BUFFER_SIZE, CONFIG_BUFFER_SIZE, DEFAULT_MULTISCATTERING_LUT_SIZE, DEFAULT_SKY_VIEW_LUT_SIZE, MULTI_SCATTERING_LUT_FORMAT, SKY_VIEW_LUT_FORMAT, SkyAtmosphereResources, TRANSMITTANCE_LUT_FORMAT } from "./resources.js";
 import { makeAerialPerspectiveLutShaderCode, makeMultiScatteringLutShaderCode, makeSkyViewLutShaderCode, makeTransmittanceLutShaderCode } from "./shaders.js";
 import { ComputePass } from "./util.js";
@@ -13,7 +14,7 @@ export class SkyAtmospherePipelines {
     readonly skyViewLutPipeline: SkyViewLutPipeline;
     readonly aerialPerspectiveLutPipeline: AerialPerspectiveLutPipeline;
 
-    constructor(device: GPUDevice) {
+    constructor(device: GPUDevice, config: SkyAtmosphereConfig) {
         this.lutSampler = device.createSampler({
             label: 'LUT sampler',
             addressModeU: 'clamp-to-edge',
@@ -27,10 +28,14 @@ export class SkyAtmospherePipelines {
             maxAnisotropy: 1,
         });
 
+        const coordinateSystem = config.coordinateSystem ?? {
+            yUp: true
+        };
+
         this.transmittanceLutPipeline = new TransmittanceLutPipeline(device);
         this.multiScatteringLutPipeline = new MultiScatteringLutPipeline(device);
-        this.skyViewLutPipeline = new SkyViewLutPipeline(device);
-        this.aerialPerspectiveLutPipeline = new AerialPerspectiveLutPipeline(device);
+        this.skyViewLutPipeline = new SkyViewLutPipeline(device, coordinateSystem);
+        this.aerialPerspectiveLutPipeline = new AerialPerspectiveLutPipeline(device, coordinateSystem);
     }
 }
 
@@ -233,9 +238,11 @@ export class SkyViewLutPipeline {
     readonly skyViewLutFormat: GPUTextureFormat;
     readonly skyViewLutSize: [number, number];
     readonly multiscatteringLutSize: number;
+    readonly coordinateSystem: CoordinateSystemConfig;
 
-    constructor(device: GPUDevice, skyViewLutFormat: GPUTextureFormat = SKY_VIEW_LUT_FORMAT, skyViewLutSize: [number, number] = DEFAULT_SKY_VIEW_LUT_SIZE, multiscatteringLutSize: number = DEFAULT_MULTISCATTERING_LUT_SIZE) {
+    constructor(device: GPUDevice, coordinateSystem: CoordinateSystemConfig, skyViewLutFormat: GPUTextureFormat = SKY_VIEW_LUT_FORMAT, skyViewLutSize: [number, number] = DEFAULT_SKY_VIEW_LUT_SIZE, multiscatteringLutSize: number = DEFAULT_MULTISCATTERING_LUT_SIZE) {
         this.device = device;
+        this.coordinateSystem = coordinateSystem;
         this.skyViewLutFormat = skyViewLutFormat;
         this.skyViewLutSize = skyViewLutSize;
         this.multiscatteringLutSize = multiscatteringLutSize;
@@ -311,6 +318,7 @@ export class SkyViewLutPipeline {
                     SKY_VIEW_LUT_RES_X: this.skyViewLutSize[0],
                     SKY_VIEW_LUT_RES_Y: this.skyViewLutSize[1],
                     MULTI_SCATTERING_LUT_RES: this.multiscatteringLutSize,
+                    IS_Y_UP: this.coordinateSystem.yUp ?? true ? 1 : 0,
                 },
             },
         });
@@ -383,9 +391,11 @@ export class AerialPerspectiveLutPipeline {
     readonly bindGroupLayout: GPUBindGroupLayout;
     readonly aerialPerspectiveLutFormat: GPUTextureFormat;
     readonly multiscatteringLutSize: number;
+    readonly coordinateSystem: CoordinateSystemConfig;
 
-    constructor(device: GPUDevice, aerialPerspectiveLutFormat: GPUTextureFormat = AERIAL_PERSPECTIVE_LUT_FORMAT, multiscatteringLutSize: number = DEFAULT_MULTISCATTERING_LUT_SIZE) {
+    constructor(device: GPUDevice, coordinateSystem: CoordinateSystemConfig, aerialPerspectiveLutFormat: GPUTextureFormat = AERIAL_PERSPECTIVE_LUT_FORMAT, multiscatteringLutSize: number = DEFAULT_MULTISCATTERING_LUT_SIZE) {
         this.device = device;
+        this.coordinateSystem = coordinateSystem;
         this.aerialPerspectiveLutFormat = aerialPerspectiveLutFormat;
         this.multiscatteringLutSize = multiscatteringLutSize;
         this.bindGroupLayout = device.createBindGroupLayout({
@@ -458,6 +468,7 @@ export class AerialPerspectiveLutPipeline {
                 entryPoint: 'render_aerial_perspective_lut',
                 constants: {
                     MULTI_SCATTERING_LUT_RES: this.multiscatteringLutSize,
+                    IS_Y_UP: this.coordinateSystem.yUp ?? true ? 1 : 0,
                 },
             },
         });

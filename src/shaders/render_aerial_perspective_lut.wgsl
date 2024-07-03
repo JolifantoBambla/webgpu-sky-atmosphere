@@ -95,8 +95,8 @@ fn render_aerial_perspective_lut(@builtin(global_invocation_id) global_id: vec3<
 	let sun_illuminance = config.sun_illuminance;
 
     var world_dir = uv_to_world_dir(uv, config.inverse_projection, config.inverse_view);
-    let cam_pos = to_z_up_left_handed(config.camera_world_position) + vec3(0.0, 0.0, atmosphere.bottom_radius);
-	let sun_dir = to_z_up_left_handed(normalize(config.sun_direction));
+    let cam_pos = to_z_up(config.camera_world_position) + vec3(0.0, 0.0, atmosphere.bottom_radius);
+	let sun_dir = to_z_up(normalize(config.sun_direction));
 
 	var world_pos = cam_pos;
 

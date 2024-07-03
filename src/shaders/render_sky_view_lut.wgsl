@@ -132,8 +132,8 @@ fn render_sky_view_lut(@builtin(global_invocation_id) global_id: vec3<u32>) {
 	let max_sample_count = config_buffer.ray_march_max_spp;
 	let sun_illuminance = config_buffer.sun_illuminance;
 
-	let view_world_pos = to_z_up_left_handed(config_buffer.camera_world_position) + vec3(0.0, 0.0, atmosphere.bottom_radius);
-	let world_sun_dir = to_z_up_left_handed(normalize(config_buffer.sun_direction));
+	let view_world_pos = to_z_up(config_buffer.camera_world_position) + vec3(0.0, 0.0, atmosphere.bottom_radius);
+	let world_sun_dir = to_z_up(normalize(config_buffer.sun_direction));
 
 	let view_height = length(view_world_pos);
 
