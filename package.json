@@ -9,7 +9,7 @@
     "/dist/**"
   ],
   "scripts": {
-    "docs": "typedoc src/index.ts",
+    "docs": "typedoc src/webgpu-sky-atmosphere.ts",
     "build": "rollup -c",
     "lint": "eslint \"src/**/*.{js,ts,tsx}\""
   },
