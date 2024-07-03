@@ -90,7 +90,7 @@ export function makeEarthAtmosphere(center?: [number, number, number]): Atmosphe
     const rayleighScaleHeight = 8.0;
     const mieScaleHeight = 1.2;
     return {
-	    center,
+        center,
         bottomRadius: 6360.0,
         height: 100.0,
         rayleigh: {

@@ -48,7 +48,7 @@ export interface CoordinateSystemConfig {
      * Internally, {@link SkyAtmosphereRenderer} uses a left-handed coordinate system with the z axis pointing up.
      * To correctly interpret positions and directions passed in from the user side (such as the camera position or the sun light's direction),
      * specify if y is pointing up.
-     * Defaults to true. 
+     * Defaults to true.
      */
     yUp?: boolean,
 }
@@ -61,10 +61,10 @@ export interface ComputeBackBufferConfig {
      * The back buffer texture.
      */
     texture: GPUTexture,
-            
+
     /**
      * A texture view to use for the back buffer.
-     * 
+     *
      * If this is not present, a new view is created from the given {@link texture}.
      */
     view?: GPUTextureView,
@@ -82,7 +82,7 @@ export interface DepthBufferConfig {
     /**
      * A texture view to use for the depth buffer.
      * If {@link texture} has a depth-stencil format, this view must be a "depth-only" view (to support binding it as a `texture_2d<f32>`).
-     * 
+     *
      * If this is not present, a new view is created from the given {@link texture}.
      */
     view?: GPUTextureView,
@@ -102,7 +102,7 @@ export interface ComputeRenderTargetConfig {
      * Must support the STORAGE_BINDING usage.
      * Its format must support 'write-only' access.
      * Its format should have at least 16 bit precision per channel.
-     * 
+     *
      * Must not be the same texture as the back or depth buffer.
      */
     texture: GPUTexture,
@@ -166,13 +166,13 @@ export interface SkyRendererShadowConfig {
 
     /**
      * The shader code to inject into the ray marching pipelines to render volumetric shadows.
-     * 
+     *
      * This needs to provide at least a function with the following signature:
-     * 
+     *
      *      fn get_shadow(world_space_position: vec3<f32>) -> f32
-     * 
+     *
      * The function should return a floating point value in the range [0, 1], where 1 implies that the given world space position is not in shadow.
-     * 
+     *
      * It should also include the bind group matching the given {@link bindGroupLayout}.
      * The bind group must use bind group index 2 (i.e., `@group(2)`).
      */
@@ -190,14 +190,14 @@ export interface SkyAtmosphereConfig {
      * Defaults to true.
      */
     initializeConstantLuts?: boolean,
-    
+
     /**
      * The atmosphere parameters for this {@link SkyAtmosphereRenderer}.
      * Defaults to: {@link makeEarthAtmosphere}
      * @see makeEarthAtmosphere
      */
     atmosphere?: Atmosphere,
-    
+
     /**
      * Coordinate system specifics to interface with the user's system.
      */
@@ -205,21 +205,21 @@ export interface SkyAtmosphereConfig {
 
     /**
      * Sets external resources required by a {@link SkyAtmosphereRenderer} when using a compute pipeline.
-     * 
+     *
      * At least one of {@link compute} and {@link render} must be set.
-     * 
+     *
      * Note that without the "dual-source-blending" feature enabled, colored transmissions can only be rendered using a compute pipeline.
      * Note that colored transmissions can only be rendered using the ray marching pipelines.
-     * 
+     *
      * One of {@link compute} and {@link render} must be set to specify if the sky / atmosphere should be rendered using a GPUComputePipeline or a GPURenderPipeline.
      */
     compute?: SkyRendererComputeConfig,
 
     /**
      * Sets external resources required by a {@link SkyAtmosphereRenderer} when using a render pipeline.
-     * 
+     *
      * Note that rendering colored transmisstion using a render pipeline is only possible with the "dual-source-blending" feature enabled.
-     * 
+     *
      * At least one of {@link compute} and {@link render} must be set.
      */
     render?: SkyRendererRenderConfig,

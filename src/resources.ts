@@ -134,7 +134,7 @@ function atmosphereToFloatArray(atmosphere: Atmosphere, yUp = true) {
         atmosphere.groundAlbedo[1],
         atmosphere.groundAlbedo[2],
         atmosphere.bottomRadius + Math.max(atmosphere.height, 0.0),
-        ...(atmosphere.center ?? [0.0, yUp ? -atmosphere.bottomRadius : 0.0, yUp ? 0.0: -atmosphere.bottomRadius]),
+        ...(atmosphere.center ?? [0.0, yUp ? -atmosphere.bottomRadius : 0.0, yUp ? 0.0 : -atmosphere.bottomRadius]),
         0.0, // padding
     ]);
 }

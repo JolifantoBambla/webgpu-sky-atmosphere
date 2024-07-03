@@ -29,7 +29,7 @@ export class SkyAtmospherePipelines {
         });
 
         const coordinateSystem = config.coordinateSystem ?? {
-            yUp: true
+            yUp: true,
         };
 
         this.transmittanceLutPipeline = new TransmittanceLutPipeline(device);
