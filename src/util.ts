@@ -23,3 +23,19 @@ export class ComputePass {
         }
     }
 }
+
+export class RenderPass {
+    constructor(readonly pipeline: GPURenderPipeline, readonly bindGroups: GPUBindGroup[]) {}
+    encode(passEncoder: GPURenderPassEncoder | GPURenderBundleEncoder, resetBindGroups: boolean = false) {
+        passEncoder.setPipeline(this.pipeline);
+        for (let i = 0; i < this.bindGroups.length; ++i) {
+            passEncoder.setBindGroup(i, this.bindGroups[i]);
+        }
+        passEncoder.draw(3);
+        if (resetBindGroups) {
+            for (let i = 0; i < this.bindGroups.length; ++i) {
+                passEncoder.setBindGroup(i, null);
+            }
+        }
+    }
+}

@@ -3,6 +3,7 @@ import blendWgsl from './shaders/common/blend.wgsl';
 import configWgsl from './shaders/common/config.wgsl';
 import constantsWgsl from './shaders/common/constants.wgsl';
 import coordinateSystemWgsl from './shaders/common/coordinate_system.wgsl';
+import fullScreenVertexShaderWgsl from './shaders/common/vertex_full_screen.wgsl';
 import intersectionWgsl from './shaders/common/intersection.wgsl';
 import mediumWgsl from './shaders/common/medium.wgsl';
 import multipleScatteringWgsl from './shaders/common/multiple_scattering.wgsl';
@@ -36,9 +37,9 @@ export function makeAerialPerspectiveLutShaderCode() {
 }
 
 export function makeRenderSkyWithLutsShaderCode() {
-    return `${constantsWgsl}\n${intersectionWgsl}\n${mediumWgsl}\n${phaseWgsl}\n${uvWgsl}\n${configWgsl}\n${coordinateSystemWgsl}\n${aerialPerspectiveWgsl}\n${skyViewWgsl}\n${blendWgsl}\n${sunDiskWgsl}\n${renderSkyWithLutsWgsl}`;
+    return `${constantsWgsl}\n${intersectionWgsl}\n${mediumWgsl}\n${phaseWgsl}\n${uvWgsl}\n${configWgsl}\n${coordinateSystemWgsl}\n${aerialPerspectiveWgsl}\n${skyViewWgsl}\n${blendWgsl}\n${sunDiskWgsl}\n${fullScreenVertexShaderWgsl}\n${renderSkyWithLutsWgsl}`;
 }
 
 export function makeRenderSkyRaymarchingShaderCode() {
-    return `${constantsWgsl}\n${intersectionWgsl}\n${mediumWgsl}\n${phaseWgsl}\n${uvWgsl}\n${configWgsl}\n${coordinateSystemWgsl}\n${multipleScatteringWgsl}\n${blendWgsl}\n${sunDiskWgsl}\n${renderSkyRaymarchingWgsl}`;
+    return `${constantsWgsl}\n${intersectionWgsl}\n${mediumWgsl}\n${phaseWgsl}\n${uvWgsl}\n${configWgsl}\n${coordinateSystemWgsl}\n${multipleScatteringWgsl}\n${blendWgsl}\n${sunDiskWgsl}\n${fullScreenVertexShaderWgsl}\n${renderSkyRaymarchingWgsl}`;
 }
