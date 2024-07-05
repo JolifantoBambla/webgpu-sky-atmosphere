@@ -3,17 +3,13 @@ override WORKGROUP_SIZE_Y: u32 = 16;
 
 @group(0) @binding(0) var<uniform> atmosphere_buffer: Atmosphere;
 @group(0) @binding(1) var<uniform> config_buffer: Config;
+@group(0) @binding(2) var lut_sampler: sampler;
+@group(0) @binding(3) var sky_view_lut: texture_2d<f32>;
+@group(0) @binding(4) var aerial_perspective_lut : texture_3d<f32>;
 
-@group(1) @binding(0) var lut_sampler: sampler;
-
-@group(2) @binding(0) var sky_view_lut: texture_2d<f32>;
-@group(2) @binding(1) var aerial_perspective_lut : texture_3d<f32>;
-
-// group 3 is passed in and contains only resources controlled by the user (except for render target? let's see what makes sense)
-// todo: might be a depth texture
-@group(3) @binding(0) var depth_buffer: texture_2d<f32>;
-@group(3) @binding(1) var backbuffer : texture_2d<f32>;
-@group(3) @binding(2) var render_target : texture_storage_2d<rgba16float, write>;
+@group(1) @binding(0) var depth_buffer: texture_2d<f32>;
+@group(1) @binding(1) var backbuffer : texture_2d<f32>;
+@group(1) @binding(2) var render_target : texture_storage_2d<rgba16float, write>;
 
 fn render_sky(pix: vec2<u32>) -> vec4<f32> {
 	let atmosphere = atmosphere_buffer;
@@ -22,7 +18,7 @@ fn render_sky(pix: vec2<u32>) -> vec4<f32> {
     let uv = (vec2<f32>(pix) + 0.5) / vec2<f32>(config.screen_resolution);
 
     let world_dir = uv_to_world_dir(uv, config.inverse_projection, config.inverse_view);
-    var world_pos = to_z_up(config.camera_world_position) + vec3(0.0, 0.0, atmosphere.bottom_radius);
+    var world_pos = to_z_up(config.camera_world_position - atmosphere.planet_center);
     let sun_dir = to_z_up(normalize(config.sun_direction));
 
 	let view_height = length(world_pos);
@@ -45,7 +41,7 @@ fn render_sky(pix: vec2<u32>) -> vec4<f32> {
 
     let depth_buffer_world_pos = uv_and_depth_to_world_pos(config.inverse_view * config.inverse_projection, uv, depth);
 
-    let t_depth = length(depth_buffer_world_pos - (world_pos - vec3(0.0, 0.0, atmosphere.bottom_radius)));
+    let t_depth = length(depth_buffer_world_pos - (world_pos + to_z_up(atmosphere.planet_center)));
     var slice = aerial_perspective_depth_to_slice(t_depth);
     var weight = 1.0;
     if slice < 0.5 {

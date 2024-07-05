@@ -10,6 +10,10 @@ override WORKGROUP_SIZE_Y: u32 = 16;
 @group(0) @binding(4) var multi_scattering_lut: texture_2d<f32>;
 @group(0) @binding(5) var aerial_perspective_lut: texture_storage_3d<rgba16float, write>;
 
+fn get_sample_shadow(atmosphere: Atmosphere, sample_position: vec3<f32>) -> f32 {
+	return get_shadow(from_z_up(sample_position) + atmosphere.planet_center);
+}
+
 struct SingleScatteringResult {
 	luminance: vec3<f32>,				// Scattered light (luminance)
 	transmittance: vec3<f32>,			// Transmittance in [0,1] (unitless)
@@ -59,11 +63,11 @@ fn integrate_scattered_luminance(
 
 		let phase_times_scattering = medium.mie_scattering * mie_phase_val + medium.rayleigh_scattering * rayleigh_phase_val;
 
-        // todo: shadow mapping
+		let shadow = get_sample_shadow(atmosphere, sample_pos);
 
 		let multi_scattered_luminance = get_multiple_scattering(atmosphere, medium.scattering, medium.extinction, sample_pos, cos_sun_zenith);
 
-		let scattering = sun_illuminance * (planet_shadow * transmittance_to_sun * phase_times_scattering + multi_scattered_luminance * medium.scattering);
+		let scattering = sun_illuminance * (planet_shadow * shadow * transmittance_to_sun * phase_times_scattering + multi_scattered_luminance * medium.scattering);
 
         let scattering_int = (scattering - scattering * sample_transmittance) / medium.extinction;
         result.luminance += result.transmittance * scattering_int;
@@ -95,7 +99,7 @@ fn render_aerial_perspective_lut(@builtin(global_invocation_id) global_id: vec3<
 	let sun_illuminance = config.sun_illuminance;
 
     var world_dir = uv_to_world_dir(uv, config.inverse_projection, config.inverse_view);
-    let cam_pos = to_z_up(config.camera_world_position) + vec3(0.0, 0.0, atmosphere.bottom_radius);
+    let cam_pos = to_z_up(config.camera_world_position - atmosphere.planet_center);
 	let sun_dir = to_z_up(normalize(config.sun_direction));
 
 	var world_pos = cam_pos;

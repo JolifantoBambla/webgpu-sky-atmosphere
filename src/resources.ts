@@ -33,7 +33,7 @@ export class SkyAtmosphereResources {
 
     readonly config: SkyAtmosphereConfig;
 
-    constructor(device: GPUDevice, config: SkyAtmosphereConfig = {}, lutSampler?: GPUSampler) {
+    constructor(device: GPUDevice, config: SkyAtmosphereConfig, lutSampler?: GPUSampler) {
         this.label = config.label ?? 'atmosphere';
         this.device = device;
         this.config = config;

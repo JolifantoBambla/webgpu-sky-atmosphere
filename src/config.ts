@@ -1,5 +1,8 @@
 import { Atmosphere } from "./atmosphere.js";
 
+/**
+ * Config for internally used look up tables.
+ */
 export interface SkyAtmosphereLutConfig {
     /**
      * The size of the transmittance look up table.
@@ -117,16 +120,11 @@ export interface ComputeRenderTargetConfig {
 /**
  * Config for rendering the sky / atmosphere using a GPUComputePipeline.
  */
-export interface SkyRendererComputeConfig {
+export interface SkyRendererComputePassConfig {
     /**
      * The back buffer texture to use as back ground for rendering the sky / atmosphere.
      */
     backBuffer: ComputeBackBufferConfig,
-
-    /**
-     * The depth buffer to limit the ray marching distance when rendering the sky / atmosphere.
-     */
-    depthBuffer: DepthBufferConfig,
 
     /**
      * The render target to render into.
@@ -137,17 +135,12 @@ export interface SkyRendererComputeConfig {
 /**
  * Config for rendering the sky / atmosphere using a GPURenderPipeline.
  */
-export interface SkyRendererRenderConfig {
+export interface SkyRenderPassConfig {
     /**
      * Must support RENDER_ATTACHMENT usage.
      * Should have at least 16 bit precision per channel. (todo: maybe r11g11b10 also enough?)
      */
     renderTargetFormat: GPUTextureFormat,
-
-    /**
-     * The depth buffer to limit the ray marching distance when rendering the sky / atmosphere.
-     */
-    depthBuffer: DepthBufferConfig,
 }
 
 /**
@@ -179,6 +172,35 @@ export interface SkyRendererShadowConfig {
     wgslCode: string,
 }
 
+/**
+ * External resources and settings required by a {@link SkyAtmosphereRenderer}.
+ */
+export interface SkyRendererPassConfig {
+    /**
+     * External resources required by a {@link SkyAtmosphereRenderer} when using a render or compute pipeline for rendering the atmosphere.
+     *
+     * This setting defines whether {@link SkyAtmosphereRenderer} will use render or compute pipelines to render the atmosphere.
+     */
+    passConfig: SkyRendererComputePassConfig | SkyRenderPassConfig,
+
+    /**
+     * The depth buffer to limit the ray marching distance when rendering the sky / atmosphere.
+     */
+    depthBuffer: DepthBufferConfig,
+
+    /**
+     * Used to determine whether to prefer colored transmissions when rendering the atmosphere using {@link SkyAtmosphereRenderer.render}.
+     *
+     * Since colored transmissions are only supported when rendering the atmosphere using ray marching, the more expensive ray marching pipelines will be used by default.
+     *
+     * Note that without the "dual-source-blending" feature enabled, colored transmissions can only be rendered using a compute pipeline.
+     * If the feature is not enabled and the {@link SkyAtmosphereRenderer} is configured to use render pipelines, this flag has no effect.
+     *
+     * Defaults to false.
+     */
+    preferColoredTransmission?: boolean,
+}
+
 export interface SkyAtmosphereConfig {
     /**
      * Defaults to 'atmosphere'
@@ -204,28 +226,12 @@ export interface SkyAtmosphereConfig {
     coordinateSystem?: CoordinateSystemConfig,
 
     /**
-     * Sets external resources required by a {@link SkyAtmosphereRenderer} when using a compute pipeline.
-     *
-     * At least one of {@link compute} and {@link render} must be set.
-     *
-     * Note that without the "dual-source-blending" feature enabled, colored transmissions can only be rendered using a compute pipeline.
-     * Note that colored transmissions can only be rendered using the ray marching pipelines.
-     *
-     * One of {@link compute} and {@link render} must be set to specify if the sky / atmosphere should be rendered using a GPUComputePipeline or a GPURenderPipeline.
+     * External resources and settings required by a {@link SkyAtmosphereRenderer}.
      */
-    compute?: SkyRendererComputeConfig,
+    skyRenderer: SkyRendererPassConfig,
 
     /**
-     * Sets external resources required by a {@link SkyAtmosphereRenderer} when using a render pipeline.
-     *
-     * Note that rendering colored transmisstion using a render pipeline is only possible with the "dual-source-blending" feature enabled.
-     *
-     * At least one of {@link compute} and {@link render} must be set.
-     */
-    render?: SkyRendererRenderConfig,
-
-    /**
-     * Sets external resources required by a {@link SkyAtmosphereRenderer} to render volumetric shadows.
+     * External resources required by a {@link SkyAtmosphereRenderer} to render volumetric shadows.
      */
     shadow?: SkyRendererShadowConfig,
 

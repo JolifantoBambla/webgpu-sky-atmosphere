@@ -18,9 +18,8 @@ override WORKGROUP_SIZE_Y: u32 = 16;
 @group(1) @binding(1) var backbuffer: texture_2d<f32>;
 @group(1) @binding(2) var render_target: texture_storage_2d<rgba16float, write>;
 
-// todo: this will be passed in by the user
 fn get_sample_shadow(atmosphere: Atmosphere, sample_position: vec3<f32>) -> f32 {
-	return get_shadow(vec3(sample_position.x, sample_position.z, sample_position.y) + atmosphere.planet_center);
+	return get_shadow(from_z_up(sample_position) + atmosphere.planet_center);
 }
 
 struct SingleScatteringResult {
@@ -39,7 +38,7 @@ fn integrate_scattered_luminance(uv: vec2<f32>, world_pos: vec3<f32>, world_dir:
 
     if is_valid_depth(depth) {
         let depth_buffer_world_pos = uv_and_depth_to_world_pos(config.inverse_view * config.inverse_projection, uv, depth);
-        t_max = min(t_max, length(depth_buffer_world_pos - (world_pos - vec3(0.0, 0.0, atmosphere.bottom_radius))));
+        t_max = min(t_max, length(depth_buffer_world_pos - (world_pos + to_z_up(atmosphere.planet_center))));
     }
 	t_max = min(t_max, t_max_max);
 

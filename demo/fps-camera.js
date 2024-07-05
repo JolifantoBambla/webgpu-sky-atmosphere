@@ -1,20 +1,31 @@
 import { vec3n, mat4n, quatn } from 'https://wgpu-matrix.org/dist/3.x/wgpu-matrix.module.min.js';
 
 export class FPSCameraController {
-    #pitch = 0.0;
-    #yaw = 0.0;
-    #velocity = vec3n.fromValues(0, 0, 0);
-    #acceleration = 20.0;
-    #maxSpeed = 1;
-    #decay = 0.9;
-    #pointerSensitivity = 0.002;
     #keys = [];
-    #pointerMoveHandler;
-    #position = vec3n.create(0, 20, 100);
     #rotation = quatn.identity();
+    #velocity = vec3n.fromValues(0, 0, 0);
+    
+    #acceleration;
+    #maxSpeed;
+    #decay;
+    #pointerSensitivity;
+    #pointerMoveHandler;
+    #position;
+    #pitch;
+    #yaw;
 
-    constructor(canvas) {
+    constructor(canvas, {position = [0, 1, 100], pitch = 0.36, yaw = 0.06, acceleration = 2.0, maxSpeed = 0.1, pointerSensitivity = 0.002, decay = 0.9} = {}) {
+        this.#position = vec3n.create(...position);
+        this.#pitch = pitch;
+        this.#yaw = yaw;
+        this.#acceleration = acceleration;
+        this.#maxSpeed = maxSpeed;
+        this.#pointerSensitivity = pointerSensitivity;
+        this.#decay = decay;
         this.#pointerMoveHandler = e => this.#onMouseMove(e);
+
+        this.update();
+        
         canvas.ownerDocument.addEventListener('keydown', e => { this.#keys[e.code] = true; });
         canvas.ownerDocument.addEventListener('keyup', e => { this.#keys[e.code] = false; });
         canvas.addEventListener('click', _ => { canvas.requestPointerLock(); });
@@ -41,6 +52,7 @@ export class FPSCameraController {
         const keyBack = 'KeyS';
         const keyLeft = 'KeyA';
         const keyRight = 'KeyD';
+        const keyFast = 'Space';
 
         const cos = Math.cos(this.#yaw);
         const sin = Math.sin(this.#yaw);
@@ -66,11 +78,12 @@ export class FPSCameraController {
             vec3n.scale(this.#velocity, Math.exp(dt * Math.log(1 - this.#decay)), this.#velocity);
         }
         const speed = vec3n.length(this.#velocity);
-        if (speed > this.#maxSpeed) {
-            vec3n.scale(this.#velocity, this.#maxSpeed / speed, this.#velocity);
+        const maxSpeed = this.#maxSpeed * (this.#keys[keyFast] ? 10.0 : 1.0);
+        if (speed > maxSpeed) {
+            vec3n.scale(this.#velocity, maxSpeed / speed, this.#velocity);
         }
         vec3n.addScaled(this.#position, this.#velocity, dt, this.#position);
-        
+
         const rotation = quatn.identity();
         quatn.rotateY(rotation, this.#yaw, rotation);
         quatn.rotateX(rotation, this.#pitch, rotation);

@@ -1,4 +1,4 @@
-import { CoordinateSystemConfig, SkyAtmosphereConfig } from "./config.js";
+import { CoordinateSystemConfig, SkyAtmosphereConfig, SkyRendererShadowConfig } from "./config.js";
 import { AERIAL_PERSPECTIVE_LUT_FORMAT, ATMOSPHERE_BUFFER_SIZE, CONFIG_BUFFER_SIZE, DEFAULT_MULTISCATTERING_LUT_SIZE, DEFAULT_SKY_VIEW_LUT_SIZE, MULTI_SCATTERING_LUT_FORMAT, SKY_VIEW_LUT_FORMAT, SkyAtmosphereResources, TRANSMITTANCE_LUT_FORMAT } from "./resources.js";
 import { makeAerialPerspectiveLutShaderCode, makeMultiScatteringLutShaderCode, makeSkyViewLutShaderCode, makeTransmittanceLutShaderCode } from "./shaders.js";
 import { ComputePass } from "./util.js";
@@ -35,7 +35,7 @@ export class SkyAtmospherePipelines {
         this.transmittanceLutPipeline = new TransmittanceLutPipeline(device);
         this.multiScatteringLutPipeline = new MultiScatteringLutPipeline(device);
         this.skyViewLutPipeline = new SkyViewLutPipeline(device, coordinateSystem);
-        this.aerialPerspectiveLutPipeline = new AerialPerspectiveLutPipeline(device, coordinateSystem);
+        this.aerialPerspectiveLutPipeline = new AerialPerspectiveLutPipeline(device, coordinateSystem, config.shadow);
     }
 }
 
@@ -318,7 +318,7 @@ export class SkyViewLutPipeline {
                     SKY_VIEW_LUT_RES_X: this.skyViewLutSize[0],
                     SKY_VIEW_LUT_RES_Y: this.skyViewLutSize[1],
                     MULTI_SCATTERING_LUT_RES: this.multiscatteringLutSize,
-                    IS_Y_UP: this.coordinateSystem.yUp ?? true ? 1 : 0,
+                    IS_Y_UP: Number(this.coordinateSystem.yUp ?? true),
                 },
             },
         });
@@ -393,7 +393,7 @@ export class AerialPerspectiveLutPipeline {
     readonly multiscatteringLutSize: number;
     readonly coordinateSystem: CoordinateSystemConfig;
 
-    constructor(device: GPUDevice, coordinateSystem: CoordinateSystemConfig, aerialPerspectiveLutFormat: GPUTextureFormat = AERIAL_PERSPECTIVE_LUT_FORMAT, multiscatteringLutSize: number = DEFAULT_MULTISCATTERING_LUT_SIZE) {
+    constructor(device: GPUDevice, coordinateSystem: CoordinateSystemConfig, shadowConfig?: SkyRendererShadowConfig, aerialPerspectiveLutFormat: GPUTextureFormat = AERIAL_PERSPECTIVE_LUT_FORMAT, multiscatteringLutSize: number = DEFAULT_MULTISCATTERING_LUT_SIZE) {
         this.device = device;
         this.coordinateSystem = coordinateSystem;
         this.aerialPerspectiveLutFormat = aerialPerspectiveLutFormat;
@@ -459,22 +459,22 @@ export class AerialPerspectiveLutPipeline {
             label: 'aerial perspective LUT pass',
             layout: device.createPipelineLayout({
                 label: 'aerial perspective LUT pass',
-                bindGroupLayouts: [this.bindGroupLayout],
+                bindGroupLayouts: [this.bindGroupLayout, shadowConfig?.bindGroupLayout].filter(layout => layout !== undefined) as GPUBindGroupLayout[],
             }),
             compute: {
                 module: device.createShaderModule({
-                    code: makeAerialPerspectiveLutShaderCode(),
+                    code: `${shadowConfig?.wgslCode.replaceAll('@group(2)', '@group(1)') || 'fn get_shadow(p: vec3<f32>) -> f32 { return 1.0; }'}\n${makeAerialPerspectiveLutShaderCode()}`,
                 }),
                 entryPoint: 'render_aerial_perspective_lut',
                 constants: {
                     MULTI_SCATTERING_LUT_RES: this.multiscatteringLutSize,
-                    IS_Y_UP: this.coordinateSystem.yUp ?? true ? 1 : 0,
+                    IS_Y_UP: Number(this.coordinateSystem.yUp ?? true),
                 },
             },
         });
     }
 
-    public makeComputePass(resources: SkyAtmosphereResources): ComputePass {
+    public makeComputePass(resources: SkyAtmosphereResources, shadowBindGroup?: GPUBindGroup): ComputePass {
         if (this.device !== resources.device) {
             throw new Error(`[AerialPerspectiveLutPipeline::makeComputePass]: device mismatch`);
         }
@@ -526,7 +526,7 @@ export class AerialPerspectiveLutPipeline {
         });
         return new ComputePass(
             this.pipeline,
-            [bindGroup],
+            [bindGroup, shadowBindGroup].filter(bindGroup => bindGroup !== undefined) as GPUBindGroup[],
             [
                 Math.ceil(resources.aerialPerspectiveLut.texture.width / 16.0),
                 Math.ceil(resources.aerialPerspectiveLut.texture.height / 16.0),
@@ -535,4 +535,3 @@ export class AerialPerspectiveLutPipeline {
         );
     }
 }
-

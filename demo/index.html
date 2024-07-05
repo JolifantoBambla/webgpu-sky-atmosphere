@@ -137,20 +137,22 @@
                 coordinateSystem: {
                     yUp: true,
                 },
-                compute: {
-                    backBuffer: {
-                        texture: backBuffer,
-                        view: backBufferView,
+                skyRenderer: {
+                    passConfig: {
+                        backBuffer: {
+                            texture: backBuffer,
+                            view: backBufferView,
+                        },
+                        renderTarget: {
+                            texture: skyRenderTarget,
+                            view: skyRenderTarget.createView(),
+                        },
                     },
                     depthBuffer: {
                         texture: depthBuffer,
                         view: depthBufferView,
                         reverseZ: true,
                     },
-                    renderTarget: {
-                        texture: skyRenderTarget,
-                        view: skyRenderTarget.createView(),
-                    }
                 },
                 shadow: {
                     bindGroupLayout: shadowBindGroupLayout,
@@ -163,7 +165,7 @@
                             {binding: 2, resource: shadowMapView},
                         ],
                     }),
-                    wgslCode: /*wgsl*/ `
+                    wgslCode: `
                         @group(2) @binding(0) var<uniform> sun_view_projection: mat4x4<f32>;
                         @group(2) @binding(1) var shadow_sampler: sampler_comparison;
                         @group(2) @binding(2) var shadow_map: texture_depth_2d;
@@ -172,55 +174,7 @@
                             var shadow_pos = (sun_view_projection * vec4(p, 1.0)).xyz;
                             shadow_pos = vec3(shadow_pos.xy * vec2(0.5, -0.5) + 0.5, shadow_pos.z);
                             if all(shadow_pos >= vec3<f32>()) && all(shadow_pos < vec3(1.0)) {
-                                return textureSampleCompareLevel(shadow_map, shadow_sampler, shadow_pos.xy, shadow_pos.z - 0.007);
-                            }
-                            return 1.0;
-                        }
-                    `
-                },
-            });
-
-            const skyAtmosphereRenderer2 = new SkyAtmosphereRenderer(device, {
-                initializeConstantLuts: true,
-                coordinateSystem: {
-                    yUp: true,
-                },
-                compute: {
-                    backBuffer: {
-                        texture: backBuffer,
-                        view: backBufferView,
-                    },
-                    depthBuffer: {
-                        texture: depthBuffer,
-                        view: depthBufferView,
-                        reverseZ: true,
-                    },
-                    renderTarget: {
-                        texture: skyRenderTarget2,
-                        view: skyRenderTarget2.createView(),
-                    }
-                },
-                shadow: {
-                    bindGroupLayout: shadowBindGroupLayout,
-                    bindGroup: device.createBindGroup({
-                        label: 'shadow',
-                        layout: shadowBindGroupLayout,
-                        entries: [
-                            {binding: 0, resource: {buffer: shadowBuffer}},
-                            {binding: 1, resource: device.createSampler({compare: 'less'})},
-                            {binding: 2, resource: shadowMapView},
-                        ],
-                    }),
-                    wgslCode: /*wgsl*/ `
-                        @group(2) @binding(0) var<uniform> sun_view_projection: mat4x4<f32>;
-                        @group(2) @binding(1) var shadow_sampler: sampler_comparison;
-                        @group(2) @binding(2) var shadow_map: texture_depth_2d;
-                        
-                        fn get_shadow(p: vec3<f32>) -> f32 {
-                            var shadow_pos = (sun_view_projection * vec4(p, 1.0)).xyz;
-                            shadow_pos = vec3(shadow_pos.xy * vec2(0.5, -0.5) + 0.5, shadow_pos.z);
-                            if all(shadow_pos >= vec3<f32>()) && all(shadow_pos < vec3(1.0)) {
-                                return textureSampleCompareLevel(shadow_map, shadow_sampler, shadow_pos.xy, shadow_pos.z - 0.007);
+                                return textureSampleCompareLevel(shadow_map, shadow_sampler, shadow_pos.xy, shadow_pos.z);
                             }
                             return 1.0;
                         }
@@ -441,8 +395,7 @@
                 geometryPass.end();
 
                 const computePass = encoder.beginComputePass();
-                skyAtmosphereRenderer.renderSkyAtmosphere(computePass, true, false, config, params.atmosphere);
-                //skyAtmosphereRenderer2.renderSkyAtmosphere(computePass, true, false, config, makeEarthAtmosphere([20000, 10000, 10000]));
+                skyAtmosphereRenderer.renderSkyAtmosphere(computePass, false, false, config, params.atmosphere);
                 computePass.end();
 
                 const pass = encoder.beginRenderPass({

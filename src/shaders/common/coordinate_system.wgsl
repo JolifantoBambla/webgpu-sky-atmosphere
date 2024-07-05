@@ -9,6 +9,14 @@ fn to_z_up(v: vec3<f32>) -> vec3<f32> {
     }
 }
 
+fn from_z_up(v: vec3<f32>) -> vec3<f32> {
+    if IS_Y_UP {
+        return vec3<f32>(v.x, v.z, v.y);
+    } else {
+        return v;
+    }
+}
+
 fn depth_max() -> f32 {
     if IS_REVERSE_Z {
         return 0.0000001;
