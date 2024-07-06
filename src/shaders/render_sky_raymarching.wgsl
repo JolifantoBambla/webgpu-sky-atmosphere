@@ -8,20 +8,15 @@ override WORKGROUP_SIZE_Y: u32 = 16;
 
 @group(0) @binding(0) var<uniform> atmosphere_buffer: Atmosphere;
 @group(0) @binding(1) var<uniform> config_buffer: Config;
-
 @group(0) @binding(2) var lut_sampler: sampler;
-
 @group(0) @binding(3) var transmittance_lut: texture_2d<f32>;
 @group(0) @binding(4) var multi_scattering_lut: texture_2d<f32>;
-
-// group 3 is passed in and contains only resources controlled by the user (except for render target? let's see what makes sense)
-// todo: might be a depth texture
-@group(1) @binding(0) var depth_buffer: texture_2d<f32>;
-@group(1) @binding(1) var backbuffer: texture_2d<f32>;
-@group(1) @binding(2) var render_target: texture_storage_2d<rgba16float, write>;
+@group(0) @binding(5) var depth_buffer: texture_2d<f32>;
+@group(0) @binding(6) var backbuffer: texture_2d<f32>;
+@group(0) @binding(7) var render_target: texture_storage_2d<rgba16float, write>;
 
 fn get_sample_shadow(atmosphere: Atmosphere, sample_position: vec3<f32>) -> f32 {
-	return get_shadow(from_z_up(sample_position) + atmosphere.planet_center);
+	return get_shadow(from_z_up(sample_position) + atmosphere.planet_center, 0);
 }
 
 struct SingleScatteringResult {

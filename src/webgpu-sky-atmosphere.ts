@@ -12,16 +12,18 @@ import {
     ComputeBackBufferConfig,
     ComputeRenderTargetConfig,
     CoordinateSystemConfig,
+    CustomLightsConfig,
+    CustomUniformBuffersConfig,
     DepthBufferConfig,
     SkyAtmosphereLutConfig,
     SkyAtmosphereConfig,
     SkyRendererComputePassConfig,
     SkyRendererPassConfig,
     SkyRenderPassConfig,
-    SkyRendererShadowConfig,
+    ShadowConfig,
 } from './config.js';
 
-import { Camera, Sun, Uniforms } from './uniforms.js';
+import { Camera, SkyLight, Uniforms } from './uniforms.js';
 import { ATMOSPHERE_BUFFER_SIZE, CONFIG_BUFFER_SIZE, SkyAtmosphereResources } from './resources.js';
 
 import {
@@ -45,18 +47,20 @@ export {
     ComputeBackBufferConfig,
     ComputeRenderTargetConfig,
     CoordinateSystemConfig,
+    CustomLightsConfig,
+    CustomUniformBuffersConfig,
     DepthBufferConfig,
     SkyAtmosphereLutConfig,
     SkyAtmosphereConfig,
     SkyRendererComputePassConfig,
     SkyRendererPassConfig,
     SkyRenderPassConfig,
-    SkyRendererShadowConfig,
+    ShadowConfig,
 };
 
 export {
     Camera,
-    Sun,
+    SkyLight,
     Uniforms,
 };
 
@@ -89,7 +93,7 @@ export class SkyAtmosphereRenderer {
         this.transmittanceLutPass = this.skyAtmospherePipelines.transmittanceLutPipeline.makeComputePass(this.resources);
         this.multiScatteringLutPass = this.skyAtmospherePipelines.multiScatteringLutPipeline.makeComputePass(this.resources);
         this.skyViewLutPass = this.skyAtmospherePipelines.skyViewLutPipeline.makeComputePass(this.resources);
-        this.aerialPerspectiveLutPass = this.skyAtmospherePipelines.aerialPerspectiveLutPipeline.makeComputePass(this.resources, config.shadow?.bindGroup);
+        this.aerialPerspectiveLutPass = this.skyAtmospherePipelines.aerialPerspectiveLutPipeline.makeComputePass(this.resources, config.shadow?.bindGroups);
 
         const renderSkyBindGroupLayoutBaseEntries: GPUBindGroupLayoutEntry[] = [
             {
@@ -138,57 +142,50 @@ export class SkyAtmosphereRenderer {
         ]
 
         if (isComputePassConfig(config.skyRenderer.passConfig)) {
-            const externalResourcesBindGroupLayout = device.createBindGroupLayout({
-                label: 'Render sky raymarching external bind group layout',
-                entries: [
-                    {
-                        binding: 0,
-                        visibility: GPUShaderStage.COMPUTE,
-                        texture: {
-                            sampleType: 'unfilterable-float',
-                            viewDimension: config.skyRenderer.depthBuffer.texture.dimension,
-                            multisampled: false,
-                        },
+            const externalResourcesLayoutEntries: GPUBindGroupLayoutEntry[] = [
+                {
+                    binding: 5,
+                    visibility: GPUShaderStage.COMPUTE,
+                    texture: {
+                        sampleType: 'unfilterable-float',
+                        viewDimension: config.skyRenderer.depthBuffer.texture.dimension,
+                        multisampled: false,
                     },
-                    {
-                        binding: 1,
-                        visibility: GPUShaderStage.COMPUTE,
-                        texture: {
-                            sampleType: 'unfilterable-float',
-                            viewDimension: config.skyRenderer.passConfig.backBuffer.texture.dimension,
-                            multisampled: false,
-                        },
+                },
+                {
+                    binding: 6,
+                    visibility: GPUShaderStage.COMPUTE,
+                    texture: {
+                        sampleType: 'unfilterable-float',
+                        viewDimension: config.skyRenderer.passConfig.backBuffer.texture.dimension,
+                        multisampled: false,
                     },
-                    {
-                        binding: 2,
-                        visibility: GPUShaderStage.COMPUTE,
-                        storageTexture: {
-                            access: 'write-only',
-                            format: config.skyRenderer.passConfig.renderTarget.texture.format,
-                            viewDimension: config.skyRenderer.passConfig.renderTarget.texture.dimension,
-                        },
+                },
+                {
+                    binding: 7,
+                    visibility: GPUShaderStage.COMPUTE,
+                    storageTexture: {
+                        access: 'write-only',
+                        format: config.skyRenderer.passConfig.renderTarget.texture.format,
+                        viewDimension: config.skyRenderer.passConfig.renderTarget.texture.dimension,
                     },
-                ],
-            });
+                },
+            ];
 
-            const externalResourcesBindGroup = device.createBindGroup({
-                label: 'External resources bind group',
-                layout: externalResourcesBindGroupLayout,
-                entries: [
-                    {
-                        binding: 0,
-                        resource: config.skyRenderer.depthBuffer.view!,
-                    },
-                    {
-                        binding: 1,
-                        resource: config.skyRenderer.passConfig.backBuffer.view!,
-                    },
-                    {
-                        binding: 2,
-                        resource: config.skyRenderer.passConfig.renderTarget.view!,
-                    },
-                ],
-            });
+            const externalResourcesBindGroupEntries = [
+                {
+                    binding: 5,
+                    resource: config.skyRenderer.depthBuffer.view!,
+                },
+                {
+                    binding: 6,
+                    resource: config.skyRenderer.passConfig.backBuffer.view!,
+                },
+                {
+                    binding: 7,
+                    resource: config.skyRenderer.passConfig.renderTarget.view!,
+                },
+            ];
 
             // render sky with luts pass - compute
             {
@@ -214,6 +211,7 @@ export class SkyAtmosphereRenderer {
                                 multisampled: false,
                             },
                         },
+                        ...externalResourcesLayoutEntries,
                     ],
                 });
 
@@ -231,6 +229,7 @@ export class SkyAtmosphereRenderer {
                             binding: 4,
                             resource: this.resources.aerialPerspectiveLut.view,
                         },
+                        ...externalResourcesBindGroupEntries,
                     ],
                 });
 
@@ -240,7 +239,6 @@ export class SkyAtmosphereRenderer {
                         label: 'Render sky with LUTs pipeline layout',
                         bindGroupLayouts: [
                             renderSkyWithLutsBindGroupLayout,
-                            externalResourcesBindGroupLayout,
                         ],
                     }),
                     compute: {
@@ -257,7 +255,7 @@ export class SkyAtmosphereRenderer {
 
                 this.renderSkyWithLutsPass = new ComputePass(
                     renderSkyPipeline,
-                    [renderSkyWithLutsBindGroup, externalResourcesBindGroup],
+                    [renderSkyWithLutsBindGroup],
                     [
                         Math.ceil(config.skyRenderer.passConfig.renderTarget.texture.width / 16.0),
                         Math.ceil(config.skyRenderer.passConfig.renderTarget.texture.height / 16.0),
@@ -290,6 +288,7 @@ export class SkyAtmosphereRenderer {
                                 multisampled: false,
                             },
                         },
+                        ...externalResourcesLayoutEntries,
                     ],
                 });
 
@@ -306,6 +305,7 @@ export class SkyAtmosphereRenderer {
                             binding: 4,
                             resource: this.resources.multiScatteringLut.view,
                         },
+                        ...externalResourcesBindGroupEntries,
                     ],
                 });
 
@@ -315,9 +315,8 @@ export class SkyAtmosphereRenderer {
                         label: 'Render sky raymarching pipeline layout',
                         bindGroupLayouts: [
                             renderSkyRaymarchingBindGroupLayout,
-                            externalResourcesBindGroupLayout,
-                            config.shadow?.bindGroupLayout,
-                        ].filter(layout => layout !== undefined) as GPUBindGroupLayout[],
+                            ...(config.shadow?.bindGroupLayouts ?? []),
+                        ],
                     }),
                     compute: {
                         module: device.createShaderModule({
@@ -336,9 +335,8 @@ export class SkyAtmosphereRenderer {
                     renderSkyPipeline,
                     [
                         renderSkyRaymarchingBindGroup,
-                        externalResourcesBindGroup,
-                        config.shadow?.bindGroup,
-                    ].filter(bindGroup => bindGroup !== undefined) as GPUBindGroup[],
+                        ...(config.shadow?.bindGroups ?? []),
+                    ],
                     [
                         Math.ceil(config.skyRenderer.passConfig.renderTarget.texture.width / 16.0),
                         Math.ceil(config.skyRenderer.passConfig.renderTarget.texture.height / 16.0),
@@ -352,31 +350,24 @@ export class SkyAtmosphereRenderer {
                 console.warn('[SkyAtmosphereRenderer]: dual source blending was requested but the device feature is not enabled');
             }
 
-            const externalResourcesBindGroupLayout = device.createBindGroupLayout({
-                label: 'Render sky raymarching external bind group layout',
-                entries: [
-                    {
-                        binding: 0,
-                        visibility: GPUShaderStage.FRAGMENT,
-                        texture: {
-                            sampleType: 'unfilterable-float',
-                            viewDimension: config.skyRenderer.depthBuffer.texture.dimension,
-                            multisampled: false,
-                        },
+            const externalResourcesLayoutEntries: GPUBindGroupLayoutEntry[] = [
+                {
+                    binding: 5,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    texture: {
+                        sampleType: 'unfilterable-float',
+                        viewDimension: config.skyRenderer.depthBuffer.texture.dimension,
+                        multisampled: false,
                     },
-                ],
-            });
+                },
+            ];
 
-            const externalResourcesBindGroup = device.createBindGroup({
-                label: 'External resources bind group',
-                layout: externalResourcesBindGroupLayout,
-                entries: [
-                    {
-                        binding: 0,
-                        resource: config.skyRenderer.depthBuffer.view!,
-                    },
-                ],
-            });
+            const externalResourcesBindGroupEntries: GPUBindGroupEntry[] = [
+                {
+                    binding: 5,
+                    resource: config.skyRenderer.depthBuffer.view!,
+                },
+            ];
 
             // render sky with luts pass - render
             {
@@ -402,6 +393,7 @@ export class SkyAtmosphereRenderer {
                                 multisampled: false,
                             },
                         },
+                        ...externalResourcesLayoutEntries,
                     ],
                 });
 
@@ -419,6 +411,7 @@ export class SkyAtmosphereRenderer {
                             binding: 4,
                             resource: this.resources.aerialPerspectiveLut.view,
                         },
+                        ...externalResourcesBindGroupEntries,
                     ],
                 });
 
@@ -432,7 +425,6 @@ export class SkyAtmosphereRenderer {
                         label: 'Render sky with LUTs pipeline layout',
                         bindGroupLayouts: [
                             renderSkyWithLutsBindGroupLayout,
-                            externalResourcesBindGroupLayout,
                         ],
                     }),
                     vertex: {
@@ -477,7 +469,7 @@ export class SkyAtmosphereRenderer {
 
                 this.renderSkyWithLutsPass = new RenderPass(
                     renderSkyPipeline,
-                    [renderSkyWithLutsBindGroup, externalResourcesBindGroup],
+                    [renderSkyWithLutsBindGroup],
                 );
             }
 
@@ -505,6 +497,7 @@ export class SkyAtmosphereRenderer {
                                 multisampled: false,
                             },
                         },
+                        ...externalResourcesLayoutEntries,
                     ],
                 });
 
@@ -521,6 +514,7 @@ export class SkyAtmosphereRenderer {
                             binding: 4,
                             resource: this.resources.multiScatteringLut.view,
                         },
+                        ...externalResourcesBindGroupEntries,
                     ],
                 });
 
@@ -534,9 +528,8 @@ export class SkyAtmosphereRenderer {
                         label: 'Render sky raymarching pipeline layout',
                         bindGroupLayouts: [
                             renderSkyRaymarchingBindGroupLayout,
-                            externalResourcesBindGroupLayout,
-                            config.shadow?.bindGroupLayout,
-                        ].filter(layout => layout !== undefined) as GPUBindGroupLayout[],
+                            ...(config.shadow?.bindGroupLayouts || []),
+                        ],
                     }),
                     vertex: {
                         module,
@@ -571,9 +564,8 @@ export class SkyAtmosphereRenderer {
                     renderSkyPipeline,
                     [
                         renderSkyRaymarchingBindGroup,
-                        externalResourcesBindGroup,
-                        config.shadow?.bindGroup,
-                    ].filter(bindGroup => bindGroup !== undefined) as GPUBindGroup[],
+                        ...(config.shadow?.bindGroups ?? []),
+                    ],
                 );
             }
         }

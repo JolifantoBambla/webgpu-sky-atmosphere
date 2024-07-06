@@ -11,7 +11,7 @@ override WORKGROUP_SIZE_Y: u32 = 16;
 @group(0) @binding(5) var aerial_perspective_lut: texture_storage_3d<rgba16float, write>;
 
 fn get_sample_shadow(atmosphere: Atmosphere, sample_position: vec3<f32>) -> f32 {
-	return get_shadow(from_z_up(sample_position) + atmosphere.planet_center);
+	return get_shadow(from_z_up(sample_position) + atmosphere.planet_center, 0);
 }
 
 struct SingleScatteringResult {

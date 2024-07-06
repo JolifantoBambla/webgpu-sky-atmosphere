@@ -6,10 +6,9 @@ override WORKGROUP_SIZE_Y: u32 = 16;
 @group(0) @binding(2) var lut_sampler: sampler;
 @group(0) @binding(3) var sky_view_lut: texture_2d<f32>;
 @group(0) @binding(4) var aerial_perspective_lut : texture_3d<f32>;
-
-@group(1) @binding(0) var depth_buffer: texture_2d<f32>;
-@group(1) @binding(1) var backbuffer : texture_2d<f32>;
-@group(1) @binding(2) var render_target : texture_storage_2d<rgba16float, write>;
+@group(0) @binding(5) var depth_buffer: texture_2d<f32>;
+@group(0) @binding(6) var backbuffer : texture_2d<f32>;
+@group(0) @binding(7) var render_target : texture_storage_2d<rgba16float, write>;
 
 fn render_sky(pix: vec2<u32>) -> vec4<f32> {
 	let atmosphere = atmosphere_buffer;

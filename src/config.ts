@@ -144,35 +144,6 @@ export interface SkyRenderPassConfig {
 }
 
 /**
- * Config for external resources required to render volumetric shadows.
- */
-export interface SkyRendererShadowConfig {
-    /**
-     * A bind group layout specifying all resources required to render volumetric shadows.
-     */
-    bindGroupLayout: GPUBindGroupLayout,
-
-    /**
-     * A bind group generated using the {@link bindGroupLayout}, containing all resources required to render volumetric shadows.
-     */
-    bindGroup: GPUBindGroup,
-
-    /**
-     * The shader code to inject into the ray marching pipelines to render volumetric shadows.
-     *
-     * This needs to provide at least a function with the following signature:
-     *
-     *      fn get_shadow(world_space_position: vec3<f32>) -> f32
-     *
-     * The function should return a floating point value in the range [0, 1], where 1 implies that the given world space position is not in shadow.
-     *
-     * It should also include the bind group matching the given {@link bindGroupLayout}.
-     * The bind group must use bind group index 2 (i.e., `@group(2)`).
-     */
-    wgslCode: string,
-}
-
-/**
  * External resources and settings required by a {@link SkyAtmosphereRenderer}.
  */
 export interface SkyRendererPassConfig {
@@ -199,6 +170,99 @@ export interface SkyRendererPassConfig {
      * Defaults to false.
      */
     preferColoredTransmission?: boolean,
+}
+
+/**
+ * Config for external resources required to render volumetric shadows.
+ */
+export interface ShadowConfig {
+    /**
+     * A bind group layout specifying all resources required to render volumetric shadows.
+     */
+    bindGroupLayouts: GPUBindGroupLayout[],
+
+    /**
+     * A bind group generated using the {@link bindGroupLayout}, containing all resources required to render volumetric shadows.
+     */
+    bindGroups: GPUBindGroup[],
+
+    /**
+     * The shader code to inject into the ray marching pipelines to render volumetric shadows.
+     *
+     * This needs to provide at least a function with the following signature:
+     *
+     *      fn get_shadow(world_space_position: vec3<f32>, light_index: u32) -> f32
+     *
+     * The function should return a floating point value in the range [0, 1], where 1 implies that the given world space position is not in shadow.
+     *
+     * It should also include the bind group matching the given {@link bindGroupLayout}.
+     * The bind groups must not use bind group index 0.
+     */
+    wgslCode: string,
+}
+
+/**
+ * Config for user-defined light sources.
+ */
+export interface CustomLightsConfig {
+    /**
+     * A set of bind group layouts.
+     */
+    bindGroupLayouts: GPUBindGroupLayout[],
+
+    /**
+     * A set of bind groups compatible with the {@link bindGroupLayout}.
+     */
+    bindGroups: GPUBindGroup[],
+
+    /**
+     * The shader code to replace the built-in light source definitions.
+     *
+     * This needs to provide at least the following functions with the following signatures:
+     *
+     *      fn get_number_of_light_sources() -> u32
+     *      fn get_light_direction(light_index: u32) -> vec3<f32>
+     *      fn get_light_illuminance(light_index: u32) -> vec3<f32>
+     *      fn get_light_luminance(light_index: u32) -> vec3<f32>
+     *      fn get_light_diameter(light_index: u32) -> vec3<f32>
+     *
+     * It should also include the bind groups matching the given {@link bindGroupLayouts}.
+     * The bind groups must not use bind group index 0.
+     */
+    wgslCode: string,
+}
+
+/**
+ * Config for user-defined uniforms.
+ */
+export interface CustomUniformBuffersConfig {
+    /**
+     * A set of bind group layouts.
+     */
+    bindGroupLayouts: GPUBindGroupLayout[],
+
+    /**
+     * A set of bind groups compatible with the {@link bindGroupLayout}.
+     */
+    bindGroups: GPUBindGroup[],
+
+    /**
+     * The shader code to replace the built-in uniform definitions.
+     *
+     * This needs to provide at least the following functions with the following signatures:
+     *
+     *      fn get_camera_world_position() -> vec3<f32>
+     *      fn get_camera_inverse_view() -> mat4x4<f32>
+     *      fn get_camera_inverse_projection() -> mat4x4<f32>
+     *      fn get_screen_resolution() -> vec2<f32>
+     *      fn get_frame_id() -> f32
+     *      fn get_ray_march_spp_min() -> f32
+     *      fn get_ray_march_spp_max() -> f32
+     *
+     * It should also include the bind groups matching the given {@link bindGroupLayouts}.
+     * The bind groups must not use bind group index 0.
+     */
+    wgslCode: string,
 }
 
 export interface SkyAtmosphereConfig {
@@ -233,10 +297,22 @@ export interface SkyAtmosphereConfig {
     /**
      * External resources required by a {@link SkyAtmosphereRenderer} to render volumetric shadows.
      */
-    shadow?: SkyRendererShadowConfig,
+    shadow?: ShadowConfig,
 
     /**
      * Config for internally used look up tables.
      */
     lookUpTables?: SkyAtmosphereLutConfig,
+
+    /**
+     * If this is defined, replaces the built-in light source definition with user-defined bind groups and shader code.
+     * All lighting system related arguments in all function calls on this {@link AtmosphereRenderer} will be ignored.
+     */
+    customLights?: CustomLightsConfig,
+
+    /**
+     * If this is defined, replaces the built-in uniform buffers for render settings and camera parameters.
+     * All uniform buffer related arguments in all function calls on this {@link AtmosphereRenderer} will be ignored.
+     */
+    customUniforms?: CustomUniformBuffersConfig,
 }

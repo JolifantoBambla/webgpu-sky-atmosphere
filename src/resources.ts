@@ -142,9 +142,9 @@ function configToFloatArray(config: Uniforms) {
     return new Float32Array([
         ...config.camera.inverseProjection,
         ...config.camera.inverseView,
-        ...config.sun.illuminance,
+        ...config.skyLights![0].illuminance!,
         config.rayMarchMinSPP,
-        ...config.sun.direction,
+        ...config.skyLights![0].direction!,
         config.rayMarchMaxSPP,
         ...config.camera.position,
         config.frameId,
