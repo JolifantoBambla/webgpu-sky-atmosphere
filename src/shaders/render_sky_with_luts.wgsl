@@ -36,7 +36,7 @@ fn render_sky(pix: vec2<u32>) -> vec4<f32> {
 
         let uv = sky_view_lut_params_to_uv(atmosphere, intersects_ground, cos_view_zenith, cos_light_view, view_height);
 
-        return vec4(textureSampleLevel(sky_view_lut, lut_sampler, uv, 0).rgb + get_sun_luminance(world_pos, world_dir, sun_dir, atmosphere.bottom_radius), 1.0);
+        return vec4(textureSampleLevel(sky_view_lut, lut_sampler, uv, 0).rgb + get_sun_luminance(world_pos, world_dir, atmosphere.bottom_radius), 1.0);
     }
 
     let depth_buffer_world_pos = uv_and_depth_to_world_pos(config.inverse_view * config.inverse_projection, uv, depth);

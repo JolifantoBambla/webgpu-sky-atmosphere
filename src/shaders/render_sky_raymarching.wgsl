@@ -16,8 +16,8 @@ override WORKGROUP_SIZE_Y: u32 = 16;
 @group(0) @binding(7) var backbuffer: texture_2d<f32>;
 @group(0) @binding(8) var render_target: texture_storage_2d<rgba16float, write>;
 
-fn get_sample_shadow(atmosphere: Atmosphere, sample_position: vec3<f32>) -> f32 {
-	return get_shadow(from_z_up(sample_position) + atmosphere.planet_center, 0);
+fn get_sample_shadow(atmosphere: Atmosphere, sample_position: vec3<f32>, light_index: u32) -> f32 {
+	return get_shadow(from_z_up(sample_position) + atmosphere.planet_center, light_index);
 }
 
 struct SingleScatteringResult {
@@ -52,6 +52,8 @@ fn get_sample_segment_t(uv: vec2<f32>, config: Uniforms) -> f32 {
     }
 }
 
+override NUM_SKY_LIGHTS: u32 = 2;
+
 fn integrate_scattered_luminance(uv: vec2<f32>, world_pos: vec3<f32>, world_dir: vec3<f32>, sun_dir: vec3<f32>, atmosphere: Atmosphere, depth: f32, config: Uniforms) -> SingleScatteringResult {
 	var result = SingleScatteringResult();
 
@@ -73,9 +75,13 @@ fn integrate_scattered_luminance(uv: vec2<f32>, world_pos: vec3<f32>, world_dir:
     let sample_segment_t = get_sample_segment_t(uv, config);
 
 	// Phase functions
-	let cos_theta = dot(sun_dir, world_dir);
-	let mie_phase_val = cornette_shanks_phase(atmosphere.mie_phase_g, -cos_theta);
-	let rayleigh_phase_val = rayleigh_phase(cos_theta);
+    var mie_phase_val: array<f32, 2>;
+    var rayleigh_phase_val: array<f32, 2>;
+    for (var i: u32 = 0u; i < arrayLength(&sky_lights); i += 1) {
+        let cos_theta = dot(normalize(to_z_up(sky_lights[i].direction)), world_dir);
+        mie_phase_val[i] = cornette_shanks_phase(atmosphere.mie_phase_g, -cos_theta);
+        rayleigh_phase_val[i] = rayleigh_phase(cos_theta);
+    }
 
 	let sun_illuminance = sky_lights[0].illuminance;
 
@@ -100,23 +106,26 @@ fn integrate_scattered_luminance(uv: vec2<f32>, world_pos: vec3<f32>, world_dir:
         let sample_pos = world_pos + t * world_dir;
         let sample_height= length(sample_pos);
 
-		let zenith = sample_pos / sample_height;
-		let cos_sun_zenith = dot(sun_dir, zenith);
-		let uv = transmittance_lut_params_to_uv(atmosphere, sample_height, cos_sun_zenith);
-		let transmittance_to_sun = textureSampleLevel(transmittance_lut, lut_sampler, uv, 0).rgb;
-
 		let medium = sample_medium(sample_height - atmosphere.bottom_radius, atmosphere);
 		let sample_transmittance = exp(-medium.extinction * dt);
 
-		let planet_shadow = compute_planet_shadow(sample_pos, sun_dir, planet_center + planet_radius_offset * zenith, atmosphere.bottom_radius);
+        var scattering: vec3<f32> = vec3();
+        for (var i = 0u; i < arrayLength(&sky_lights); i += 1) {
+            let zenith = sample_pos / sample_height;
+            let cos_sun_zenith = dot(normalize(to_z_up(sky_lights[i].direction)), zenith);
+            let uv = transmittance_lut_params_to_uv(atmosphere, sample_height, cos_sun_zenith);
+            let transmittance_to_sun = textureSampleLevel(transmittance_lut, lut_sampler, uv, 0).rgb;
 
-        let phase_times_scattering = medium.mie_scattering * mie_phase_val + medium.rayleigh_scattering * rayleigh_phase_val;
+            let planet_shadow = compute_planet_shadow(sample_pos, normalize(to_z_up(sky_lights[i].direction)), planet_center + planet_radius_offset * zenith, atmosphere.bottom_radius);
 
-		let multi_scattered_luminance = get_multiple_scattering(atmosphere, medium.scattering, medium.extinction, sample_pos, cos_sun_zenith);
+            let phase_times_scattering = medium.mie_scattering * mie_phase_val[i] + medium.rayleigh_scattering * rayleigh_phase_val[i];
 
-		let shadow = get_sample_shadow(atmosphere, sample_pos);
+            let multi_scattered_luminance = get_multiple_scattering(atmosphere, medium.scattering, medium.extinction, sample_pos, cos_sun_zenith);
 
-		let scattering = sun_illuminance * (planet_shadow * shadow * transmittance_to_sun * phase_times_scattering + multi_scattered_luminance * medium.scattering);
+            let shadow = get_sample_shadow(atmosphere, sample_pos, i);
+
+            scattering += sky_lights[i].illuminance * (planet_shadow * shadow * transmittance_to_sun * phase_times_scattering + multi_scattered_luminance * medium.scattering);
+        }
 
         let scattering_int = (scattering - scattering * sample_transmittance) / medium.extinction;
         result.luminance += result.transmittance * scattering_int;
@@ -151,11 +160,11 @@ fn render_sky(pix: vec2<u32>) -> RenderSkyResult {
 	
     let depth = textureLoad(depth_buffer, pix, 0).r;
     if !is_valid_depth(depth) {
-        luminance += get_sun_luminance(world_pos, world_dir, sun_dir, atmosphere.bottom_radius);
+        luminance += get_sun_luminance(world_pos, world_dir, atmosphere.bottom_radius);
     }
 
     if !move_to_atmosphere_top(&world_pos, world_dir, atmosphere.top_radius) {
-        luminance = get_sun_luminance(world_pos, world_dir, sun_dir, atmosphere.bottom_radius);
+        luminance = get_sun_luminance(world_pos, world_dir, atmosphere.bottom_radius);
         return RenderSkyResult(max(vec4(luminance, 1.0), vec4()), max(vec4(0.0, 0.0, 0.0, 1.0), vec4()));
     }
     

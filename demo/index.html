@@ -137,7 +137,6 @@
                 coordinateSystem: {
                     yUp: true,
                 },
-                maxNumLightSources: 1,
                 skyRenderer: {
                     passConfig: {
                         backBuffer: {
@@ -172,10 +171,12 @@
                         @group(1) @binding(2) var shadow_map: texture_depth_2d;
                         
                         fn get_shadow(p: vec3<f32>, light_index: u32) -> f32 {
-                            var shadow_pos = (sun_view_projection * vec4(p, 1.0)).xyz;
-                            shadow_pos = vec3(shadow_pos.xy * vec2(0.5, -0.5) + 0.5, shadow_pos.z);
-                            if all(shadow_pos >= vec3<f32>()) && all(shadow_pos < vec3(1.0)) {
-                                return textureSampleCompareLevel(shadow_map, shadow_sampler, shadow_pos.xy, shadow_pos.z);
+                            if light_index == 0 {
+                                var shadow_pos = (sun_view_projection * vec4(p, 1.0)).xyz;
+                                shadow_pos = vec3(shadow_pos.xy * vec2(0.5, -0.5) + 0.5, shadow_pos.z);
+                                if all(shadow_pos >= vec3<f32>()) && all(shadow_pos < vec3(1.0)) {
+                                    return textureSampleCompareLevel(shadow_map, shadow_sampler, shadow_pos.xy, shadow_pos.z);
+                                }
                             }
                             return 1.0;
                         }
@@ -333,18 +334,36 @@
                         inverseView: mat4n.inverse(cameraView),
                         inverseProjection: mat4n.inverse(projection),
                     },
-                    skyLights: [{
-                        illuminance: [
-                            params.renderSettings.sun.illuminance.r,
-                            params.renderSettings.sun.illuminance.g,
-                            params.renderSettings.sun.illuminance.b,
-                        ].map(c => c * params.renderSettings.sun.illuminanceFactor),
-                        direction: vec3n.normalize([
-                            0.0,
-                            params.renderSettings.sun.direction.y,
-                            params.renderSettings.sun.direction.x,
-                        ]),
-                    }],
+                    skyLights: [
+                        {
+                            illuminance: [
+                                params.renderSettings.sun.illuminance.r,
+                                params.renderSettings.sun.illuminance.g,
+                                params.renderSettings.sun.illuminance.b,
+                            ].map(c => c * params.renderSettings.sun.illuminanceFactor),
+                            direction: vec3n.normalize([
+                                0.0,
+                                params.renderSettings.sun.direction.y,
+                                params.renderSettings.sun.direction.x,
+                            ]),
+                            luminance: [120000.0, 120000.0, 120000.0],
+                            diameter: 0.545 * Math.PI / 180.0,
+                        },
+                        {
+                            illuminance: [
+                                params.renderSettings.sun.illuminance.r,
+                                params.renderSettings.sun.illuminance.g,
+                                params.renderSettings.sun.illuminance.b,
+                            ].map(c => 0.0 * c * params.renderSettings.sun.illuminanceFactor / 100000),
+                            direction: vec3n.normalize([
+                                0.0,
+                                -params.renderSettings.sun.direction.y,
+                                -params.renderSettings.sun.direction.x,
+                            ]),
+                            luminance: [0.26, 0.26, 0.26],
+                            diameter: 0.568 * Math.PI / 180.0,
+                        },
+                    ],
                     screenResolution: resolution,
                     rayMarchMinSPP: params.config.rayMarchMinSPP,
                     rayMarchMaxSPP: Math.max(params.config.rayMarchMinSPP + 1, 31),

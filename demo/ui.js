@@ -102,7 +102,7 @@ export function makeUi() {
     });
     renderSettingsFolder.addBinding(params.renderSettings.sun, 'illuminance', {color: {type: 'float'}, label: 'Sun illuminance'});
     renderSettingsFolder.addBinding(params.renderSettings.sun, 'illuminanceFactor', {min: 0.1, max: 10.0, step: 0.1, label: 'Sun illum. scale'});
-    renderSettingsFolder.addBinding(params.renderSettings.sun, 'direction', {picker: 'inline', expanded: true, y: {inverted: true, min: -0.01, max: 1.0}, x: {min: -1.0, max: 1.0}, label: 'Sun direction'});
+    renderSettingsFolder.addBinding(params.renderSettings.sun, 'direction', {picker: 'inline', expanded: true, y: {inverted: true, min: -1.0, max: 1.0}, x: {min: -1.0, max: 1.0}, label: 'Sun direction'});
     renderSettingsFolder.addBinding(params.config, 'rayMarchMinSPP', {min: 14, max: 100, step: 1, label: 'Min. SPP'});
 
     const atmosphereFolder = pane.addFolder({
