@@ -6,11 +6,12 @@ override WORKGROUP_SIZE_X: u32 = 16;
 override WORKGROUP_SIZE_Y: u32 = 16;
 
 @group(0) @binding(0) var<uniform> atmosphere_buffer: Atmosphere;
-@group(0) @binding(1) var<uniform> config_buffer: Config;
-@group(0) @binding(2) var lut_sampler: sampler;
-@group(0) @binding(3) var transmittance_lut: texture_2d<f32>;
-@group(0) @binding(4) var multi_scattering_lut: texture_2d<f32>;
-@group(0) @binding(5) var sky_view_lut : texture_storage_2d<rgba16float, write>;
+@group(0) @binding(1) var<uniform> config_buffer: Uniforms;
+@group(0) @binding(2) var<storage> sky_lights: array<SkyLight>;
+@group(0) @binding(3) var lut_sampler: sampler;
+@group(0) @binding(4) var transmittance_lut: texture_2d<f32>;
+@group(0) @binding(5) var multi_scattering_lut: texture_2d<f32>;
+@group(0) @binding(6) var sky_view_lut : texture_storage_2d<rgba16float, write>;
 
 fn integrate_scattered_luminance(world_pos: vec3<f32>, world_dir: vec3<f32>, sun_dir: vec3<f32>, atmosphere: Atmosphere, sun_illuminance: vec3<f32>, min_sample_count: f32, max_sample_count: f32) -> vec3<f32> {
 	// Compute next intersection with atmosphere or ground
@@ -128,12 +129,12 @@ fn render_sky_view_lut(@builtin(global_invocation_id) global_id: vec3<u32>) {
 	let atmosphere = atmosphere_buffer;
     let config = config_buffer;
 	
-	let min_sample_count = config_buffer.ray_march_min_spp;
-	let max_sample_count = config_buffer.ray_march_max_spp;
-	let sun_illuminance = config_buffer.sun_illuminance;
+	let min_sample_count = config.ray_march_min_spp;
+	let max_sample_count = config.ray_march_max_spp;
+	let sun_illuminance = sky_lights[0].illuminance;
 
 	let view_world_pos = to_z_up(config.camera_world_position - atmosphere.planet_center);
-	let world_sun_dir = to_z_up(normalize(config_buffer.sun_direction));
+	let world_sun_dir = to_z_up(normalize(sky_lights[0].direction));
 
 	let view_height = length(view_world_pos);
 

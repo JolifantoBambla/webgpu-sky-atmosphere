@@ -24,7 +24,7 @@ import {
 } from './config.js';
 
 import { Camera, SkyLight, Uniforms } from './uniforms.js';
-import { ATMOSPHERE_BUFFER_SIZE, CONFIG_BUFFER_SIZE, SkyAtmosphereResources } from './resources.js';
+import { ATMOSPHERE_BUFFER_SIZE, CONFIG_BUFFER_SIZE, SKY_LIGHTS_BUFFER_MIN_SIZE, SkyAtmosphereResources } from './resources.js';
 
 import {
     makeRenderSkyWithLutsShaderCode,
@@ -117,6 +117,15 @@ export class SkyAtmosphereRenderer {
             {
                 binding: 2,
                 visibility: GPUShaderStage.COMPUTE,
+                buffer: {
+                    type: 'read-only-storage',
+                    hasDynamicOffset: false,
+                    minBindingSize: SKY_LIGHTS_BUFFER_MIN_SIZE,
+                }
+            },
+            {
+                binding: 3,
+                visibility: GPUShaderStage.COMPUTE,
                 sampler: {
                     type: 'filtering',
                 },
@@ -137,6 +146,12 @@ export class SkyAtmosphereRenderer {
             },
             {
                 binding: 2,
+                resource: {
+                    buffer: this.resources.skyLightsBuffer,
+                },
+            },
+            {
+                binding: 3,
                 resource: this.resources.lutSampler,
             },
         ]
@@ -144,7 +159,7 @@ export class SkyAtmosphereRenderer {
         if (isComputePassConfig(config.skyRenderer.passConfig)) {
             const externalResourcesLayoutEntries: GPUBindGroupLayoutEntry[] = [
                 {
-                    binding: 5,
+                    binding: 6,
                     visibility: GPUShaderStage.COMPUTE,
                     texture: {
                         sampleType: 'unfilterable-float',
@@ -153,7 +168,7 @@ export class SkyAtmosphereRenderer {
                     },
                 },
                 {
-                    binding: 6,
+                    binding: 7,
                     visibility: GPUShaderStage.COMPUTE,
                     texture: {
                         sampleType: 'unfilterable-float',
@@ -162,7 +177,7 @@ export class SkyAtmosphereRenderer {
                     },
                 },
                 {
-                    binding: 7,
+                    binding: 8,
                     visibility: GPUShaderStage.COMPUTE,
                     storageTexture: {
                         access: 'write-only',
@@ -174,15 +189,15 @@ export class SkyAtmosphereRenderer {
 
             const externalResourcesBindGroupEntries = [
                 {
-                    binding: 5,
+                    binding: 6,
                     resource: config.skyRenderer.depthBuffer.view!,
                 },
                 {
-                    binding: 6,
+                    binding: 7,
                     resource: config.skyRenderer.passConfig.backBuffer.view!,
                 },
                 {
-                    binding: 7,
+                    binding: 8,
                     resource: config.skyRenderer.passConfig.renderTarget.view!,
                 },
             ];
@@ -194,7 +209,7 @@ export class SkyAtmosphereRenderer {
                     entries: [
                         ...renderSkyBindGroupLayoutBaseEntries,
                         {
-                            binding: 3,
+                            binding: 4,
                             visibility: GPUShaderStage.COMPUTE,
                             texture: {
                                 sampleType: 'float',
@@ -203,7 +218,7 @@ export class SkyAtmosphereRenderer {
                             },
                         },
                         {
-                            binding: 4,
+                            binding: 5,
                             visibility: GPUShaderStage.COMPUTE,
                             texture: {
                                 sampleType: 'float',
@@ -222,11 +237,11 @@ export class SkyAtmosphereRenderer {
                     entries: [
                         ...renderSkyBindGroupBaseEntries,
                         {
-                            binding: 3,
+                            binding: 4,
                             resource: this.resources.skyViewLut.view,
                         },
                         {
-                            binding: 4,
+                            binding: 5,
                             resource: this.resources.aerialPerspectiveLut.view,
                         },
                         ...externalResourcesBindGroupEntries,
@@ -271,7 +286,7 @@ export class SkyAtmosphereRenderer {
                     entries: [
                         ...renderSkyBindGroupLayoutBaseEntries,
                         {
-                            binding: 3,
+                            binding: 4,
                             visibility: GPUShaderStage.COMPUTE,
                             texture: {
                                 sampleType: 'float',
@@ -280,7 +295,7 @@ export class SkyAtmosphereRenderer {
                             },
                         },
                         {
-                            binding: 4,
+                            binding: 5,
                             visibility: GPUShaderStage.COMPUTE,
                             texture: {
                                 sampleType: 'float',
@@ -298,11 +313,11 @@ export class SkyAtmosphereRenderer {
                     entries: [
                         ...renderSkyBindGroupBaseEntries,
                         {
-                            binding: 3,
+                            binding: 4,
                             resource: this.resources.transmittanceLut.view,
                         },
                         {
-                            binding: 4,
+                            binding: 5,
                             resource: this.resources.multiScatteringLut.view,
                         },
                         ...externalResourcesBindGroupEntries,
@@ -352,7 +367,7 @@ export class SkyAtmosphereRenderer {
 
             const externalResourcesLayoutEntries: GPUBindGroupLayoutEntry[] = [
                 {
-                    binding: 5,
+                    binding: 6,
                     visibility: GPUShaderStage.FRAGMENT,
                     texture: {
                         sampleType: 'unfilterable-float',
@@ -364,7 +379,7 @@ export class SkyAtmosphereRenderer {
 
             const externalResourcesBindGroupEntries: GPUBindGroupEntry[] = [
                 {
-                    binding: 5,
+                    binding: 6,
                     resource: config.skyRenderer.depthBuffer.view!,
                 },
             ];
@@ -376,7 +391,7 @@ export class SkyAtmosphereRenderer {
                     entries: [
                         ...renderSkyBindGroupLayoutBaseEntries,
                         {
-                            binding: 3,
+                            binding: 4,
                             visibility: GPUShaderStage.FRAGMENT,
                             texture: {
                                 sampleType: 'float',
@@ -385,7 +400,7 @@ export class SkyAtmosphereRenderer {
                             },
                         },
                         {
-                            binding: 4,
+                            binding: 5,
                             visibility: GPUShaderStage.FRAGMENT,
                             texture: {
                                 sampleType: 'float',
@@ -404,11 +419,11 @@ export class SkyAtmosphereRenderer {
                     entries: [
                         ...renderSkyBindGroupBaseEntries,
                         {
-                            binding: 3,
+                            binding: 4,
                             resource: this.resources.skyViewLut.view,
                         },
                         {
-                            binding: 4,
+                            binding: 5,
                             resource: this.resources.aerialPerspectiveLut.view,
                         },
                         ...externalResourcesBindGroupEntries,
@@ -480,7 +495,7 @@ export class SkyAtmosphereRenderer {
                     entries: [
                         ...renderSkyBindGroupLayoutBaseEntries,
                         {
-                            binding: 3,
+                            binding: 4,
                             visibility: GPUShaderStage.FRAGMENT,
                             texture: {
                                 sampleType: 'float',
@@ -489,7 +504,7 @@ export class SkyAtmosphereRenderer {
                             },
                         },
                         {
-                            binding: 4,
+                            binding: 5,
                             visibility: GPUShaderStage.FRAGMENT,
                             texture: {
                                 sampleType: 'float',
@@ -507,11 +522,11 @@ export class SkyAtmosphereRenderer {
                     entries: [
                         ...renderSkyBindGroupBaseEntries,
                         {
-                            binding: 3,
+                            binding: 4,
                             resource: this.resources.transmittanceLut.view,
                         },
                         {
-                            binding: 4,
+                            binding: 5,
                             resource: this.resources.multiScatteringLut.view,
                         },
                         ...externalResourcesBindGroupEntries,
@@ -626,6 +641,9 @@ export class SkyAtmosphereRenderer {
 
         if (config) {
             this.updateConfig(config);
+            if (config.skyLights) {
+                this.resources.updateLightSources(config.skyLights);
+            }
         }
 
         // todo: only update these luts if camera is within atmosphere

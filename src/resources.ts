@@ -1,6 +1,6 @@
 import { Atmosphere, makeEarthAtmosphere } from "./atmosphere.js";
 import { SkyAtmosphereConfig } from "./config.js";
-import { Uniforms } from "./uniforms.js";
+import { SkyLight, Uniforms } from "./uniforms.js";
 import { LookUpTable } from "./util.js";
 
 export const DEFAULT_TRANSMITTANCE_LUT_SIZE: [number, number] = [256, 64];
@@ -14,7 +14,8 @@ export const SKY_VIEW_LUT_FORMAT: GPUTextureFormat = TRANSMITTANCE_LUT_FORMAT;
 export const AERIAL_PERSPECTIVE_LUT_FORMAT: GPUTextureFormat = TRANSMITTANCE_LUT_FORMAT;
 
 export const ATMOSPHERE_BUFFER_SIZE: number = 128;
-export const CONFIG_BUFFER_SIZE: number = 192;
+export const CONFIG_BUFFER_SIZE: number = 160;
+export const SKY_LIGHTS_BUFFER_MIN_SIZE: number = 48;
 
 export class SkyAtmosphereResources {
     readonly label: string;
@@ -23,6 +24,7 @@ export class SkyAtmosphereResources {
 
     readonly atmosphereBuffer: GPUBuffer;
     readonly configBuffer: GPUBuffer;
+    readonly skyLightsBuffer: GPUBuffer;
 
     readonly lutSampler: GPUSampler;
 
@@ -49,6 +51,11 @@ export class SkyAtmosphereResources {
             label: `config buffer [${this.label}]`,
             size: CONFIG_BUFFER_SIZE,
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        });
+        this.skyLightsBuffer = device.createBuffer({
+            label: 'sky lights buffer',
+            size: (config.maxNumLightSources ?? 2) * SKY_LIGHTS_BUFFER_MIN_SIZE,
+            usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
         });
 
         this.lutSampler = lutSampler || device.createSampler({
@@ -95,15 +102,22 @@ export class SkyAtmosphereResources {
     }
 
     public updateAtmosphere(atmosphere: Atmosphere) {
-        this.device.queue.writeBuffer(this.atmosphereBuffer, 0, new Float32Array(atmosphereToFloatArray(atmosphere, this.config.coordinateSystem?.yUp ?? true)));
+        this.device.queue.writeBuffer(this.atmosphereBuffer, 0, atmosphereToFloatArray(atmosphere, this.config.coordinateSystem?.yUp ?? true));
     }
 
     public updateConfig(config: Uniforms) {
-        this.device.queue.writeBuffer(this.configBuffer, 0, new Float32Array(configToFloatArray(config)));
+        this.device.queue.writeBuffer(this.configBuffer, 0, configToFloatArray(config));
+    }
+
+    public updateLightSources(skyLights: SkyLight[]) {
+        if (skyLights.length > (this.config.maxNumLightSources ?? 2)) {
+            console.warn(`[SkyAtmosphereResources::updateLightSources]: number of light sources exceeds buffer size, only supported number of light sources are uploaded (${skyLights.length} > ${this.config.maxNumLightSources ?? 2})`)
+        }
+        this.device.queue.writeBuffer(this.skyLightsBuffer, 0, skyLightsToFloatArray(skyLights, this.config.maxNumLightSources ?? 2));
     }
 }
 
-function atmosphereToFloatArray(atmosphere: Atmosphere, yUp = true) {
+function atmosphereToFloatArray(atmosphere: Atmosphere, yUp = true): Float32Array {
     return new Float32Array([
         atmosphere.rayleigh.scattering[0],
         atmosphere.rayleigh.scattering[1],
@@ -138,18 +152,28 @@ function atmosphereToFloatArray(atmosphere: Atmosphere, yUp = true) {
     ]);
 }
 
-function configToFloatArray(config: Uniforms) {
+function configToFloatArray(config: Uniforms): Float32Array {
     return new Float32Array([
         ...config.camera.inverseProjection,
         ...config.camera.inverseView,
-        ...config.skyLights![0].illuminance!,
-        config.rayMarchMinSPP,
-        ...config.skyLights![0].direction!,
-        config.rayMarchMaxSPP,
         ...config.camera.position,
         config.frameId,
-        ...DEFAULT_SKY_VIEW_LUT_SIZE,
         ...config.screenResolution,
+        config.rayMarchMinSPP,
+        config.rayMarchMaxSPP,
     ]);
+}
+
+function skyLightsToFloatArray(skyLights: SkyLight[], maxNumLightSources: number): Float32Array {
+    return new Float32Array(skyLights.map(l => {
+        return [
+            ...(l.illuminance || [1.0, 1.0, 1.0]),
+            l.diameter ?? (0.545 * (Math.PI / 180.0)),
+            ...l.direction,
+            0.0, // padding
+            ...(l.luminance ?? [120000.0, 120000.0, 120000.0]),
+            0.0, // padding
+        ] as number[];
+    }).slice(0, maxNumLightSources).flat());
 }
 

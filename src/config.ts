@@ -141,6 +141,20 @@ export interface SkyRenderPassConfig {
      * Should have at least 16 bit precision per channel. (todo: maybe r11g11b10 also enough?)
      */
     renderTargetFormat: GPUTextureFormat,
+
+    transmissionFormat?: GPUTextureFormat,
+
+    /**
+     * Use dual-source blending for colored transmissions.
+     *
+     * Since colored transmissions are only supported when rendering the atmosphere using ray marching, the more expensive ray marching pipelines will be used by default.
+     *
+     * Note that without the "dual-source-blending" feature enabled, colored transmissions can only be rendered using a compute pipeline.
+     * If the feature is not enabled and the {@link SkyAtmosphereRenderer} is configured to use render pipelines, this flag has no effect.
+     *
+     * Defaults to false.
+     */
+    useDualSourceBlending?: boolean,
 }
 
 /**
@@ -170,6 +184,14 @@ export interface SkyRendererPassConfig {
      * Defaults to false.
      */
     preferColoredTransmission?: boolean,
+
+    /**
+     * Results in less sampling artefacts (e.g., smoother volumetric shadows) but introduces visible noise.
+     * It is recommended to use temporal anti-aliasing to get rid of this noise.
+     * 
+     * Defaults to true.
+     */
+    randomizeRayOffsets?: boolean,
 }
 
 /**
@@ -303,6 +325,14 @@ export interface SkyAtmosphereConfig {
      * Config for internally used look up tables.
      */
     lookUpTables?: SkyAtmosphereLutConfig,
+
+    /**
+     * The maximum number of sky lights to use.
+     * Ignored if user-defined light source definitions are used.
+     * 
+     * Defaults to 2.
+     */
+    maxNumLightSources?: number,
 
     /**
      * If this is defined, replaces the built-in light source definition with user-defined bind groups and shader code.

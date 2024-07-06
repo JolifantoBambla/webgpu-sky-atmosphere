@@ -56,7 +56,6 @@ struct Uniforms {
 }
 
 struct SkyLight {
-    
     illuminance: vec3<f32>,
     
     diameter: f32,

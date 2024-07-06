@@ -4,11 +4,12 @@ override WORKGROUP_SIZE_X: u32 = 16;
 override WORKGROUP_SIZE_Y: u32 = 16;
 
 @group(0) @binding(0) var<uniform> atmosphere_buffer: Atmosphere;
-@group(0) @binding(1) var<uniform> config_buffer: Config;
-@group(0) @binding(2) var lut_sampler: sampler;
-@group(0) @binding(3) var transmittance_lut: texture_2d<f32>;
-@group(0) @binding(4) var multi_scattering_lut: texture_2d<f32>;
-@group(0) @binding(5) var aerial_perspective_lut: texture_storage_3d<rgba16float, write>;
+@group(0) @binding(1) var<uniform> config_buffer: Uniforms;
+@group(0) @binding(2) var<storage> sky_lights: array<SkyLight>;
+@group(0) @binding(3) var lut_sampler: sampler;
+@group(0) @binding(4) var transmittance_lut: texture_2d<f32>;
+@group(0) @binding(5) var multi_scattering_lut: texture_2d<f32>;
+@group(0) @binding(6) var aerial_perspective_lut: texture_storage_3d<rgba16float, write>;
 
 fn get_sample_shadow(atmosphere: Atmosphere, sample_position: vec3<f32>) -> f32 {
 	return get_shadow(from_z_up(sample_position) + atmosphere.planet_center, 0);
@@ -96,11 +97,11 @@ fn render_aerial_perspective_lut(@builtin(global_invocation_id) global_id: vec3<
 	let pix = vec2<f32>(global_id.xy) + 0.5;
 	let uv = pix / vec2<f32>(config.screen_resolution);
 
-	let sun_illuminance = config.sun_illuminance;
+	let sun_illuminance = sky_lights[0].illuminance;
 
     var world_dir = uv_to_world_dir(uv, config.inverse_projection, config.inverse_view);
     let cam_pos = to_z_up(config.camera_world_position - atmosphere.planet_center);
-	let sun_dir = to_z_up(normalize(config.sun_direction));
+	let sun_dir = to_z_up(normalize(sky_lights[0].direction));
 
 	var world_pos = cam_pos;
 

@@ -1,5 +1,5 @@
 import { CoordinateSystemConfig, SkyAtmosphereConfig, ShadowConfig } from "./config.js";
-import { AERIAL_PERSPECTIVE_LUT_FORMAT, ATMOSPHERE_BUFFER_SIZE, CONFIG_BUFFER_SIZE, DEFAULT_MULTISCATTERING_LUT_SIZE, DEFAULT_SKY_VIEW_LUT_SIZE, MULTI_SCATTERING_LUT_FORMAT, SKY_VIEW_LUT_FORMAT, SkyAtmosphereResources, TRANSMITTANCE_LUT_FORMAT } from "./resources.js";
+import { AERIAL_PERSPECTIVE_LUT_FORMAT, ATMOSPHERE_BUFFER_SIZE, CONFIG_BUFFER_SIZE, DEFAULT_MULTISCATTERING_LUT_SIZE, DEFAULT_SKY_VIEW_LUT_SIZE, MULTI_SCATTERING_LUT_FORMAT, SKY_LIGHTS_BUFFER_MIN_SIZE, SKY_VIEW_LUT_FORMAT, SkyAtmosphereResources, TRANSMITTANCE_LUT_FORMAT } from "./resources.js";
 import { makeAerialPerspectiveLutShaderCode, makeMultiScatteringLutShaderCode, makeSkyViewLutShaderCode, makeTransmittanceLutShaderCode } from "./shaders.js";
 import { ComputePass } from "./util.js";
 
@@ -270,17 +270,17 @@ export class SkyViewLutPipeline {
                 {
                     binding: 2,
                     visibility: GPUShaderStage.COMPUTE,
-                    sampler: {
-                        type: 'filtering',
-                    },
+                    buffer: {
+                        type: 'read-only-storage',
+                        hasDynamicOffset: false,
+                        minBindingSize: SKY_LIGHTS_BUFFER_MIN_SIZE,
+                    }
                 },
                 {
                     binding: 3,
                     visibility: GPUShaderStage.COMPUTE,
-                    texture: {
-                        sampleType: 'float',
-                        viewDimension: '2d',
-                        multisampled: false,
+                    sampler: {
+                        type: 'filtering',
                     },
                 },
                 {
@@ -294,6 +294,15 @@ export class SkyViewLutPipeline {
                 },
                 {
                     binding: 5,
+                    visibility: GPUShaderStage.COMPUTE,
+                    texture: {
+                        sampleType: 'float',
+                        viewDimension: '2d',
+                        multisampled: false,
+                    },
+                },
+                {
+                    binding: 6,
                     visibility: GPUShaderStage.COMPUTE,
                     storageTexture: {
                         access: 'write-only',
@@ -361,18 +370,24 @@ export class SkyViewLutPipeline {
                 },
                 {
                     binding: 2,
-                    resource: resources.lutSampler,
+                    resource: {
+                        buffer: resources.skyLightsBuffer,
+                    },
                 },
                 {
                     binding: 3,
-                    resource: resources.transmittanceLut.view,
+                    resource: resources.lutSampler,
                 },
                 {
                     binding: 4,
-                    resource: resources.multiScatteringLut.view,
+                    resource: resources.transmittanceLut.view,
                 },
                 {
                     binding: 5,
+                    resource: resources.multiScatteringLut.view,
+                },
+                {
+                    binding: 6,
                     resource: resources.skyViewLut.texture.createView(),
                 },
             ],
@@ -422,17 +437,17 @@ export class AerialPerspectiveLutPipeline {
                 {
                     binding: 2,
                     visibility: GPUShaderStage.COMPUTE,
-                    sampler: {
-                        type: 'filtering',
-                    },
+                    buffer: {
+                        type: 'read-only-storage',
+                        hasDynamicOffset: false,
+                        minBindingSize: SKY_LIGHTS_BUFFER_MIN_SIZE,
+                    }
                 },
                 {
                     binding: 3,
                     visibility: GPUShaderStage.COMPUTE,
-                    texture: {
-                        sampleType: 'float',
-                        viewDimension: '2d',
-                        multisampled: false,
+                    sampler: {
+                        type: 'filtering',
                     },
                 },
                 {
@@ -446,6 +461,15 @@ export class AerialPerspectiveLutPipeline {
                 },
                 {
                     binding: 5,
+                    visibility: GPUShaderStage.COMPUTE,
+                    texture: {
+                        sampleType: 'float',
+                        viewDimension: '2d',
+                        multisampled: false,
+                    },
+                },
+                {
+                    binding: 6,
                     visibility: GPUShaderStage.COMPUTE,
                     storageTexture: {
                         access: 'write-only',
@@ -508,18 +532,24 @@ export class AerialPerspectiveLutPipeline {
                 },
                 {
                     binding: 2,
-                    resource: resources.lutSampler,
+                    resource: {
+                        buffer: resources.skyLightsBuffer,
+                    },
                 },
                 {
                     binding: 3,
-                    resource: resources.transmittanceLut.view,
+                    resource: resources.lutSampler,
                 },
                 {
                     binding: 4,
-                    resource: resources.multiScatteringLut.view,
+                    resource: resources.transmittanceLut.view,
                 },
                 {
                     binding: 5,
+                    resource: resources.multiScatteringLut.view,
+                },
+                {
+                    binding: 6,
                     resource: resources.aerialPerspectiveLut.texture.createView(),
                 },
             ],

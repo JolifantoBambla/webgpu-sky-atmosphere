@@ -55,31 +55,55 @@ export interface Uniforms {
      * A collection of directional lights, influencing the atmosphere.
      * 
      * Defaults to the default sun and default moon.
+     * 
+     * Ignored if custom light sources are used.
+     * 
+     * @see {@link CustomLightsConfig}
      */
     skyLights?: SkyLight[],
 
     /**
      * The current camera parameter.
+     * 
+     * Ignored if custom uniform buffers are used.
+     * 
+     * @see {@link CustomUniformBuffersConfig}
      */
     camera: Camera,
 
     /**
      * Minimum number of ray marching samples per pixel
+     * 
+     * Ignored if custom uniform buffers are used.
+     * 
+     * @see {@link CustomUniformBuffersConfig}
      */
     rayMarchMinSPP: number,
 
     /**
      * Maximum number of ray marching samples per pixel
+     * 
+     * Ignored if custom uniform buffers are used.
+     * 
+     * @see {@link CustomUniformBuffersConfig}
      */
     rayMarchMaxSPP: number,
 
     /**
      * Resolution of the output texture.
+     * 
+     * Ignored if custom uniform buffers are used.
+     * 
+     * @see {@link CustomUniformBuffersConfig}
      */
     screenResolution: [number, number],
 
     /**
      * The current frame id.
+     * 
+     * Ignored if custom uniform buffers are used.
+     * 
+     * @see {@link CustomUniformBuffersConfig}
      */
     frameId: number,
 }
