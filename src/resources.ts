@@ -147,7 +147,7 @@ function configToFloatArray(config: Uniforms) {
         ...config.sun.direction,
         config.rayMarchMaxSPP,
         ...config.camera.position,
-        DEFAULT_MULTISCATTERING_LUT_SIZE,
+        config.frameId,
         ...DEFAULT_SKY_VIEW_LUT_SIZE,
         ...config.screenResolution,
     ]);

@@ -301,10 +301,14 @@
             const sunProjection = mat4n.ortho(-80, 80, -80, 80, -200, 300);
 
             let lastTime = new Date();
+            let frameId = 0;
             const render = () => {
                 const now = new Date();
                 const dt = (now - lastTime);// / 1000.0;
                 lastTime = now;
+
+                ++frameId;
+
                 cameraController.update(dt);
 
                 const encoder = device.createCommandEncoder();
@@ -343,6 +347,7 @@
                     screenResolution: resolution,
                     rayMarchMinSPP: params.config.rayMarchMinSPP,
                     rayMarchMaxSPP: Math.max(params.config.rayMarchMinSPP + 1, 31),
+                    frameId,
                 };
 
                 const model = mat4n.translation([0.0, -20.0, 0.0]);
@@ -395,7 +400,7 @@
                 geometryPass.end();
 
                 const computePass = encoder.beginComputePass();
-                skyAtmosphereRenderer.renderSkyAtmosphere(computePass, false, false, config, params.atmosphere);
+                skyAtmosphereRenderer.renderSkyAtmosphere(computePass, true, false, config, params.atmosphere);
                 computePass.end();
 
                 const pass = encoder.beginRenderPass({

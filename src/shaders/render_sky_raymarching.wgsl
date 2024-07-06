@@ -1,6 +1,8 @@
 
 override MULTI_SCATTERING_LUT_RES: f32 = 32.0;
 
+override RANDOMIZE_SAMPLE_OFFSET: bool = true;
+
 override WORKGROUP_SIZE_X: u32 = 16;
 override WORKGROUP_SIZE_Y: u32 = 16;
 
@@ -27,6 +29,33 @@ struct SingleScatteringResult {
 	transmittance: vec3<f32>,			// transmittance in [0,1] (unitless)
 }
 
+fn pcg_hash(seed: u32) -> u32 {
+    let state = seed * 747796405u + 2891336453u;
+    let word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
+    return (word >> 22u) ^ word;
+}
+
+fn pcg_hashf(seed: u32) -> f32 {
+    return f32(pcg_hash(seed)) / 4294967296.0;
+}
+
+fn pcg_hash3(x: u32, y: u32, z: u32) -> f32 {
+    return pcg_hashf((x * 1664525 + y) + z);
+}
+
+fn get_sample_segment_t(uv: vec2<f32>, config: Config) -> f32 {
+    if RANDOMIZE_SAMPLE_OFFSET {
+        let seed = vec3<u32>(
+            u32(uv.x * config.screen_resolution.x),
+            u32(uv.y * config.screen_resolution.y),
+            pcg_hash(u32(config.frame_id)),
+        );
+        return pcg_hash3(seed.x, seed.y, seed.z);
+    } else {
+        return 0.3;
+    }
+}
+
 fn integrate_scattered_luminance(uv: vec2<f32>, world_pos: vec3<f32>, world_dir: vec3<f32>, sun_dir: vec3<f32>, atmosphere: Atmosphere, depth: f32, config: Config) -> SingleScatteringResult {
 	var result = SingleScatteringResult();
 
@@ -45,7 +74,7 @@ fn integrate_scattered_luminance(uv: vec2<f32>, world_pos: vec3<f32>, world_dir:
     let sample_count = mix(config.ray_march_min_spp, config.ray_march_max_spp, saturate(t_max * 0.01));
     let sample_count_floored = floor(sample_count);
     let t_max_floored = t_max * sample_count_floored / sample_count;
-    let sample_segment_t = 0.3;
+    let sample_segment_t = get_sample_segment_t(uv, config);
 
 	// Phase functions
 	let cos_theta = dot(sun_dir, world_dir);
