@@ -1,6 +1,6 @@
 import { Atmosphere, makeEarthAtmosphere } from "./atmosphere.js";
 import { SkyAtmosphereConfig } from "./config.js";
-import { SkyLight, Uniforms } from "./uniforms.js";
+import { Uniforms } from "./uniforms.js";
 import { LookUpTable } from "./util.js";
 
 export const DEFAULT_TRANSMITTANCE_LUT_SIZE: [number, number] = [256, 64];
@@ -14,8 +14,7 @@ export const SKY_VIEW_LUT_FORMAT: GPUTextureFormat = TRANSMITTANCE_LUT_FORMAT;
 export const AERIAL_PERSPECTIVE_LUT_FORMAT: GPUTextureFormat = TRANSMITTANCE_LUT_FORMAT;
 
 export const ATMOSPHERE_BUFFER_SIZE: number = 128;
-export const CONFIG_BUFFER_SIZE: number = 160;
-export const SKY_LIGHTS_BUFFER_MIN_SIZE: number = 48;
+export const CONFIG_BUFFER_SIZE: number = 224;
 
 export class SkyAtmosphereResources {
     readonly label: string;
@@ -24,7 +23,6 @@ export class SkyAtmosphereResources {
 
     readonly atmosphereBuffer: GPUBuffer;
     readonly configBuffer: GPUBuffer;
-    readonly skyLightsBuffer: GPUBuffer;
 
     readonly lutSampler: GPUSampler;
 
@@ -33,12 +31,9 @@ export class SkyAtmosphereResources {
     readonly skyViewLut: LookUpTable;
     readonly aerialPerspectiveLut: LookUpTable;
 
-    readonly config: SkyAtmosphereConfig;
-
     constructor(device: GPUDevice, config: SkyAtmosphereConfig, lutSampler?: GPUSampler) {
         this.label = config.label ?? 'atmosphere';
         this.device = device;
-        this.config = config;
 
         this.atmosphereBuffer = device.createBuffer({
             label: `atmosphere buffer [${this.label}]`,
@@ -51,11 +46,6 @@ export class SkyAtmosphereResources {
             label: `config buffer [${this.label}]`,
             size: CONFIG_BUFFER_SIZE,
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-        });
-        this.skyLightsBuffer = device.createBuffer({
-            label: 'sky lights buffer',
-            size: (config.maxNumLightSources ?? 2) * SKY_LIGHTS_BUFFER_MIN_SIZE,
-            usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
         });
 
         this.lutSampler = lutSampler || device.createSampler({
@@ -102,22 +92,15 @@ export class SkyAtmosphereResources {
     }
 
     public updateAtmosphere(atmosphere: Atmosphere) {
-        this.device.queue.writeBuffer(this.atmosphereBuffer, 0, atmosphereToFloatArray(atmosphere, this.config.coordinateSystem?.yUp ?? true));
+        this.device.queue.writeBuffer(this.atmosphereBuffer, 0, atmosphereToFloatArray(atmosphere));
     }
 
     public updateConfig(config: Uniforms) {
         this.device.queue.writeBuffer(this.configBuffer, 0, configToFloatArray(config));
     }
-
-    public updateLightSources(skyLights: SkyLight[]) {
-        if (skyLights.length > (this.config.maxNumLightSources ?? 2)) {
-            console.warn(`[SkyAtmosphereResources::updateLightSources]: number of light sources exceeds buffer size, only supported number of light sources are uploaded (${skyLights.length} > ${this.config.maxNumLightSources ?? 2})`)
-        }
-        this.device.queue.writeBuffer(this.skyLightsBuffer, 0, skyLightsToFloatArray(skyLights, this.config.maxNumLightSources ?? 2));
-    }
 }
 
-function atmosphereToFloatArray(atmosphere: Atmosphere, yUp = true): Float32Array {
+function atmosphereToFloatArray(atmosphere: Atmosphere): Float32Array {
     return new Float32Array([
         atmosphere.rayleigh.scattering[0],
         atmosphere.rayleigh.scattering[1],
@@ -147,7 +130,7 @@ function atmosphereToFloatArray(atmosphere: Atmosphere, yUp = true): Float32Arra
         atmosphere.groundAlbedo[1],
         atmosphere.groundAlbedo[2],
         atmosphere.bottomRadius + Math.max(atmosphere.height, 0.0),
-        ...(atmosphere.center ?? [0.0, yUp ? -atmosphere.bottomRadius : 0.0, yUp ? 0.0 : -atmosphere.bottomRadius]),
+        ...atmosphere.center,
         0.0, // padding
     ]);
 }
@@ -161,19 +144,14 @@ function configToFloatArray(config: Uniforms): Float32Array {
         ...config.screenResolution,
         config.rayMarchMinSPP,
         config.rayMarchMaxSPP,
+        ...(config.sun.illuminance ?? [1.0, 1.0, 1.0]),
+        config.sun.diameter ?? (0.545 * (Math.PI / 180.0)),
+        ...config.sun.direction,
+        config.sun.luminance ?? 120000.0,
+        ...(config.moon?.illuminance ?? [1.0, 1.0, 1.0]),
+        config.moon?.diameter ?? (0.568 * Math.PI / 180.0),
+        ...(config.moon?.direction ?? config.sun.direction.map(d => d * -1)),
+        config.moon?.luminance ?? 0.26,
     ]);
-}
-
-function skyLightsToFloatArray(skyLights: SkyLight[], maxNumLightSources: number): Float32Array {
-    return new Float32Array(skyLights.map(l => {
-        return [
-            ...(l.illuminance || [1.0, 1.0, 1.0]),
-            l.diameter ?? (0.545 * (Math.PI / 180.0)),
-            ...l.direction,
-            0.0, // padding
-            ...(l.luminance ?? [120000.0, 120000.0, 120000.0]),
-            0.0, // padding
-        ] as number[];
-    }).slice(0, maxNumLightSources).flat());
 }
 

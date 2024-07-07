@@ -18,7 +18,7 @@ export interface Camera {
 /**
  * Properties of a directional light influencing the atmosphere (e.g., sun or moon).
  */
-export interface SkyLight {
+export interface AtmosphereLight {
     /**
      * Light's illuminance.
      * 
@@ -27,18 +27,20 @@ export interface SkyLight {
     illuminance?: [number, number, number],
 
     /**
-     * Light's direction.
+     * Light's direction (direction to the light source).
+     * 
+     * This is expected to be normalized.
      */
     direction: [number, number, number],
 
     /**
-     * Light's luminance at its zenith.
+     * Light disk's luminance.
      * 
-     * For the sun, defaults to [120000.0, 120000.0, 120000.0]
+     * For the sun, defaults to 120000.0
      * 
-     * For the moon, defaults to [0.26, 0.26, 0.26]
+     * For the moon, defaults to 0.26
      */
-    luminance?: [number, number, number],
+    luminance?: number,
 
     /**
      * Light disk's angular diameter in radians.
@@ -52,15 +54,21 @@ export interface SkyLight {
 
 export interface Uniforms {
     /**
-     * A collection of directional lights, influencing the atmosphere.
+     * A directional light that influences the atmosphere.
      * 
-     * Defaults to the default sun and default moon.
+     * Defaults to the default sun.
      * 
      * Ignored if custom light sources are used.
-     * 
-     * @see {@link CustomLightsConfig}
      */
-    skyLights?: SkyLight[],
+    sun: AtmosphereLight,
+
+    /**
+     * A directional lights that influences the atmosphere.
+     * 
+     * Ignored if {@link SkyAtmosphereRenderer} is not configured to render 2 atmosphere lights.
+     * Ignored if custom light sources are used.
+     */
+    moon?: AtmosphereLight,
 
     /**
      * The current camera parameter.

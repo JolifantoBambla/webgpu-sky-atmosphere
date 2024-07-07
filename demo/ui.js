@@ -37,6 +37,7 @@ const params = {
         },
         rayMarchingMinSpp: 14,
         rayMarchingMaxSpp: 30,
+        rayMarch: false,
     },
     atmosphere: makeEarthAtmosphere([0.0, -makeEarthAtmosphere().bottomRadius, 0.0]),
     atmosphereHelper: {
@@ -104,6 +105,7 @@ export function makeUi() {
     renderSettingsFolder.addBinding(params.renderSettings.sun, 'illuminanceFactor', {min: 0.1, max: 10.0, step: 0.1, label: 'Sun illum. scale'});
     renderSettingsFolder.addBinding(params.renderSettings.sun, 'direction', {picker: 'inline', expanded: true, y: {inverted: true, min: -1.0, max: 1.0}, x: {min: -1.0, max: 1.0}, label: 'Sun direction'});
     renderSettingsFolder.addBinding(params.config, 'rayMarchMinSPP', {min: 14, max: 100, step: 1, label: 'Min. SPP'});
+    renderSettingsFolder.addBinding(params.renderSettings, 'rayMarch', {label: 'Force ray marching'});
 
     const atmosphereFolder = pane.addFolder({
         title: 'Atmosphere',

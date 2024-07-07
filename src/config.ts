@@ -44,19 +44,6 @@ export interface SkyAtmosphereLutConfig {
 }
 
 /**
- * Coordinate system specifics to interface with the user's system.
- */
-export interface CoordinateSystemConfig {
-    /**
-     * Internally, {@link SkyAtmosphereRenderer} uses a left-handed coordinate system with the z axis pointing up.
-     * To correctly interpret positions and directions passed in from the user side (such as the camera position or the sun light's direction),
-     * specify if y is pointing up.
-     * Defaults to true.
-     */
-    yUp?: boolean,
-}
-
-/**
  * The back buffer texture to use as back ground when rendering the sky / atmosphere using a GPUComputePipeline.
  */
 export interface ComputeBackBufferConfig {
@@ -226,7 +213,7 @@ export interface ShadowConfig {
 /**
  * Config for user-defined light sources.
  */
-export interface CustomLightsConfig {
+interface CustomLightsConfig {
     /**
      * A set of bind group layouts.
      */
@@ -257,7 +244,7 @@ export interface CustomLightsConfig {
 /**
  * Config for user-defined uniforms.
  */
-export interface CustomUniformBuffersConfig {
+interface CustomUniformBuffersConfig {
     /**
      * A set of bind group layouts.
      */
@@ -287,6 +274,22 @@ export interface CustomUniformBuffersConfig {
     wgslCode: string,
 }
 
+export interface AtmosphereLightsConfig {
+    /**
+     * Render a sun disk.
+     * 
+     * Defaults to true.
+     */
+    renderSunDisk?: boolean,
+
+    /**
+     * Use the second atmosphere light source specified in {@link Uniforms.moon}.
+     * 
+     * Defaults to false.
+     */
+    useMoon?: boolean,
+}
+
 export interface SkyAtmosphereConfig {
     /**
      * Defaults to 'atmosphere'
@@ -307,14 +310,14 @@ export interface SkyAtmosphereConfig {
     atmosphere?: Atmosphere,
 
     /**
-     * Coordinate system specifics to interface with the user's system.
-     */
-    coordinateSystem?: CoordinateSystemConfig,
-
-    /**
      * External resources and settings required by a {@link SkyAtmosphereRenderer}.
      */
     skyRenderer: SkyRendererPassConfig,
+
+    /**
+     * Atmosphere light config.
+     */
+    lights?: AtmosphereLightsConfig,
 
     /**
      * External resources required by a {@link SkyAtmosphereRenderer} to render volumetric shadows.
@@ -325,24 +328,4 @@ export interface SkyAtmosphereConfig {
      * Config for internally used look up tables.
      */
     lookUpTables?: SkyAtmosphereLutConfig,
-
-    /**
-     * The maximum number of sky lights to use.
-     * Ignored if user-defined light source definitions are used.
-     * 
-     * Defaults to 2.
-     */
-    maxNumLightSources?: number,
-
-    /**
-     * If this is defined, replaces the built-in light source definition with user-defined bind groups and shader code.
-     * All lighting system related arguments in all function calls on this {@link AtmosphereRenderer} will be ignored.
-     */
-    customLights?: CustomLightsConfig,
-
-    /**
-     * If this is defined, replaces the built-in uniform buffers for render settings and camera parameters.
-     * All uniform buffer related arguments in all function calls on this {@link AtmosphereRenderer} will be ignored.
-     */
-    customUniforms?: CustomUniformBuffersConfig,
 }

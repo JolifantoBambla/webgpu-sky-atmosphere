@@ -1,5 +1,5 @@
-import { CoordinateSystemConfig, SkyAtmosphereConfig, ShadowConfig } from "./config.js";
-import { AERIAL_PERSPECTIVE_LUT_FORMAT, ATMOSPHERE_BUFFER_SIZE, CONFIG_BUFFER_SIZE, DEFAULT_MULTISCATTERING_LUT_SIZE, DEFAULT_SKY_VIEW_LUT_SIZE, MULTI_SCATTERING_LUT_FORMAT, SKY_LIGHTS_BUFFER_MIN_SIZE, SKY_VIEW_LUT_FORMAT, SkyAtmosphereResources, TRANSMITTANCE_LUT_FORMAT } from "./resources.js";
+import { SkyAtmosphereConfig, ShadowConfig } from "./config.js";
+import { AERIAL_PERSPECTIVE_LUT_FORMAT, ATMOSPHERE_BUFFER_SIZE, CONFIG_BUFFER_SIZE, DEFAULT_MULTISCATTERING_LUT_SIZE, DEFAULT_SKY_VIEW_LUT_SIZE, MULTI_SCATTERING_LUT_FORMAT, SKY_VIEW_LUT_FORMAT, SkyAtmosphereResources, TRANSMITTANCE_LUT_FORMAT } from "./resources.js";
 import { makeAerialPerspectiveLutShaderCode, makeMultiScatteringLutShaderCode, makeSkyViewLutShaderCode, makeTransmittanceLutShaderCode } from "./shaders.js";
 import { ComputePass } from "./util.js";
 
@@ -28,14 +28,10 @@ export class SkyAtmospherePipelines {
             maxAnisotropy: 1,
         });
 
-        const coordinateSystem = config.coordinateSystem ?? {
-            yUp: true,
-        };
-
         this.transmittanceLutPipeline = new TransmittanceLutPipeline(device);
         this.multiScatteringLutPipeline = new MultiScatteringLutPipeline(device);
-        this.skyViewLutPipeline = new SkyViewLutPipeline(device, coordinateSystem);
-        this.aerialPerspectiveLutPipeline = new AerialPerspectiveLutPipeline(device, coordinateSystem, config.shadow);
+        this.skyViewLutPipeline = new SkyViewLutPipeline(device);
+        this.aerialPerspectiveLutPipeline = new AerialPerspectiveLutPipeline(device, config.shadow);
     }
 }
 
@@ -238,11 +234,9 @@ export class SkyViewLutPipeline {
     readonly skyViewLutFormat: GPUTextureFormat;
     readonly skyViewLutSize: [number, number];
     readonly multiscatteringLutSize: number;
-    readonly coordinateSystem: CoordinateSystemConfig;
 
-    constructor(device: GPUDevice, coordinateSystem: CoordinateSystemConfig, skyViewLutFormat: GPUTextureFormat = SKY_VIEW_LUT_FORMAT, skyViewLutSize: [number, number] = DEFAULT_SKY_VIEW_LUT_SIZE, multiscatteringLutSize: number = DEFAULT_MULTISCATTERING_LUT_SIZE) {
+    constructor(device: GPUDevice, skyViewLutFormat: GPUTextureFormat = SKY_VIEW_LUT_FORMAT, skyViewLutSize: [number, number] = DEFAULT_SKY_VIEW_LUT_SIZE, multiscatteringLutSize: number = DEFAULT_MULTISCATTERING_LUT_SIZE) {
         this.device = device;
-        this.coordinateSystem = coordinateSystem;
         this.skyViewLutFormat = skyViewLutFormat;
         this.skyViewLutSize = skyViewLutSize;
         this.multiscatteringLutSize = multiscatteringLutSize;
@@ -270,17 +264,17 @@ export class SkyViewLutPipeline {
                 {
                     binding: 2,
                     visibility: GPUShaderStage.COMPUTE,
-                    buffer: {
-                        type: 'read-only-storage',
-                        hasDynamicOffset: false,
-                        minBindingSize: SKY_LIGHTS_BUFFER_MIN_SIZE,
-                    }
+                    sampler: {
+                        type: 'filtering',
+                    },
                 },
                 {
                     binding: 3,
                     visibility: GPUShaderStage.COMPUTE,
-                    sampler: {
-                        type: 'filtering',
+                    texture: {
+                        sampleType: 'float',
+                        viewDimension: '2d',
+                        multisampled: false,
                     },
                 },
                 {
@@ -294,15 +288,6 @@ export class SkyViewLutPipeline {
                 },
                 {
                     binding: 5,
-                    visibility: GPUShaderStage.COMPUTE,
-                    texture: {
-                        sampleType: 'float',
-                        viewDimension: '2d',
-                        multisampled: false,
-                    },
-                },
-                {
-                    binding: 6,
                     visibility: GPUShaderStage.COMPUTE,
                     storageTexture: {
                         access: 'write-only',
@@ -327,7 +312,6 @@ export class SkyViewLutPipeline {
                     SKY_VIEW_LUT_RES_X: this.skyViewLutSize[0],
                     SKY_VIEW_LUT_RES_Y: this.skyViewLutSize[1],
                     MULTI_SCATTERING_LUT_RES: this.multiscatteringLutSize,
-                    IS_Y_UP: Number(this.coordinateSystem.yUp ?? true),
                 },
             },
         });
@@ -370,24 +354,18 @@ export class SkyViewLutPipeline {
                 },
                 {
                     binding: 2,
-                    resource: {
-                        buffer: resources.skyLightsBuffer,
-                    },
-                },
-                {
-                    binding: 3,
                     resource: resources.lutSampler,
                 },
                 {
-                    binding: 4,
+                    binding: 3,
                     resource: resources.transmittanceLut.view,
                 },
                 {
-                    binding: 5,
+                    binding: 4,
                     resource: resources.multiScatteringLut.view,
                 },
                 {
-                    binding: 6,
+                    binding: 5,
                     resource: resources.skyViewLut.texture.createView(),
                 },
             ],
@@ -406,11 +384,9 @@ export class AerialPerspectiveLutPipeline {
     readonly bindGroupLayout: GPUBindGroupLayout;
     readonly aerialPerspectiveLutFormat: GPUTextureFormat;
     readonly multiscatteringLutSize: number;
-    readonly coordinateSystem: CoordinateSystemConfig;
 
-    constructor(device: GPUDevice, coordinateSystem: CoordinateSystemConfig, shadowConfig?: ShadowConfig, aerialPerspectiveLutFormat: GPUTextureFormat = AERIAL_PERSPECTIVE_LUT_FORMAT, multiscatteringLutSize: number = DEFAULT_MULTISCATTERING_LUT_SIZE) {
+    constructor(device: GPUDevice, shadowConfig?: ShadowConfig, aerialPerspectiveLutFormat: GPUTextureFormat = AERIAL_PERSPECTIVE_LUT_FORMAT, multiscatteringLutSize: number = DEFAULT_MULTISCATTERING_LUT_SIZE) {
         this.device = device;
-        this.coordinateSystem = coordinateSystem;
         this.aerialPerspectiveLutFormat = aerialPerspectiveLutFormat;
         this.multiscatteringLutSize = multiscatteringLutSize;
         this.bindGroupLayout = device.createBindGroupLayout({
@@ -437,17 +413,17 @@ export class AerialPerspectiveLutPipeline {
                 {
                     binding: 2,
                     visibility: GPUShaderStage.COMPUTE,
-                    buffer: {
-                        type: 'read-only-storage',
-                        hasDynamicOffset: false,
-                        minBindingSize: SKY_LIGHTS_BUFFER_MIN_SIZE,
-                    }
+                    sampler: {
+                        type: 'filtering',
+                    },
                 },
                 {
                     binding: 3,
                     visibility: GPUShaderStage.COMPUTE,
-                    sampler: {
-                        type: 'filtering',
+                    texture: {
+                        sampleType: 'float',
+                        viewDimension: '2d',
+                        multisampled: false,
                     },
                 },
                 {
@@ -461,15 +437,6 @@ export class AerialPerspectiveLutPipeline {
                 },
                 {
                     binding: 5,
-                    visibility: GPUShaderStage.COMPUTE,
-                    texture: {
-                        sampleType: 'float',
-                        viewDimension: '2d',
-                        multisampled: false,
-                    },
-                },
-                {
-                    binding: 6,
                     visibility: GPUShaderStage.COMPUTE,
                     storageTexture: {
                         access: 'write-only',
@@ -492,7 +459,6 @@ export class AerialPerspectiveLutPipeline {
                 entryPoint: 'render_aerial_perspective_lut',
                 constants: {
                     MULTI_SCATTERING_LUT_RES: this.multiscatteringLutSize,
-                    IS_Y_UP: Number(this.coordinateSystem.yUp ?? true),
                 },
             },
         });
@@ -532,24 +498,18 @@ export class AerialPerspectiveLutPipeline {
                 },
                 {
                     binding: 2,
-                    resource: {
-                        buffer: resources.skyLightsBuffer,
-                    },
-                },
-                {
-                    binding: 3,
                     resource: resources.lutSampler,
                 },
                 {
-                    binding: 4,
+                    binding: 3,
                     resource: resources.transmittanceLut.view,
                 },
                 {
-                    binding: 5,
+                    binding: 4,
                     resource: resources.multiScatteringLut.view,
                 },
                 {
-                    binding: 6,
+                    binding: 5,
                     resource: resources.aerialPerspectiveLut.texture.createView(),
                 },
             ],

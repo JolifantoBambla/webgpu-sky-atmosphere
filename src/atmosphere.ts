@@ -61,9 +61,11 @@ export interface Absorption {
 
 export interface Atmosphere {
     /**
-     * Defaults to upDirection * -bottomRadius
+     * Center of the atmosphere.
+     * 
+     * For earth, this defaults to upDirection * -{@link bottomRadius}.
      */
-    center?: [number, number, number],
+    center: [number, number, number],
 
     /**
      * Radius of the planet in kilometers (center to ground)
@@ -76,8 +78,19 @@ export interface Atmosphere {
      */
 	height: number,
 
+    /**
+     * Rayleigh component.
+     */
     rayleigh: Rayleigh,
+
+    /**
+     * Mie component.
+     */
     mie: Mie,
+
+    /**
+     * Absorption / Ozone component.
+     */
 	absorption: Absorption,
 
 	/**
@@ -91,12 +104,13 @@ export interface Atmosphere {
  * @param center The center of the atmosphere.
  * @returns Atmosphere parameters corresponding to earth's atmosphere.
  */
-export function makeEarthAtmosphere(center?: [number, number, number]): Atmosphere {
+export function makeEarthAtmosphere(center?: [number, number, number], yUp = true): Atmosphere {
     const rayleighScaleHeight = 8.0;
     const mieScaleHeight = 1.2;
+    const bottomRadius = 6360.0;
     return {
-        center,
-        bottomRadius: 6360.0,
+        center: [0.0, yUp ? -bottomRadius : 0.0, yUp ? 0.0 : -bottomRadius],
+        bottomRadius,
         height: 100.0,
         rayleigh: {
             densityExpScale: -1.0 / rayleighScaleHeight,
@@ -120,6 +134,6 @@ export function makeEarthAtmosphere(center?: [number, number, number]): Atmosphe
             },
             extinction: [0.000650, 0.001881, 0.000085],
         },
-        groundAlbedo: [0.0, 0.0, 0.0],
+        groundAlbedo: [0.4, 0.4, 0.4],
     };
 }
