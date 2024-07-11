@@ -171,11 +171,11 @@ fn render_sky(pix: vec2<u32>) -> RenderSkyResult {
 	
     let depth = textureLoad(depth_buffer, pix, 0).r;
     if !is_valid_depth(depth) {
-        luminance += get_sun_luminance(world_pos, world_dir, atmosphere.bottom_radius);
+        luminance += get_sun_luminance(world_pos, world_dir, atmosphere, config);
     }
 
     if !move_to_atmosphere_top(&world_pos, world_dir, atmosphere.top_radius) {
-        luminance = get_sun_luminance(world_pos, world_dir, atmosphere.bottom_radius);
+        luminance = get_sun_luminance(world_pos, world_dir, atmosphere, config);
         return RenderSkyResult(max(vec4(luminance, 1.0), vec4()), max(vec4(0.0, 0.0, 0.0, 1.0), vec4()));
     }
     
