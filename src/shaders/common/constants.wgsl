@@ -1,5 +1,5 @@
 const pi: f32 = radians(180.0);
-const tau: f32 = 2.0 * pi;
+const tau: f32 = pi * 2.0;
 const golden_ratio: f32 = (1.0 + sqrt(5.0)) / 2.0;
 
 const u32_max: f32 = 4294967296.0;

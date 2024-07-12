@@ -194,7 +194,7 @@ export class SkyAtmosphereRenderer {
                             visibility: GPUShaderStage.COMPUTE,
                             texture: {
                                 sampleType: 'float',
-                                viewDimension: this.resources.skyViewLut.texture.dimension,
+                                viewDimension: this.resources.transmittanceLut.texture.dimension,
                                 multisampled: false,
                             },
                         },
@@ -203,12 +203,24 @@ export class SkyAtmosphereRenderer {
                             visibility: GPUShaderStage.COMPUTE,
                             texture: {
                                 sampleType: 'float',
+                                viewDimension: this.resources.skyViewLut.texture.dimension,
+                                multisampled: false,
+                            },
+                        },
+                        {
+                            binding: 5,
+                            visibility: GPUShaderStage.COMPUTE,
+                            texture: {
+                                sampleType: 'float',
                                 viewDimension: this.resources.aerialPerspectiveLut.texture.dimension,
                                 multisampled: false,
                             },
                         },
                         ...externalResourcesLayoutEntries,
-                    ],
+                    ].map((v, i) => {
+                        v.binding = i;
+                        return v;
+                    }) as GPUBindGroupLayoutEntry[],
                 });
 
 
@@ -219,14 +231,21 @@ export class SkyAtmosphereRenderer {
                         ...renderSkyBindGroupBaseEntries,
                         {
                             binding: 3,
-                            resource: this.resources.skyViewLut.view,
+                            resource: this.resources.transmittanceLut.view,
                         },
                         {
                             binding: 4,
+                            resource: this.resources.skyViewLut.view,
+                        },
+                        {
+                            binding: 5,
                             resource: this.resources.aerialPerspectiveLut.view,
                         },
                         ...externalResourcesBindGroupEntries,
-                    ],
+                    ].map((v, i) => {
+                        v.binding = i;
+                        return v;
+                    }) as GPUBindGroupEntry[],
                 });
 
                 const renderSkyPipeline = device.createComputePipeline({
@@ -285,7 +304,10 @@ export class SkyAtmosphereRenderer {
                             },
                         },
                         ...externalResourcesLayoutEntries,
-                    ],
+                    ].map((v, i) => {
+                        v.binding = i;
+                        return v;
+                    }) as GPUBindGroupLayoutEntry[],
                 });
 
                 const renderSkyRaymarchingBindGroup = device.createBindGroup({
@@ -302,7 +324,10 @@ export class SkyAtmosphereRenderer {
                             resource: this.resources.multiScatteringLut.view,
                         },
                         ...externalResourcesBindGroupEntries,
-                    ],
+                    ].map((v, i) => {
+                        v.binding = i;
+                        return v;
+                    }) as GPUBindGroupEntry[],
                 });
 
                 const renderSkyPipeline = device.createComputePipeline({

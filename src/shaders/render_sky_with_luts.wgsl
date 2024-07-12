@@ -7,11 +7,12 @@ override WORKGROUP_SIZE_Y: u32 = 16;
 @group(0) @binding(0) var<uniform> atmosphere_buffer: Atmosphere;
 @group(0) @binding(1) var<uniform> config_buffer: Uniforms;
 @group(0) @binding(2) var lut_sampler: sampler;
-@group(0) @binding(3) var sky_view_lut: texture_2d<f32>;
-@group(0) @binding(4) var aerial_perspective_lut : texture_3d<f32>;
-@group(0) @binding(5) var depth_buffer: texture_2d<f32>;
-@group(0) @binding(6) var backbuffer : texture_2d<f32>;
-@group(0) @binding(7) var render_target : texture_storage_2d<rgba16float, write>;
+@group(0) @binding(3) var transmittance_lut: texture_2d<f32>;
+@group(0) @binding(4) var sky_view_lut: texture_2d<f32>;
+@group(0) @binding(5) var aerial_perspective_lut : texture_3d<f32>;
+@group(0) @binding(6) var depth_buffer: texture_2d<f32>;
+@group(0) @binding(7) var backbuffer: texture_2d<f32>;
+@group(0) @binding(8) var render_target: texture_storage_2d<rgba16float, write>;
 
 fn render_sky(pix: vec2<u32>) -> vec4<f32> {
 	let atmosphere = atmosphere_buffer;
@@ -38,7 +39,7 @@ fn render_sky(pix: vec2<u32>) -> vec4<f32> {
 
         let uv = sky_view_lut_params_to_uv(atmosphere, intersects_ground, cos_view_zenith, cos_light_view, view_height);
 
-        return vec4(textureSampleLevel(sky_view_lut, lut_sampler, uv, 0).rgb + get_sun_luminance(world_pos, world_dir, atmosphere.bottom_radius), 1.0);
+        return vec4(textureSampleLevel(sky_view_lut, lut_sampler, uv, 0).rgb + get_sun_luminance(world_pos, world_dir, atmosphere, config), 1.0);
     }
 
     let depth_buffer_world_pos = uv_and_depth_to_world_pos(config.inverse_view * config.inverse_projection, uv, depth);

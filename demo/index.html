@@ -358,8 +358,8 @@
                             params.renderSettings.sun.direction.y,
                             params.renderSettings.sun.direction.x,
                         ]),
-                        luminance: 120000.0,
-                        diameter: 0.545 * Math.PI / 180.0,
+                        luminance: params.renderSettings.sun.diskIlluminance,
+                        diameter: params.renderSettings.sun.diskDiameter * Math.PI / 180.0,
                     },
                     moon: {
                         illuminance: [

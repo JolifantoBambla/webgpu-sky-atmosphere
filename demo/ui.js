@@ -34,6 +34,8 @@ const params = {
             illuminance: {r: 1.0, g: 1.0, b: 1.0},
             illuminanceFactor: 1.0,
             direction: {x: 0.0, y: 1.0},
+            diskDiameter: 0.545,
+            diskIlluminance: 120000.0,
         },
         rayMarchingMinSpp: 14,
         rayMarchingMaxSpp: 30,
@@ -104,6 +106,8 @@ export function makeUi() {
     renderSettingsFolder.addBinding(params.renderSettings.sun, 'illuminance', {color: {type: 'float'}, label: 'Sun illuminance'});
     renderSettingsFolder.addBinding(params.renderSettings.sun, 'illuminanceFactor', {min: 0.1, max: 10.0, step: 0.1, label: 'Sun illum. scale'});
     renderSettingsFolder.addBinding(params.renderSettings.sun, 'direction', {picker: 'inline', expanded: true, y: {inverted: true, min: -1.0, max: 1.0}, x: {min: -1.0, max: 1.0}, label: 'Sun direction'});
+    renderSettingsFolder.addBinding(params.renderSettings.sun, 'diskDiameter', {min: 0.1, max: 100.0, step: 0.1, label: 'Sun disk ang. diameter (deg)'});
+    renderSettingsFolder.addBinding(params.renderSettings.sun, 'diskIlluminance', {min: 1.0, max: 120000.0, step: 10, label: 'Sun disk illuminance (at zenith)'});
     renderSettingsFolder.addBinding(params.config, 'rayMarchMinSPP', {min: 14, max: 100, step: 1, label: 'Min. SPP'});
     renderSettingsFolder.addBinding(params.renderSettings, 'rayMarch', {label: 'Force ray marching'});
 
