@@ -131,7 +131,7 @@ function atmosphereToFloatArray(atmosphere: Atmosphere): Float32Array {
         atmosphere.groundAlbedo[2],
         atmosphere.bottomRadius + Math.max(atmosphere.height, 0.0),
         ...atmosphere.center,
-        0.0, // padding
+        atmosphere.multipleScatteringFactor,
     ]);
 }
 

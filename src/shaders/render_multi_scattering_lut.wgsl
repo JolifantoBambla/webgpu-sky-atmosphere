@@ -1,17 +1,12 @@
 override SAMPLE_COUNT: u32 = 20; // a minimum set of step is required for accuracy unfortunately
 
-// todo: multiscattering_factor as uniform?
-override MULTI_SCATTERING_FACTOR: f32 = 1.0;
-
 @group(0) @binding(0) var<uniform> atmosphere_buffer: Atmosphere;
 @group(0) @binding(1) var lut_sampler: sampler;
 @group(0) @binding(2) var transmittance_lut: texture_2d<f32>;
 @group(0) @binding(3) var multi_scattering_lut: texture_storage_2d<rgba16float, write>;
 
-const sqrt_direction_sample_count: u32 = 8;
-const sqrt_direction_sample_count_f: f32 = f32(sqrt_direction_sample_count);
-const workgroup_size_z: u32 = sqrt_direction_sample_count * sqrt_direction_sample_count;
-const direction_sample_count_f: f32 = f32(workgroup_size_z);
+const direction_sample_count: f32 = 64.0;
+const workgroup_size_z: u32 = 64;
 
 var<workgroup> shared_multi_scattering: array<vec3<f32>, workgroup_size_z>;
 var<workgroup> shared_luminance: array<vec3<f32>, workgroup_size_z>;
@@ -85,18 +80,17 @@ fn integrate_scattered_luminance(world_pos: vec3<f32>, world_dir: vec3<f32>, sun
 }
 
 fn compute_sample_direction(direction_index: u32) -> vec3<f32> {
-	let i = (0.5 + f32(direction_index / sqrt_direction_sample_count)) / sqrt_direction_sample_count_f;
-	let j = (0.5 + f32(direction_index - ((direction_index / sqrt_direction_sample_count) * sqrt_direction_sample_count))) / sqrt_direction_sample_count_f;
-	let theta = 2.0 * pi * i;
-    let phi = acos(1.0 - 2.0 * j);	// uniform distribution https://mathworld.wolfram.com/SpherePointPicking.html
-    let cosPhi = cos(phi);
-    let sinPhi = sin(phi);
-    let cosTheta = cos(theta);
-    let sinTheta = sin(theta);
+	let sample = f32(direction_index);
+	let theta = acos(1.0 - 2.0 * (sample + 0.5) / direction_sample_count);
+	let phi = tau * sample / golden_ratio;
+	let cos_phi = cos(phi);
+    let sin_phi = sin(phi);
+    let cos_theta = cos(theta);
+    let sin_theta = sin(theta);
     return vec3(
-        cosTheta * sinPhi,
-        sinTheta * sinPhi,
-        cosPhi
+        cos_theta * sin_phi,
+        sin_theta * sin_phi,
+        cos_phi
     );
 }
 
@@ -122,8 +116,8 @@ fn render_multi_scattering_lut(@builtin(global_invocation_id) global_id: vec3<u3
 
     let scattering_result = integrate_scattered_luminance(world_pos, world_dir, sun_dir, atmosphere);
 
-    shared_multi_scattering[direction_index] = scattering_result.multi_scattering * sphere_solid_angle / direction_sample_count_f;
-    shared_luminance[direction_index] = scattering_result.luminance * sphere_solid_angle / direction_sample_count_f;
+    shared_multi_scattering[direction_index] = scattering_result.multi_scattering / direction_sample_count;
+    shared_luminance[direction_index] = scattering_result.luminance / direction_sample_count;
 
 	workgroupBarrier();
 
@@ -139,13 +133,8 @@ fn render_multi_scattering_lut(@builtin(global_invocation_id) global_id: vec3<u3
 		return;
     }
 
-	let inscattered_luminance = shared_luminance[0] * isotropic_phase;
-    
-    let r = shared_multi_scattering[0] * isotropic_phase;
-    let sum_of_multi_scattering_contributions = 1.0 / (1.0 - r);
+    let luminance = shared_luminance[0] * (1.0 / (1.0 - shared_multi_scattering[0]));
 
-    let luminance = inscattered_luminance * sum_of_multi_scattering_contributions;
-
-    textureStore(multi_scattering_lut, global_id.xy, vec4<f32>(MULTI_SCATTERING_FACTOR * luminance, 1.0));
+    textureStore(multi_scattering_lut, global_id.xy, vec4<f32>(atmosphere.multi_scattering_factor * luminance, 1.0));
 }
 
