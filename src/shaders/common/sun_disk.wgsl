@@ -22,7 +22,7 @@ fn sun_disk_luminance(world_pos: vec3<f32>, world_dir: vec3<f32>, atmosphere: At
     let e_zenith = light.disk_luminance;
     let disk_solid_angle = tau * cos_disk_radius;
     let l_zenith = e_zenith / disk_solid_angle;
-    let transmittance_zenith = textureSampleLevel(transmittance_lut, lut_sampler, transmittance_lut_params_to_uv(atmosphere_buffer, height, 1.0), 0).rgb;
+    let transmittance_zenith = textureLoad(transmittance_lut, vec2(0, 0), 0).rgb;
     let l_outer_space = l_zenith / transmittance_zenith;
 
     let zenith = world_pos / height;
