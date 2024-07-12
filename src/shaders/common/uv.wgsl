@@ -14,7 +14,7 @@ fn transmittance_lut_params_to_uv(atmosphere: Atmosphere, view_height: f32, cos_
 	let rho = sqrt(max(0.0, height_sq - bottom_radius_sq));
 
 	let discriminant = height_sq * (cos_view_zenith * cos_view_zenith - 1.0) + top_radius_sq;
-	let distance_to_boundary = max(0.0, (-view_height * cos_view_zenith + sqrt(discriminant))); // Distance to atmosphere boundary
+	let distance_to_boundary = max(0.0, (-view_height * cos_view_zenith + sqrt(discriminant)));
 
 	let min_distance = atmosphere.top_radius - view_height;
 	let max_distance = rho + h;

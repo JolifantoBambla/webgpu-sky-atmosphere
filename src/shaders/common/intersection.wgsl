@@ -34,11 +34,7 @@ fn ray_intersects_sphere(o: vec3<f32>, d: vec3<f32>, c: vec3<f32>, r: f32) -> bo
 }
 
 fn compute_planet_shadow(o: vec3<f32>, d: vec3<f32>, c: vec3<f32>, r: f32) -> f32 {
-    if ray_intersects_sphere(o, d, c, r) {
-        return 0.0;
-    } else {
-        return 1.0;
-    }
+    return f32(!ray_intersects_sphere(o, d, c, r));
 }
 
 fn find_atmosphere_t_max(t_max: ptr<function, f32>, o: vec3<f32>, d: vec3<f32>, c: vec3<f32>, bottom_radius: f32, top_radius: f32) -> bool {
@@ -46,7 +42,7 @@ fn find_atmosphere_t_max(t_max: ptr<function, f32>, o: vec3<f32>, d: vec3<f32>, 
     let t_top = find_closest_ray_sphere_intersection(o, d, c, top_radius);
     if t_bottom < 0.0 {
         if t_top < 0.0 {
-            *t_max = 0.0; // No intersection with earth nor atmosphere: stop right away
+            *t_max = 0.0;
             return false;
         } else {
             *t_max = t_top;
@@ -55,7 +51,7 @@ fn find_atmosphere_t_max(t_max: ptr<function, f32>, o: vec3<f32>, d: vec3<f32>, 
         if t_top > 0.0 {
             *t_max = min(t_top, t_bottom);
         } else {
-            *t_max = 0.0;
+            *t_max = t_bottom;
         }
     }
     return true;
@@ -66,7 +62,7 @@ fn find_atmosphere_t_max_t_bottom(t_max: ptr<function, f32>, t_bottom: ptr<funct
     let t_top = find_closest_ray_sphere_intersection(o, d, c, top_radius);
     if *t_bottom < 0.0 {
         if t_top < 0.0 {
-            *t_max = 0.0; // No intersection with earth nor atmosphere: stop right away
+            *t_max = 0.0;
             return false;
         } else {
             *t_max = t_top;
@@ -75,7 +71,7 @@ fn find_atmosphere_t_max_t_bottom(t_max: ptr<function, f32>, t_bottom: ptr<funct
         if t_top > 0.0 {
             *t_max = min(t_top, *t_bottom);
         } else {
-            *t_max = 0.0;
+            *t_max = *t_bottom;
         }
     }
     return true;
@@ -90,9 +86,8 @@ fn move_to_atmosphere_top(world_pos: ptr<function, vec3<f32>>, world_dir: vec3<f
 			let zenith_offset = zenith * -planet_radius_offset;
 			*world_pos = *world_pos + world_dir * t_top + zenith_offset;
 		} else {
-			// Ray is not intersecting the atmosphere
 			return false;
 		}
 	}
-	return true; // ok to start tracing
+	return true;
 }

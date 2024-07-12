@@ -1,4 +1,4 @@
-override SAMPLE_COUNT: u32 = 20; // a minimum set of step is required for accuracy unfortunately
+override SAMPLE_COUNT: u32 = 20;
 
 @group(0) @binding(0) var<uniform> atmosphere_buffer: Atmosphere;
 @group(0) @binding(1) var lut_sampler: sampler;
@@ -63,7 +63,7 @@ fn integrate_scattered_luminance(world_pos: vec3<f32>, world_dir: vec3<f32>, sun
         throughput *= sample_transmittance;
 	}
 
-    // Account for bounced light off the earth
+    // Account for light bounced off the planet
 	if t_max == t_bottom && t_bottom > 0.0 {
 		let t = t_bottom;
 		let sample_pos = world_pos + t * world_dir;
@@ -81,8 +81,8 @@ fn integrate_scattered_luminance(world_pos: vec3<f32>, world_dir: vec3<f32>, sun
 
 fn compute_sample_direction(direction_index: u32) -> vec3<f32> {
 	let sample = f32(direction_index);
-	let theta = acos(1.0 - 2.0 * (sample + 0.5) / direction_sample_count);
-	let phi = tau * sample / golden_ratio;
+	let theta = tau * sample / golden_ratio;
+	let phi = acos(1.0 - 2.0 * (sample + 0.5) / direction_sample_count);
 	let cos_phi = cos(phi);
     let sin_phi = sin(phi);
     let cos_theta = cos(theta);
@@ -108,7 +108,6 @@ fn render_multi_scattering_lut(@builtin(global_invocation_id) global_id: vec3<u3
 
 	let cos_sun_zenith = uv.x * 2.0 - 1.0;
 	let sun_dir = vec3<f32>(0.0, sqrt(saturate(1.0 - cos_sun_zenith * cos_sun_zenith)), cos_sun_zenith);
-	// view_height is offset by planet_radius_offset to be in a valid range.
 	let view_height = atmosphere.bottom_radius + saturate(uv.y + planet_radius_offset) * (atmosphere.top_radius - atmosphere.bottom_radius - planet_radius_offset);
 
 	let world_pos = vec3<f32>(0.0, 0.0, view_height);
