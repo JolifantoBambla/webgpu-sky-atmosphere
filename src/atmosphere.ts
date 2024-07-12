@@ -139,7 +139,7 @@ export function makeEarthAtmosphere(center?: [number, number, number], yUp = tru
             },
             extinction: [0.000650, 0.001881, 0.000085],
         },
-        groundAlbedo: [0, 0, 0],//[0.4, 0.4, 0.4],
+        groundAlbedo: [0.4, 0.4, 0.4],
         multipleScatteringFactor: 1.0,
     };
 }

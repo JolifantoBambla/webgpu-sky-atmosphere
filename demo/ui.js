@@ -75,6 +75,11 @@ const params = {
                 b: 0.0085,
             },
         },
+        groundAlbedo: {
+            r: 0.4,
+            g: 0.4,
+            b: 0.4,
+        },
     },
 };
 
@@ -117,7 +122,10 @@ export function makeUi() {
     });
     atmosphereFolder.addBinding(params.atmosphere, 'bottomRadius', {min: 100.0, max: 10000.0, step: 10.0, label: 'ground radius'});
     atmosphereFolder.addBinding(params.atmosphere, 'height', {min: 10.0, max: 500.0, step: 1.0, label: 'height'});
-    //atmosphereFolder.addBinding(params.atmosphere, 'groundAlbedo', )
+    atmosphereFolder.addBinding(params.atmosphereHelper, 'groundAlbedo', {color: {type: 'float'}, label: 'Ground albedo'})
+        .on('change', e => {
+            params.atmosphere.groundAlbedo = [e.value.r, e.value.g, e.value.b];
+        });
 
     const rayleighFolder = atmosphereFolder.addFolder({
         title: 'Rayleigh',
