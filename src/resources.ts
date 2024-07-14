@@ -17,18 +17,61 @@ export const ATMOSPHERE_BUFFER_SIZE: number = 128;
 export const CONFIG_BUFFER_SIZE: number = 224;
 
 export class SkyAtmosphereResources {
+    /**
+     * A name that is propagated to the WebGPU resources.
+     */
     readonly label: string;
 
+    /**
+     * The WebGPU device the resources are allocated from.
+     */
     readonly device: GPUDevice;
 
+    /**
+     * A uniform buffer of size {@link ATMOSPHERE_BUFFER_SIZE} storing the {@link Atmosphere}'s parameters.
+     */
     readonly atmosphereBuffer: GPUBuffer;
+
+    /**
+     * A uniform buffer of size {@link CONFIG_BUFFER_SIZE} storing parameters set through {@link Uniforms}.
+     */
     readonly configBuffer: GPUBuffer;
 
+    /**
+     * A linear sampler used to sample the look up tables.
+     */
     readonly lutSampler: GPUSampler;
 
+    /**
+     * The transmittance look up table.
+     * Stores the medium transmittance toward the sun.
+     *
+     * Parameterized by the view / zenith angle in x and the altitude in y.
+     */
     readonly transmittanceLut: LookUpTable;
+
+    /**
+     * The multiple scattering look up table.
+     * Stores multiple scattering contribution.
+     *
+     * Paramterized by the sun / zenith angle in x (range: [π, 0]) and the altitude in y (range: [0, top], where top is the height of the atmosphere).
+     */
     readonly multiScatteringLut: LookUpTable;
+
+    /**
+     * The sky view look up table.
+     * Stores the distant sky around the camera with respect to it's altitude within the atmosphere.
+     *
+     * Parameterized by the longitude in x (range: [0, 2π]) and latitude in y (range: [-π/2, π/2]).
+     */
     readonly skyViewLut: LookUpTable;
+
+    /**
+     * The aerial perspective look up table.
+     * Stores the aerial perspective in a volume fit to the view frustum.
+     *
+     * Parameterized by x and y corresponding to the image plane and z being the view depth (range: [0, {@link AerialPerspectiveLutConfig.size}[2] * {@link AerialPerspectiveLutConfig.distancePerSlice}]).
+     */
     readonly aerialPerspectiveLut: LookUpTable;
 
     constructor(device: GPUDevice, config: SkyAtmosphereConfig, lutSampler?: GPUSampler) {
@@ -40,7 +83,7 @@ export class SkyAtmosphereResources {
             size: ATMOSPHERE_BUFFER_SIZE,
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
         });
-        this.updateAtmosphere(config.atmosphere ?? makeEarthAtmosphere());
+        this.updateAtmosphere(config.atmosphere ?? makeEarthAtmosphere(config.distanceScaleFactor ?? 1.0));
 
         this.configBuffer = device.createBuffer({
             label: `config buffer [${this.label}]`,
@@ -91,16 +134,31 @@ export class SkyAtmosphereResources {
         }));
     }
 
+    /**
+     * Updates the {@link SkyAtmosphereResources.atmosphereBuffer} using a given {@link Atmosphere}.
+     * @param atmosphere the {@link Atmosphere} to write to the {@link atmosphereBuffer}.
+     * @see atmosphereToFloatArray Internally call {@link atmosphereToFloatArray} to convert the {@link Atmosphere} to a `Float32Array`.
+     */
     public updateAtmosphere(atmosphere: Atmosphere) {
         this.device.queue.writeBuffer(this.atmosphereBuffer, 0, atmosphereToFloatArray(atmosphere));
     }
 
+    /**
+     * Updates the {@link SkyAtmosphereResources.configBuffer} using a given {@link Uniforms}.
+     * @param config the {@link Uniforms} to write to the {@link atmosphereBuffer}.
+     * @see configToFloatArray Internally call {@link configToFloatArray} to convert the {@link Uniforms} to a `Float32Array`.
+     */
     public updateConfig(config: Uniforms) {
         this.device.queue.writeBuffer(this.configBuffer, 0, configToFloatArray(config));
     }
 }
 
-function atmosphereToFloatArray(atmosphere: Atmosphere): Float32Array {
+/**
+ * Converts an {@link Atmosphere} to a tightly packed `Float32Array`.
+ * @param atmosphere the {@link Atmosphere} to convert.
+ * @returns a `Float32Array` containing the {@link Atmosphere} parameters.
+ */
+export function atmosphereToFloatArray(atmosphere: Atmosphere): Float32Array {
     return new Float32Array([
         atmosphere.rayleigh.scattering[0],
         atmosphere.rayleigh.scattering[1],
@@ -117,7 +175,7 @@ function atmosphereToFloatArray(atmosphere: Atmosphere): Float32Array {
         Math.max(atmosphere.mie.extinction[0] - atmosphere.mie.scattering[0], 0.0),
         Math.max(atmosphere.mie.extinction[1] - atmosphere.mie.scattering[1], 0.0),
         Math.max(atmosphere.mie.extinction[2] - atmosphere.mie.scattering[2], 0.0),
-        atmosphere.absorption.layer0.width,
+        atmosphere.absorption.layer0.height,
         atmosphere.absorption.layer0.constantTerm,
         atmosphere.absorption.layer0.linearTerm,
         atmosphere.absorption.layer1.constantTerm,
@@ -135,7 +193,12 @@ function atmosphereToFloatArray(atmosphere: Atmosphere): Float32Array {
     ]);
 }
 
-function configToFloatArray(config: Uniforms): Float32Array {
+/**
+ * Converts an {@link Uniforms} to a tightly packed `Float32Array`.
+ * @param config the {@link Uniforms} to convert.
+ * @returns a `Float32Array` containing the {@link Uniforms} parameters.
+ */
+export function configToFloatArray(config: Uniforms): Float32Array {
     return new Float32Array([
         ...config.camera.inverseProjection,
         ...config.camera.inverseView,

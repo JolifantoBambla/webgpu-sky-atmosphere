@@ -1,7 +1,7 @@
 
 override USE_MOON: bool = false;
-
 override RANDOMIZE_SAMPLE_OFFSET: bool = true;
+override INV_DISTANCE_TO_MAX_SAMPLE_COUNT: f32 = 1.0 / 100.0;
 
 override WORKGROUP_SIZE_X: u32 = 16;
 override WORKGROUP_SIZE_Y: u32 = 16;
@@ -66,7 +66,7 @@ fn integrate_scattered_luminance(uv: vec2<f32>, world_pos: vec3<f32>, world_dir:
     }
 	t_max = min(t_max, t_max_max);
 
-    let sample_count = mix(config.ray_march_min_spp, config.ray_march_max_spp, saturate(t_max * 0.01));
+    let sample_count = mix(config.ray_march_min_spp, config.ray_march_max_spp, saturate(t_max * INV_DISTANCE_TO_MAX_SAMPLE_COUNT));
     let sample_count_floored = floor(sample_count);
     let t_max_floored = t_max * sample_count_floored / sample_count;
     let sample_segment_t = get_sample_segment_t(uv, config);

@@ -99,10 +99,10 @@ export interface AerialPerspectiveLutConfig {
 
     /**
      * The distance each slice of the areal perspective look up table covers.
-     * 
+     *
      * This distance should be measured in the same units as {@link Atmosphere} parameters (e.g., {@link Atmosphere.bottomRadius}).
      *
-     * Defaults to 4.
+     * Defaults to 4 * {@link SkyAtmosphereConfig.distanceScaleFactor}.
      */
     distancePerSlice?: number
 }
@@ -204,8 +204,16 @@ export interface SkyRendererComputePassConfig {
 
     /**
      * The render target to render into.
+     * The result will be blended with the texture data in the {@link backBuffer}.
      */
     renderTarget: ComputeRenderTargetConfig,
+
+    /**
+     * If this this true, colored transmittance will be used to blend the rendered sky and the texture data in the {@link backBuffer} when using the per-pixel ray marching pass to render the sky.
+     *
+     * Defaults to true.
+     */
+    useColoredTransmittanceOnPerPixelRayMarch?: boolean,
 }
 
 /**
@@ -213,24 +221,43 @@ export interface SkyRendererComputePassConfig {
  */
 export interface SkyRenderPassConfig {
     /**
+     * The format of the render target at location 0.
+     *
      * Must support RENDER_ATTACHMENT usage.
-     * Should have at least 16 bit precision per channel. (todo: maybe r11g11b10 also enough?)
+     * Should have at least 16 bit precision per channel.
      */
     renderTargetFormat: GPUTextureFormat,
 
+    /**
+     * If this is set, all render passes will be configured to use two render targets, where transmission will be written to the second render target using this format.
+     *
+     * If {@link useDualSourceBlending} is true and the device supports the `"dual-source-blending"` feature, both targets will be blended with the render target at location 0 using dual-source blending.
+     * If {@link useDualSourceBlending} is true and the device does not support the `"dual-source-blending"` feature, both targets will be overwritten and no blending will be performed. It is the user's responsibility to blend the results in an extra pass.
+     * If {@link useDualSourceBlending} is false, scattered luminance is blended with the texture at location 0 based on monochrome transmittance, and transmittance will be written to the render target at location 1 separately.
+     *
+     * If {@link writeTransmissionOnlyOnPerPixelRayMarch} is true, this setting does not affect the sky rendering pass using the aerial perspective look up table. It will instead be configured to expect a single render target at location 0.
+     */
     transmissionFormat?: GPUTextureFormat,
 
     /**
      * Use dual-source blending for colored transmissions.
      *
-     * Since colored transmissions are only supported when rendering the atmosphere using ray marching, the more expensive ray marching pipelines will be used by default.
-     *
-     * Note that without the "dual-source-blending" feature enabled, colored transmissions can only be rendered using a compute pipeline.
-     * If the feature is not enabled and the {@link SkyAtmosphereRenderer} is configured to use render pipelines, this flag has no effect.
+     * Note that...
+     *  - colored transmissions are only supported when using per-pixel ray marching instead of the aerial perspective look up table.
+     *  - without the "dual-source-blending" feature enabled, colored transmissions can only be rendered using a compute pipeline or by blending scattered luminance and transmittance in an extra pass (this is currently not done by the {@link SkyAtmosphereRenderer} and is left to the user).
      *
      * Defaults to false.
      */
     useDualSourceBlending?: boolean,
+
+    /**
+     * Only configure the more expensive per-pixel ray marching pass to use a second render target and write colored transmittance.
+     *
+     * Note that the faster pass using the aerial perspective look up table does not support colored transmittance anyway and thus writing to a second render target is an extra cost without any benefit.
+     *
+     * Defaults to true.
+     */
+    writeTransmissionOnlyOnPerPixelRayMarch?: boolean,
 }
 
 /**
@@ -250,16 +277,20 @@ export interface SkyRendererPassConfig {
     depthBuffer: DepthBufferConfig,
 
     /**
-     * Used to determine whether to prefer colored transmissions when rendering the atmosphere using {@link SkyAtmosphereRenderer.render}.
-     *
-     * Since colored transmissions are only supported when rendering the atmosphere using ray marching, the more expensive ray marching pipelines will be used by default.
-     *
-     * Note that without the "dual-source-blending" feature enabled, colored transmissions can only be rendered using a compute pipeline.
-     * If the feature is not enabled and the {@link SkyAtmosphereRenderer} is configured to use render pipelines, this flag has no effect.
+     * If this is true, {@link SkyAtmosphereRenderer.renderSkyAtmosphere} will default to per-pixel ray marching to render the atmosphere.
      *
      * Defaults to false.
      */
-    preferColoredTransmission?: boolean,
+    defaultToPerPixelRayMarch?: boolean,
+
+    /**
+     * Distance at which the maximum number of sampler per ray is used when ray marching the sky (either when rendering the sky view look up table or when ray marching the sky per pixel).
+     *
+     * Should be in the same distance unit used for the {@link Atmosphere} parameters.
+     *
+     * Defaults to 100 * {@link SkyAtmosphereConfig.distanceScaleFactor}.
+     */
+    distanceToMaxSampleCount?: number,
 
     /**
      * Results in less sampling artefacts (e.g., smoother volumetric shadows) but introduces visible noise.
@@ -280,7 +311,7 @@ export interface ShadowConfig {
     bindGroupLayouts: GPUBindGroupLayout[],
 
     /**
-     * A bind group generated using the {@link bindGroupLayout}, containing all resources required to render volumetric shadows.
+     * A bind group generated using the {@link bindGroupLayouts}, containing all resources required to render volumetric shadows.
      */
     bindGroups: GPUBindGroup[],
 
@@ -293,71 +324,7 @@ export interface ShadowConfig {
      *
      * The function should return a floating point value in the range [0, 1], where 1 implies that the given world space position is not in shadow.
      *
-     * It should also include the bind group matching the given {@link bindGroupLayout}.
-     * The bind groups must not use bind group index 0.
-     */
-    wgslCode: string,
-}
-
-/**
- * Config for user-defined light sources.
- */
-interface CustomLightsConfig {
-    /**
-     * A set of bind group layouts.
-     */
-    bindGroupLayouts: GPUBindGroupLayout[],
-
-    /**
-     * A set of bind groups compatible with the {@link bindGroupLayout}.
-     */
-    bindGroups: GPUBindGroup[],
-
-    /**
-     * The shader code to replace the built-in light source definitions.
-     *
-     * This needs to provide at least the following functions with the following signatures:
-     *
-     *      fn get_number_of_light_sources() -> u32
-     *      fn get_light_direction(light_index: u32) -> vec3<f32>
-     *      fn get_light_illuminance(light_index: u32) -> vec3<f32>
-     *      fn get_light_luminance(light_index: u32) -> vec3<f32>
-     *      fn get_light_diameter(light_index: u32) -> vec3<f32>
-     *
-     * It should also include the bind groups matching the given {@link bindGroupLayouts}.
-     * The bind groups must not use bind group index 0.
-     */
-    wgslCode: string,
-}
-
-/**
- * Config for user-defined uniforms.
- */
-interface CustomUniformBuffersConfig {
-    /**
-     * A set of bind group layouts.
-     */
-    bindGroupLayouts: GPUBindGroupLayout[],
-
-    /**
-     * A set of bind groups compatible with the {@link bindGroupLayout}.
-     */
-    bindGroups: GPUBindGroup[],
-
-    /**
-     * The shader code to replace the built-in uniform definitions.
-     *
-     * This needs to provide at least the following functions with the following signatures:
-     *
-     *      fn get_camera_world_position() -> vec3<f32>
-     *      fn get_camera_inverse_view() -> mat4x4<f32>
-     *      fn get_camera_inverse_projection() -> mat4x4<f32>
-     *      fn get_screen_resolution() -> vec2<f32>
-     *      fn get_frame_id() -> f32
-     *      fn get_ray_march_spp_min() -> f32
-     *      fn get_ray_march_spp_max() -> f32
-     *
-     * It should also include the bind groups matching the given {@link bindGroupLayouts}.
+     * It should also include the bind group matching the given {@link bindGroupLayouts}.
      * The bind groups must not use bind group index 0.
      */
     wgslCode: string,
@@ -387,13 +354,21 @@ export interface SkyAtmosphereConfig {
 
     /**
      * If true, all lookup tables that only depend on constant atmosphere parameters are rendered at creation time.
+     *
      * Defaults to true.
      */
     initializeConstantLuts?: boolean,
 
     /**
+     * A scale factor to apply to all distance-related parameters that are not explicitly set (e.g., {@link Atmosphere} or {@link AerialPerspectiveLutConfig.distancePerSlice}).
+     *
+     * Defaults to 1.0.
+     */
+    distanceScaleFactor?: number,
+
+    /**
      * The atmosphere parameters for this {@link SkyAtmosphereRenderer}.
-     * Defaults to: {@link makeEarthAtmosphere}
+     * Defaults to: {@link makeEarthAtmosphere} with the scale parameter set to {@link SkyAtmosphereConfig.distanceScaleFactor}.
      * @see makeEarthAtmosphere
      */
     atmosphere?: Atmosphere,

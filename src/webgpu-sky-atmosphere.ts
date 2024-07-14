@@ -9,20 +9,30 @@ import {
 } from './atmosphere.js';
 
 import {
+    AerialPerspectiveLutConfig,
     AtmosphereLightsConfig,
     ComputeBackBufferConfig,
     ComputeRenderTargetConfig,
     DepthBufferConfig,
+    MultiScatteringLutConfig,
+    ShadowConfig,
     SkyAtmosphereLutConfig,
     SkyAtmosphereConfig,
     SkyRendererComputePassConfig,
     SkyRendererPassConfig,
     SkyRenderPassConfig,
-    ShadowConfig,
+    SkyViewLutConfig,
+    TransmittanceLutConfig,
 } from './config.js';
 
 import { Camera, AtmosphereLight, Uniforms } from './uniforms.js';
-import { ATMOSPHERE_BUFFER_SIZE, CONFIG_BUFFER_SIZE, SkyAtmosphereResources } from './resources.js';
+import {
+    atmosphereToFloatArray,
+    ATMOSPHERE_BUFFER_SIZE,
+    configToFloatArray,
+    CONFIG_BUFFER_SIZE,
+    SkyAtmosphereResources,
+} from './resources.js';
 
 import {
     makeRenderSkyWithLutsShaderCode,
@@ -42,22 +52,34 @@ export {
 };
 
 export {
+    AerialPerspectiveLutConfig,
     AtmosphereLightsConfig,
     ComputeBackBufferConfig,
     ComputeRenderTargetConfig,
     DepthBufferConfig,
+    MultiScatteringLutConfig,
+    ShadowConfig,
     SkyAtmosphereLutConfig,
     SkyAtmosphereConfig,
     SkyRendererComputePassConfig,
     SkyRendererPassConfig,
     SkyRenderPassConfig,
-    ShadowConfig,
+    SkyViewLutConfig,
+    TransmittanceLutConfig,
 };
 
 export {
     Camera,
     AtmosphereLight,
     Uniforms,
+};
+
+export {
+    atmosphereToFloatArray,
+    ATMOSPHERE_BUFFER_SIZE,
+    configToFloatArray,
+    CONFIG_BUFFER_SIZE,
+    SkyAtmosphereResources,
 };
 
 function isComputePassConfig(passConfig: SkyRendererComputePassConfig | SkyRenderPassConfig): passConfig is SkyRendererComputePassConfig {
@@ -345,6 +367,7 @@ export class SkyAtmosphereRenderer {
                         }),
                         entryPoint: 'render_sky_atmosphere',
                         constants: {
+                            INV_DISTANCE_TO_MAX_SAMPLE_COUNT: 1.0 / (config.skyRenderer.distanceToMaxSampleCount ?? (100.0 * (config.distanceScaleFactor ?? 1.0))),
                             MULTI_SCATTERING_LUT_RES_X: this.resources.multiScatteringLut.texture.width,
                             MULTI_SCATTERING_LUT_RES_Y: this.resources.multiScatteringLut.texture.height,
                             IS_REVERSE_Z: Number(config.skyRenderer.depthBuffer.reverseZ ?? false),
@@ -561,6 +584,7 @@ export class SkyAtmosphereRenderer {
                     fragment: {
                         module,
                         constants: {
+                            INV_DISTANCE_TO_MAX_SAMPLE_COUNT: 1.0 / (config.skyRenderer.distanceToMaxSampleCount ?? (100.0 * (config.distanceScaleFactor ?? 1.0))),
                             MULTI_SCATTERING_LUT_RES_X: this.resources.multiScatteringLut.texture.width,
                             MULTI_SCATTERING_LUT_RES_Y: this.resources.multiScatteringLut.texture.height,
                             IS_REVERSE_Z: Number(config.skyRenderer.depthBuffer.reverseZ ?? false),
@@ -638,7 +662,7 @@ export class SkyAtmosphereRenderer {
         this.skyViewLutPass.encode(computePassEncoder);
     }
 
-    public renderAerialPerspective(computePassEncoder: GPUComputePassEncoder) {
+    public renderAerialPerspectiveLut(computePassEncoder: GPUComputePassEncoder) {
         this.aerialPerspectiveLutPass.encode(computePassEncoder);
     }
 
@@ -676,7 +700,7 @@ export class SkyAtmosphereRenderer {
                 // todo: sky view + ray marching
                 this.renderSkyRaymarching(computePassEncoder);
             } else {
-                this.renderAerialPerspective(computePassEncoder);
+                this.renderAerialPerspectiveLut(computePassEncoder);
 
                 this.renderSkyWithLuts(computePassEncoder);
             }

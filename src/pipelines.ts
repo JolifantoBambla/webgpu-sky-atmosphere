@@ -44,13 +44,14 @@ export class SkyAtmospherePipelines {
             config.lookUpTables?.skyViewLut?.format ?? SKY_VIEW_LUT_FORMAT,
             config.lookUpTables?.skyViewLut?.size ?? DEFAULT_SKY_VIEW_LUT_SIZE,
             config.lookUpTables?.multiScatteringLut?.size ?? [DEFAULT_MULTISCATTERING_LUT_SIZE, DEFAULT_MULTISCATTERING_LUT_SIZE],
+            config.skyRenderer.distanceToMaxSampleCount ?? (100.0 * (config.distanceScaleFactor ?? 1.0)),
             config.lights?.useMoon ?? false,
         );
         this.aerialPerspectiveLutPipeline = new AerialPerspectiveLutPipeline(
             device,
             config.lookUpTables?.aerialPerspectiveLut?.format ?? AERIAL_PERSPECTIVE_LUT_FORMAT,
             (config.lookUpTables?.aerialPerspectiveLut?.size ?? DEFAULT_AERIAL_PERSPECTIVE_LUT_SIZE)[2],
-            config.lookUpTables?.aerialPerspectiveLut?.distancePerSlice ?? 4,
+            config.lookUpTables?.aerialPerspectiveLut?.distancePerSlice ?? (4.0 * (config.distanceScaleFactor ?? 1.0)),
             config.lookUpTables?.multiScatteringLut?.size ?? [DEFAULT_MULTISCATTERING_LUT_SIZE, DEFAULT_MULTISCATTERING_LUT_SIZE],
             config.lights?.useMoon ?? false,
             config.shadow,
@@ -258,7 +259,7 @@ export class SkyViewLutPipeline {
     readonly skyViewLutSize: [number, number];
     readonly multiscatteringLutSize: [number, number];
 
-    constructor(device: GPUDevice, skyViewLutFormat: GPUTextureFormat, skyViewLutSize: [number, number], multiscatteringLutSize: [number, number], useMoon: boolean) {
+    constructor(device: GPUDevice, skyViewLutFormat: GPUTextureFormat, skyViewLutSize: [number, number], multiscatteringLutSize: [number, number], distanceToMaxSampleCount: number, useMoon: boolean) {
         this.device = device;
         this.skyViewLutFormat = skyViewLutFormat;
         this.skyViewLutSize = skyViewLutSize;
@@ -334,6 +335,7 @@ export class SkyViewLutPipeline {
                 constants: {
                     SKY_VIEW_LUT_RES_X: this.skyViewLutSize[0],
                     SKY_VIEW_LUT_RES_Y: this.skyViewLutSize[1],
+                    INV_DISTANCE_TO_MAX_SAMPLE_COUNT: 1.0 / distanceToMaxSampleCount,
                     MULTI_SCATTERING_LUT_RES_X: this.multiscatteringLutSize[0],
                     MULTI_SCATTERING_LUT_RES_Y: this.multiscatteringLutSize[1],
                     USE_MOON: Number(useMoon),

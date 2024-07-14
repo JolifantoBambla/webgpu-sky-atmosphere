@@ -16,7 +16,7 @@ struct Atmosphere {
 	mie_absorption: vec3<f32>,
 	
 	// Another medium type in the atmosphere
-	absorption_density_0_layer_width: f32,
+	absorption_density_0_layer_height: f32,
 	absorption_density_0_constant_term: f32,
 	absorption_density_0_linear_term: f32,
 	absorption_density_1_constant_term: f32,
@@ -59,13 +59,15 @@ fn make_earth_atmosphere() -> Atmosphere {
 	atmosphere.mie_phase_g = 0.8;
 	
 	atmosphere.absorption_extinction = vec3(0.000650, 0.001881, 0.000085);	// 1/km
-	atmosphere.absorption_density_0_layer_width = 25.0;
+	atmosphere.absorption_density_0_layer_height = 25.0;
 	atmosphere.absorption_density_0_constant_term = -2.0 / 3.0;
 	atmosphere.absorption_density_0_linear_term = 1.0 / 15.0;
 	atmosphere.absorption_density_1_constant_term = 8.0 / 3.0;
 	atmosphere.absorption_density_1_linear_term = -1.0 / 15.0;
 
     atmosphere.ground_albedo = vec3(0.0, 0.0, 0.0);
+
+    atmosphere.multi_scattering_factor = 1.0;
 	
     return atmosphere;
 }
@@ -85,7 +87,7 @@ fn sample_medium_extinction(height: f32, atmosphere: Atmosphere) -> vec3<f32> {
     let mie_density: f32 = exp(atmosphere.mie_density_exp_scale * height);
     let rayleigh_density: f32 = exp(atmosphere.rayleigh_density_exp_scale * height);
     var absorption_density: f32;
-    if height < atmosphere.absorption_density_0_layer_width {
+    if height < atmosphere.absorption_density_0_layer_height {
         absorption_density = saturate(atmosphere.absorption_density_0_linear_term * height + atmosphere.absorption_density_0_constant_term);
     } else {
         absorption_density = saturate(atmosphere.absorption_density_1_linear_term * height + atmosphere.absorption_density_1_constant_term);
@@ -102,7 +104,7 @@ fn sample_medium(height: f32, atmosphere: Atmosphere) -> MediumSample {
 	let mie_density: f32 = exp(atmosphere.mie_density_exp_scale * height);
 	let rayleigh_density: f32 = exp(atmosphere.rayleigh_density_exp_scale * height);
 	var absorption_density: f32;
-	if height < atmosphere.absorption_density_0_layer_width {
+	if height < atmosphere.absorption_density_0_layer_height {
 	    absorption_density = saturate(atmosphere.absorption_density_0_linear_term * height + atmosphere.absorption_density_0_constant_term);
 	} else {
 	    absorption_density = saturate(atmosphere.absorption_density_1_linear_term * height + atmosphere.absorption_density_1_constant_term);
