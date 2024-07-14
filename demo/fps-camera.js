@@ -90,6 +90,10 @@ export class FPSCameraController {
         this.#rotation = rotation;
     }
 
+    set height(h) {
+        this.#position[1] = h;
+    }
+
     get position() {
         return this.#position;
     }

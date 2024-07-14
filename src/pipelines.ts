@@ -1,7 +1,7 @@
 import { SkyAtmosphereConfig, ShadowConfig } from './config.js';
 import { AERIAL_PERSPECTIVE_LUT_FORMAT, ATMOSPHERE_BUFFER_SIZE, CONFIG_BUFFER_SIZE, DEFAULT_AERIAL_PERSPECTIVE_LUT_SIZE, DEFAULT_MULTISCATTERING_LUT_SIZE, DEFAULT_SKY_VIEW_LUT_SIZE, MULTI_SCATTERING_LUT_FORMAT, SKY_VIEW_LUT_FORMAT, SkyAtmosphereResources, TRANSMITTANCE_LUT_FORMAT } from './resources.js';
 import { makeAerialPerspectiveLutShaderCode, makeMultiScatteringLutShaderCode, makeSkyViewLutShaderCode, makeTransmittanceLutShaderCode } from './shaders.js';
-import { ComputePass } from './util.js';
+import { ComputePass, makeLutSampler } from './util.js';
 
 export const DEFAULT_TRANSMITTANCE_LUT_SAMPLE_COUNT: number = 40;
 export const DEFAULT_MULTI_SCATTERING_LUT_SAMPLE_COUNT: number = 20;
@@ -16,18 +16,7 @@ export class SkyAtmospherePipelines {
     readonly aerialPerspectiveLutPipeline: AerialPerspectiveLutPipeline;
 
     constructor(device: GPUDevice, config: SkyAtmosphereConfig) {
-        this.lutSampler = device.createSampler({
-            label: 'LUT sampler',
-            addressModeU: 'clamp-to-edge',
-            addressModeV: 'clamp-to-edge',
-            addressModeW: 'clamp-to-edge',
-            minFilter: 'linear',
-            magFilter: 'linear',
-            mipmapFilter: 'linear',
-            lodMinClamp: 0,
-            lodMaxClamp: 32,
-            maxAnisotropy: 1,
-        });
+        this.lutSampler = makeLutSampler(device);
 
         this.transmittanceLutPipeline = new TransmittanceLutPipeline(
             device,

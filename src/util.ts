@@ -39,3 +39,18 @@ export class RenderPass {
         }
     }
 }
+
+export function makeLutSampler(device: GPUDevice): GPUSampler {
+    return device.createSampler({
+        label: 'LUT sampler',
+        addressModeU: 'clamp-to-edge',
+        addressModeV: 'clamp-to-edge',
+        addressModeW: 'clamp-to-edge',
+        minFilter: 'linear',
+        magFilter: 'linear',
+        mipmapFilter: 'linear',
+        lodMinClamp: 0,
+        lodMaxClamp: 32,
+        maxAnisotropy: 1,
+    });
+}

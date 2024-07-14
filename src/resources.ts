@@ -1,7 +1,7 @@
 import { Atmosphere, makeEarthAtmosphere } from './atmosphere.js';
 import { SkyAtmosphereConfig } from './config.js';
 import { Uniforms } from './uniforms.js';
-import { LookUpTable } from './util.js';
+import { LookUpTable, makeLutSampler } from './util.js';
 
 export const DEFAULT_TRANSMITTANCE_LUT_SIZE: [number, number] = [256, 64];
 export const DEFAULT_MULTISCATTERING_LUT_SIZE: number = 32;
@@ -74,16 +74,29 @@ export class SkyAtmosphereResources {
      */
     readonly aerialPerspectiveLut: LookUpTable;
 
+    /**
+     * {@link Atmosphere} parameters.
+     * 
+     * Defaults to {@link makeEarthAtmosphere} using {@link SkyAtmosphereConfig.distanceScaleFactor} as {@link makeEarthAtmosphere}'s `scale` parameter.
+     * 
+     * Set using {@link updateAtmosphere}.
+     * 
+     * @see {@link updateAtmosphere}
+     */
+    #atmosphere: Atmosphere;
+
     constructor(device: GPUDevice, config: SkyAtmosphereConfig, lutSampler?: GPUSampler) {
         this.label = config.label ?? 'atmosphere';
         this.device = device;
+
+        this.#atmosphere = config.atmosphere ?? makeEarthAtmosphere(config.distanceScaleFactor ?? 1.0);
 
         this.atmosphereBuffer = device.createBuffer({
             label: `atmosphere buffer [${this.label}]`,
             size: ATMOSPHERE_BUFFER_SIZE,
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
         });
-        this.updateAtmosphere(config.atmosphere ?? makeEarthAtmosphere(config.distanceScaleFactor ?? 1.0));
+        this.updateAtmosphere(this.#atmosphere);
 
         this.configBuffer = device.createBuffer({
             label: `config buffer [${this.label}]`,
@@ -91,18 +104,7 @@ export class SkyAtmosphereResources {
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
         });
 
-        this.lutSampler = lutSampler || device.createSampler({
-            label: 'LUT sampler',
-            addressModeU: 'clamp-to-edge',
-            addressModeV: 'clamp-to-edge',
-            addressModeW: 'clamp-to-edge',
-            minFilter: 'linear',
-            magFilter: 'linear',
-            mipmapFilter: 'linear',
-            lodMinClamp: 0,
-            lodMaxClamp: 32,
-            maxAnisotropy: 1,
-        });
+        this.lutSampler = lutSampler || makeLutSampler(device);
 
         this.transmittanceLut = new LookUpTable(device.createTexture({
             label: `transmittance LUT [${this.label}]`,
@@ -134,13 +136,21 @@ export class SkyAtmosphereResources {
         }));
     }
 
+    get atmosphere() {
+        return this.#atmosphere;
+    }
+
     /**
      * Updates the {@link SkyAtmosphereResources.atmosphereBuffer} using a given {@link Atmosphere}.
+     * 
+     * Overwrites this instance's internal {@link Atmosphere} parameters.
+     * 
      * @param atmosphere the {@link Atmosphere} to write to the {@link atmosphereBuffer}.
      * @see atmosphereToFloatArray Internally call {@link atmosphereToFloatArray} to convert the {@link Atmosphere} to a `Float32Array`.
      */
     public updateAtmosphere(atmosphere: Atmosphere) {
-        this.device.queue.writeBuffer(this.atmosphereBuffer, 0, atmosphereToFloatArray(atmosphere));
+        this.#atmosphere = atmosphere;
+        this.device.queue.writeBuffer(this.atmosphereBuffer, 0, atmosphereToFloatArray(this.#atmosphere));
     }
 
     /**

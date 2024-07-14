@@ -42,8 +42,6 @@
 
             const cameraController = new FPSCameraController(canvas);
 
-            const params = makeUi();
-
             const projection = mat4n.perspectiveReverseZ(
                 45.0 * (Math.PI / 180.0),
                 resolution[0] / resolution[1],
@@ -71,29 +69,7 @@
             });
             const shadowMapView = shadowMap.createView();
 
-            const geometryPipeline = device.createRenderPipeline({
-                layout: 'auto',
-                vertex: {
-                    // todo: actually draw geometry
-                    module: device.createShaderModule({
-                        code: `
-                        @vertex
-                        fn vertex(@builtin(vertex_index) vertex_index: u32) -> @builtin(position) vec4<f32> {
-                            return vec4(vec2(f32((vertex_index << 1) & 2), f32(vertex_index & 2)) * 2 - 1, 0, 1);
-                        }
-                        `,
-                    }),
-                    entryPoint: 'vertex',
-                },
-            });
-
             const skyRenderTarget = device.createTexture({
-                size: resolution,
-                format: 'rgba16float',
-                usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING,
-            });
-
-            const skyRenderTarget2 = device.createTexture({
                 size: resolution,
                 format: 'rgba16float',
                 usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING,
@@ -132,8 +108,9 @@
                 usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
             });
 
+            const distanceScaleFactor = 1.0;
             const skyAtmosphereRenderer = new SkyAtmosphereRenderer(device, {
-                initializeConstantLuts: true,
+                distanceScaleFactor,
                 skyRenderer: {
                     passConfig: {
                         backBuffer: {
@@ -315,11 +292,13 @@
 
             const sunProjection = mat4n.ortho(-80, 80, -80, 80, -200, 300);
 
+            const params = makeUi(skyAtmosphereRenderer.resources.atmosphere, cameraController, distanceScaleFactor);
+
             let lastTime = new Date();
             let frameId = 0;
             const render = () => {
                 const now = new Date();
-                const dt = (now - lastTime);// / 1000.0;
+                const dt = (now - lastTime);
                 lastTime = now;
 
                 ++frameId;
@@ -376,8 +355,8 @@
                         diameter: 0.568 * Math.PI / 180.0,
                     },
                     screenResolution: resolution,
-                    rayMarchMinSPP: params.config.rayMarchMinSPP,
-                    rayMarchMaxSPP: Math.max(params.config.rayMarchMinSPP + 1, 31),
+                    rayMarchMinSPP: params.renderSettings.rayMarchingMinSpp,
+                    rayMarchMaxSPP: params.renderSettings.rayMarchingMaxSpp,
                     frameId,
                 };
 
