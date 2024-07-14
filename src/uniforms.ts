@@ -21,32 +21,32 @@ export interface Camera {
 export interface AtmosphereLight {
     /**
      * Light's illuminance.
-     * 
+     *
      * Defaults to [1.0, 1.0, 1.0]
      */
     illuminance?: [number, number, number],
 
     /**
      * Light's direction (direction to the light source).
-     * 
+     *
      * This is expected to be normalized.
      */
     direction: [number, number, number],
 
     /**
      * Light disk's luminance.
-     * 
+     *
      * For the sun, defaults to 120000.0
-     * 
+     *
      * For the moon, defaults to 0.26
      */
     luminance?: number,
 
     /**
      * Light disk's angular diameter in radians.
-     * 
+     *
      * For the sun, defaults to ~0.0095120444 (0.545 degrees)
-     * 
+     *
      * For the moon, defaults to ~0.0099134702 (0.568 degrees)
      */
     diameter?: number,
@@ -55,16 +55,16 @@ export interface AtmosphereLight {
 export interface Uniforms {
     /**
      * A directional light that influences the atmosphere.
-     * 
+     *
      * Defaults to the default sun.
-     * 
+     *
      * Ignored if custom light sources are used.
      */
     sun: AtmosphereLight,
 
     /**
      * A directional lights that influences the atmosphere.
-     * 
+     *
      * Ignored if {@link SkyAtmosphereRenderer} is not configured to render 2 atmosphere lights.
      * Ignored if custom light sources are used.
      */
@@ -72,45 +72,45 @@ export interface Uniforms {
 
     /**
      * The current camera parameter.
-     * 
+     *
      * Ignored if custom uniform buffers are used.
-     * 
+     *
      * @see {@link CustomUniformBuffersConfig}
      */
     camera: Camera,
 
     /**
      * Minimum number of ray marching samples per pixel
-     * 
+     *
      * Ignored if custom uniform buffers are used.
-     * 
+     *
      * @see {@link CustomUniformBuffersConfig}
      */
     rayMarchMinSPP: number,
 
     /**
      * Maximum number of ray marching samples per pixel
-     * 
+     *
      * Ignored if custom uniform buffers are used.
-     * 
+     *
      * @see {@link CustomUniformBuffersConfig}
      */
     rayMarchMaxSPP: number,
 
     /**
      * Resolution of the output texture.
-     * 
+     *
      * Ignored if custom uniform buffers are used.
-     * 
+     *
      * @see {@link CustomUniformBuffersConfig}
      */
     screenResolution: [number, number],
 
     /**
      * The current frame id.
-     * 
+     *
      * Ignored if custom uniform buffers are used.
-     * 
+     *
      * @see {@link CustomUniformBuffersConfig}
      */
     frameId: number,

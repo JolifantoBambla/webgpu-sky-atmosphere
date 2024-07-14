@@ -20,26 +20,26 @@ import renderAerialPerspectiveWgsl from './shaders/render_aerial_perspective_lut
 import renderSkyWithLutsWgsl from './shaders/render_sky_with_luts.wgsl';
 import renderSkyRaymarchingWgsl from './shaders/render_sky_raymarching.wgsl';
 
-export function makeTransmittanceLutShaderCode() {
-    return `${constantsWgsl}\n${intersectionWgsl}\n${mediumWgsl}\n${renderTransmittanceLutWgsl}`;
+export function makeTransmittanceLutShaderCode(transmittanceLutFormat: GPUTextureFormat = 'rgba16float') {
+    return `${constantsWgsl}\n${intersectionWgsl}\n${mediumWgsl}\n${renderTransmittanceLutWgsl}`.replace('rgba16float', transmittanceLutFormat);
 }
 
-export function makeMultiScatteringLutShaderCode() {
-    return `${constantsWgsl}\n${intersectionWgsl}\n${mediumWgsl}\n${phaseWgsl}\n${uvWgsl}\n${renderMultiScatteringLutWgsl}`;
+export function makeMultiScatteringLutShaderCode(multiScatteringLutFormat: GPUTextureFormat = 'rgba16float') {
+    return `${constantsWgsl}\n${intersectionWgsl}\n${mediumWgsl}\n${phaseWgsl}\n${uvWgsl}\n${renderMultiScatteringLutWgsl}`.replace('rgba16float', multiScatteringLutFormat);
 }
 
-export function makeSkyViewLutShaderCode() {
-    return `${constantsWgsl}\n${intersectionWgsl}\n${mediumWgsl}\n${phaseWgsl}\n${uvWgsl}\n${configWgsl}\n${coordinateSystemWgsl}\n${multipleScatteringWgsl}\n${renderSkyViewLutWgsl}`;
+export function makeSkyViewLutShaderCode(skyViewLutFormat: GPUTextureFormat = 'rgba16float') {
+    return `${constantsWgsl}\n${intersectionWgsl}\n${mediumWgsl}\n${phaseWgsl}\n${uvWgsl}\n${configWgsl}\n${coordinateSystemWgsl}\n${multipleScatteringWgsl}\n${renderSkyViewLutWgsl}`.replace('rgba16float', skyViewLutFormat);
 }
 
-export function makeAerialPerspectiveLutShaderCode() {
-    return `${constantsWgsl}\n${intersectionWgsl}\n${mediumWgsl}\n${phaseWgsl}\n${uvWgsl}\n${configWgsl}\n${coordinateSystemWgsl}\n${multipleScatteringWgsl}\n${aerialPerspectiveWgsl}\n${renderAerialPerspectiveWgsl}`;
+export function makeAerialPerspectiveLutShaderCode(aerialPerspectiveLutFormat: GPUTextureFormat = 'rgba16float') {
+    return `${constantsWgsl}\n${intersectionWgsl}\n${mediumWgsl}\n${phaseWgsl}\n${uvWgsl}\n${configWgsl}\n${coordinateSystemWgsl}\n${multipleScatteringWgsl}\n${aerialPerspectiveWgsl}\n${renderAerialPerspectiveWgsl}`.replace('rgba16float', aerialPerspectiveLutFormat);
 }
 
-export function makeRenderSkyWithLutsShaderCode() {
-    return `${constantsWgsl}\n${intersectionWgsl}\n${mediumWgsl}\n${phaseWgsl}\n${uvWgsl}\n${configWgsl}\n${coordinateSystemWgsl}\n${aerialPerspectiveWgsl}\n${skyViewWgsl}\n${blendWgsl}\n${sunDiskWgsl}\n${fullScreenVertexShaderWgsl}\n${renderSkyWithLutsWgsl}`;
+export function makeRenderSkyWithLutsShaderCode(renderTargetFormat: GPUTextureFormat = 'rgba16float') {
+    return `${constantsWgsl}\n${intersectionWgsl}\n${mediumWgsl}\n${phaseWgsl}\n${uvWgsl}\n${configWgsl}\n${coordinateSystemWgsl}\n${aerialPerspectiveWgsl}\n${skyViewWgsl}\n${blendWgsl}\n${sunDiskWgsl}\n${fullScreenVertexShaderWgsl}\n${renderSkyWithLutsWgsl}`.replace('rgba16float', renderTargetFormat);
 }
 
-export function makeRenderSkyRaymarchingShaderCode() {
-    return `${constantsWgsl}\n${intersectionWgsl}\n${mediumWgsl}\n${phaseWgsl}\n${uvWgsl}\n${configWgsl}\n${coordinateSystemWgsl}\n${multipleScatteringWgsl}\n${blendWgsl}\n${sunDiskWgsl}\n${fullScreenVertexShaderWgsl}\n${renderSkyRaymarchingWgsl}`;
+export function makeRenderSkyRaymarchingShaderCode(renderTargetFormat: GPUTextureFormat = 'rgba16float') {
+    return `${constantsWgsl}\n${intersectionWgsl}\n${mediumWgsl}\n${phaseWgsl}\n${uvWgsl}\n${configWgsl}\n${coordinateSystemWgsl}\n${multipleScatteringWgsl}\n${blendWgsl}\n${sunDiskWgsl}\n${fullScreenVertexShaderWgsl}\n${renderSkyRaymarchingWgsl}`.replace('rgba16float', renderTargetFormat);
 }

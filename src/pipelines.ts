@@ -1,10 +1,11 @@
-import { SkyAtmosphereConfig, ShadowConfig } from "./config.js";
-import { AERIAL_PERSPECTIVE_LUT_FORMAT, ATMOSPHERE_BUFFER_SIZE, CONFIG_BUFFER_SIZE, DEFAULT_MULTISCATTERING_LUT_SIZE, DEFAULT_SKY_VIEW_LUT_SIZE, MULTI_SCATTERING_LUT_FORMAT, SKY_VIEW_LUT_FORMAT, SkyAtmosphereResources, TRANSMITTANCE_LUT_FORMAT } from "./resources.js";
-import { makeAerialPerspectiveLutShaderCode, makeMultiScatteringLutShaderCode, makeSkyViewLutShaderCode, makeTransmittanceLutShaderCode } from "./shaders.js";
-import { ComputePass } from "./util.js";
+import { SkyAtmosphereConfig, ShadowConfig } from './config.js';
+import { AERIAL_PERSPECTIVE_LUT_FORMAT, ATMOSPHERE_BUFFER_SIZE, CONFIG_BUFFER_SIZE, DEFAULT_AERIAL_PERSPECTIVE_LUT_SIZE, DEFAULT_MULTISCATTERING_LUT_SIZE, DEFAULT_SKY_VIEW_LUT_SIZE, MULTI_SCATTERING_LUT_FORMAT, SKY_VIEW_LUT_FORMAT, SkyAtmosphereResources, TRANSMITTANCE_LUT_FORMAT } from './resources.js';
+import { makeAerialPerspectiveLutShaderCode, makeMultiScatteringLutShaderCode, makeSkyViewLutShaderCode, makeTransmittanceLutShaderCode } from './shaders.js';
+import { ComputePass } from './util.js';
 
 export const DEFAULT_TRANSMITTANCE_LUT_SAMPLE_COUNT: number = 40;
 export const DEFAULT_MULTI_SCATTERING_LUT_SAMPLE_COUNT: number = 20;
+export const MULTI_SCATTERING_LUT_MIN_SAMPLE_COUNT: number = 10;
 
 export class SkyAtmospherePipelines {
     readonly lutSampler: GPUSampler;
@@ -28,10 +29,32 @@ export class SkyAtmospherePipelines {
             maxAnisotropy: 1,
         });
 
-        this.transmittanceLutPipeline = new TransmittanceLutPipeline(device);
-        this.multiScatteringLutPipeline = new MultiScatteringLutPipeline(device);
-        this.skyViewLutPipeline = new SkyViewLutPipeline(device);
-        this.aerialPerspectiveLutPipeline = new AerialPerspectiveLutPipeline(device, config.shadow);
+        this.transmittanceLutPipeline = new TransmittanceLutPipeline(
+            device,
+            config.lookUpTables?.transmittanceLut?.format ?? TRANSMITTANCE_LUT_FORMAT,
+            config.lookUpTables?.transmittanceLut?.sampleCount ?? DEFAULT_TRANSMITTANCE_LUT_SAMPLE_COUNT,
+        );
+        this.multiScatteringLutPipeline = new MultiScatteringLutPipeline(
+            device,
+            config.lookUpTables?.multiScatteringLut?.format ?? MULTI_SCATTERING_LUT_FORMAT,
+            config.lookUpTables?.multiScatteringLut?.sampleCount ?? DEFAULT_MULTI_SCATTERING_LUT_SAMPLE_COUNT,
+        );
+        this.skyViewLutPipeline = new SkyViewLutPipeline(
+            device,
+            config.lookUpTables?.skyViewLut?.format ?? SKY_VIEW_LUT_FORMAT,
+            config.lookUpTables?.skyViewLut?.size ?? DEFAULT_SKY_VIEW_LUT_SIZE,
+            config.lookUpTables?.multiScatteringLut?.size ?? [DEFAULT_MULTISCATTERING_LUT_SIZE, DEFAULT_MULTISCATTERING_LUT_SIZE],
+            config.lights?.useMoon ?? false,
+        );
+        this.aerialPerspectiveLutPipeline = new AerialPerspectiveLutPipeline(
+            device,
+            config.lookUpTables?.aerialPerspectiveLut?.format ?? AERIAL_PERSPECTIVE_LUT_FORMAT,
+            (config.lookUpTables?.aerialPerspectiveLut?.size ?? DEFAULT_AERIAL_PERSPECTIVE_LUT_SIZE)[2],
+            config.lookUpTables?.aerialPerspectiveLut?.distancePerSlice ?? 4,
+            config.lookUpTables?.multiScatteringLut?.size ?? [DEFAULT_MULTISCATTERING_LUT_SIZE, DEFAULT_MULTISCATTERING_LUT_SIZE],
+            config.lights?.useMoon ?? false,
+            config.shadow,
+        );
     }
 }
 
@@ -41,7 +64,7 @@ export class TransmittanceLutPipeline {
     readonly bindGroupLayout: GPUBindGroupLayout;
     readonly transmittanceLutFormat: GPUTextureFormat;
 
-    constructor(device: GPUDevice, transmittanceLutFormat: GPUTextureFormat = TRANSMITTANCE_LUT_FORMAT, sampleCount: number = DEFAULT_TRANSMITTANCE_LUT_SAMPLE_COUNT) {
+    constructor(device: GPUDevice, transmittanceLutFormat: GPUTextureFormat, sampleCount: number) {
         this.device = device;
         this.transmittanceLutFormat = transmittanceLutFormat;
         this.bindGroupLayout = device.createBindGroupLayout({
@@ -75,7 +98,7 @@ export class TransmittanceLutPipeline {
             }),
             compute: {
                 module: device.createShaderModule({
-                    code: makeTransmittanceLutShaderCode(),
+                    code: makeTransmittanceLutShaderCode(transmittanceLutFormat),
                 }),
                 entryPoint: 'render_transmittance_lut',
                 constants: {
@@ -93,7 +116,7 @@ export class TransmittanceLutPipeline {
             throw new Error(`[TransmittanceLutPipeline::makeComputePass]: buffer too small for atmosphere parameters (${resources.atmosphereBuffer.size} < ${ATMOSPHERE_BUFFER_SIZE})`);
         }
         if (resources.transmittanceLut.texture.format !== this.transmittanceLutFormat) {
-            throw new Error(`[TransmittanceLutPipeline::makeComputePass]: wrong texture format for transmittance LUT. expected '${TRANSMITTANCE_LUT_FORMAT}', got ${resources.transmittanceLut.texture.format}`);
+            throw new Error(`[TransmittanceLutPipeline::makeComputePass]: wrong texture format for transmittance LUT. expected '${this.transmittanceLutFormat}', got ${resources.transmittanceLut.texture.format}`);
         }
         const bindGroup = resources.device.createBindGroup({
             label: `transmittance LUT pass [${resources.label}]`,
@@ -125,7 +148,7 @@ export class MultiScatteringLutPipeline {
     readonly bindGroupLayout: GPUBindGroupLayout;
     readonly multiScatteringLutFormat: GPUTextureFormat;
 
-    constructor(device: GPUDevice, multiScatteringLutFormat: GPUTextureFormat = MULTI_SCATTERING_LUT_FORMAT, sampleCount: number = DEFAULT_MULTI_SCATTERING_LUT_SAMPLE_COUNT) {
+    constructor(device: GPUDevice, multiScatteringLutFormat: GPUTextureFormat, sampleCount: number) {
         this.device = device;
         this.multiScatteringLutFormat = multiScatteringLutFormat;
         this.bindGroupLayout = device.createBindGroupLayout({
@@ -175,11 +198,11 @@ export class MultiScatteringLutPipeline {
             }),
             compute: {
                 module: device.createShaderModule({
-                    code: makeMultiScatteringLutShaderCode(),
+                    code: makeMultiScatteringLutShaderCode(multiScatteringLutFormat),
                 }),
                 entryPoint: 'render_multi_scattering_lut',
                 constants: {
-                    SAMPLE_COUNT: Math.max(sampleCount, 10),
+                    SAMPLE_COUNT: Math.max(sampleCount, MULTI_SCATTERING_LUT_MIN_SAMPLE_COUNT),
                 },
             },
         });
@@ -193,7 +216,7 @@ export class MultiScatteringLutPipeline {
             throw new Error(`[MultiScatteringLutPipeline::makeComputePass]: buffer too small for atmosphere parameters (${resources.atmosphereBuffer.size} < ${ATMOSPHERE_BUFFER_SIZE})`);
         }
         if (resources.multiScatteringLut.texture.format !== this.multiScatteringLutFormat) {
-            throw new Error(`[MultiScatteringLutPipeline::makeComputePass]: wrong texture format for multiple scattering LUT. expected '${MULTI_SCATTERING_LUT_FORMAT}', got ${resources.multiScatteringLut.texture.format}`);
+            throw new Error(`[MultiScatteringLutPipeline::makeComputePass]: wrong texture format for multiple scattering LUT. expected '${this.multiScatteringLutFormat}', got ${resources.multiScatteringLut.texture.format}`);
         }
         const bindGroup = resources.device.createBindGroup({
             label: `mulitple scattering LUT pass [${resources.label}]`,
@@ -233,9 +256,9 @@ export class SkyViewLutPipeline {
     readonly bindGroupLayout: GPUBindGroupLayout;
     readonly skyViewLutFormat: GPUTextureFormat;
     readonly skyViewLutSize: [number, number];
-    readonly multiscatteringLutSize: number;
+    readonly multiscatteringLutSize: [number, number];
 
-    constructor(device: GPUDevice, skyViewLutFormat: GPUTextureFormat = SKY_VIEW_LUT_FORMAT, skyViewLutSize: [number, number] = DEFAULT_SKY_VIEW_LUT_SIZE, multiscatteringLutSize: number = DEFAULT_MULTISCATTERING_LUT_SIZE) {
+    constructor(device: GPUDevice, skyViewLutFormat: GPUTextureFormat, skyViewLutSize: [number, number], multiscatteringLutSize: [number, number], useMoon: boolean) {
         this.device = device;
         this.skyViewLutFormat = skyViewLutFormat;
         this.skyViewLutSize = skyViewLutSize;
@@ -305,13 +328,15 @@ export class SkyViewLutPipeline {
             }),
             compute: {
                 module: device.createShaderModule({
-                    code: makeSkyViewLutShaderCode(),
+                    code: makeSkyViewLutShaderCode(skyViewLutFormat),
                 }),
                 entryPoint: 'render_sky_view_lut',
                 constants: {
                     SKY_VIEW_LUT_RES_X: this.skyViewLutSize[0],
                     SKY_VIEW_LUT_RES_Y: this.skyViewLutSize[1],
-                    MULTI_SCATTERING_LUT_RES: this.multiscatteringLutSize,
+                    MULTI_SCATTERING_LUT_RES_X: this.multiscatteringLutSize[0],
+                    MULTI_SCATTERING_LUT_RES_Y: this.multiscatteringLutSize[1],
+                    USE_MOON: Number(useMoon),
                 },
             },
         });
@@ -327,11 +352,11 @@ export class SkyViewLutPipeline {
         if (resources.configBuffer.size < CONFIG_BUFFER_SIZE) {
             throw new Error(`[SkyViewLutPipeline::makeComputePass]: buffer too small for config (${resources.atmosphereBuffer.size} < ${ATMOSPHERE_BUFFER_SIZE})`);
         }
-        if (resources.multiScatteringLut.texture.width !== this.multiscatteringLutSize || resources.multiScatteringLut.texture.height !== this.multiscatteringLutSize) {
+        if (resources.multiScatteringLut.texture.width !== this.multiscatteringLutSize[0] || resources.multiScatteringLut.texture.height !== this.multiscatteringLutSize[1]) {
             throw new Error(`[SkyViewLutPipeline::makeComputePass]: wrong texture size for multiple scattering LUT. expected '${this.multiscatteringLutSize}', got ${[resources.multiScatteringLut.texture.width, resources.multiScatteringLut.texture.height]}`);
         }
         if (resources.skyViewLut.texture.format !== this.skyViewLutFormat) {
-            throw new Error(`[SkyViewLutPipeline::makeComputePass]: wrong texture format for sky view LUT. expected '${SKY_VIEW_LUT_FORMAT}', got ${resources.skyViewLut.texture.format}`);
+            throw new Error(`[SkyViewLutPipeline::makeComputePass]: wrong texture format for sky view LUT. expected '${this.skyViewLutFormat}', got ${resources.skyViewLut.texture.format}`);
         }
         if (resources.skyViewLut.texture.width !== this.skyViewLutSize[0] || resources.skyViewLut.texture.height !== this.skyViewLutSize[1]) {
             throw new Error(`[SkyViewLutPipeline::makeComputePass]: wrong texture size for sky view LUT. expected '${this.skyViewLutSize}', got ${[resources.skyViewLut.texture.width, resources.skyViewLut.texture.height]}`);
@@ -383,11 +408,13 @@ export class AerialPerspectiveLutPipeline {
     readonly pipeline: GPUComputePipeline;
     readonly bindGroupLayout: GPUBindGroupLayout;
     readonly aerialPerspectiveLutFormat: GPUTextureFormat;
-    readonly multiscatteringLutSize: number;
+    readonly aerialPerspectiveSliceCount: number;
+    readonly multiscatteringLutSize: [number, number];
 
-    constructor(device: GPUDevice, shadowConfig?: ShadowConfig, aerialPerspectiveLutFormat: GPUTextureFormat = AERIAL_PERSPECTIVE_LUT_FORMAT, multiscatteringLutSize: number = DEFAULT_MULTISCATTERING_LUT_SIZE) {
+    constructor(device: GPUDevice, aerialPerspectiveLutFormat: GPUTextureFormat, aerialPerspectiveSliceCount: number, aerialPerspectiveDistancePerSlice: number, multiscatteringLutSize: [number, number], useMoon: boolean, shadowConfig?: ShadowConfig) {
         this.device = device;
         this.aerialPerspectiveLutFormat = aerialPerspectiveLutFormat;
+        this.aerialPerspectiveSliceCount = aerialPerspectiveSliceCount;
         this.multiscatteringLutSize = multiscatteringLutSize;
         this.bindGroupLayout = device.createBindGroupLayout({
             label: 'aerial perspective LUT pass',
@@ -454,11 +481,15 @@ export class AerialPerspectiveLutPipeline {
             }),
             compute: {
                 module: device.createShaderModule({
-                    code: `${shadowConfig?.wgslCode || 'fn get_shadow(p: vec3<f32>) -> f32 { return 1.0; }'}\n${makeAerialPerspectiveLutShaderCode()}`,
+                    code: `${shadowConfig?.wgslCode || 'fn get_shadow(p: vec3<f32>) -> f32 { return 1.0; }'}\n${makeAerialPerspectiveLutShaderCode(aerialPerspectiveLutFormat)}`,
                 }),
                 entryPoint: 'render_aerial_perspective_lut',
                 constants: {
-                    MULTI_SCATTERING_LUT_RES: this.multiscatteringLutSize,
+                    AP_SLICE_COUNT: this.aerialPerspectiveSliceCount,
+                    AP_DISTANCE_PER_SLICE: aerialPerspectiveDistancePerSlice,
+                    MULTI_SCATTERING_LUT_RES_X: this.multiscatteringLutSize[0],
+                    MULTI_SCATTERING_LUT_RES_Y: this.multiscatteringLutSize[1],
+                    USE_MOON: Number(useMoon),
                 },
             },
         });
@@ -474,11 +505,14 @@ export class AerialPerspectiveLutPipeline {
         if (resources.configBuffer.size < CONFIG_BUFFER_SIZE) {
             throw new Error(`[AerialPerspectiveLutPipeline::makeComputePass]: buffer too small for config (${resources.atmosphereBuffer.size} < ${ATMOSPHERE_BUFFER_SIZE})`);
         }
-        if (resources.multiScatteringLut.texture.width !== this.multiscatteringLutSize || resources.multiScatteringLut.texture.height !== this.multiscatteringLutSize) {
+        if (resources.multiScatteringLut.texture.width !== this.multiscatteringLutSize[0] || resources.multiScatteringLut.texture.height !== this.multiscatteringLutSize[1]) {
             throw new Error(`[AerialPerspectiveLutPipeline::makeComputePass]: wrong texture size for multiple scattering LUT. expected '${this.multiscatteringLutSize}', got ${[resources.multiScatteringLut.texture.width, resources.multiScatteringLut.texture.height]}`);
         }
         if (resources.aerialPerspectiveLut.texture.format !== this.aerialPerspectiveLutFormat) {
             throw new Error(`[AerialPerspectiveLutPipeline::makeComputePass]: wrong texture format for aerial perspective LUT. expected '${this.aerialPerspectiveLutFormat}', got ${resources.aerialPerspectiveLut.texture.format}`);
+        }
+        if (resources.aerialPerspectiveLut.texture.depthOrArrayLayers !== this.aerialPerspectiveSliceCount) {
+            throw new Error(`[AerialPerspectiveLutPipeline::makeComputePass]: wrong texture depth for aerial perspective LUT. expected '${this.aerialPerspectiveSliceCount}', got ${resources.aerialPerspectiveLut.texture.depthOrArrayLayers}`);
         }
         const bindGroup = resources.device.createBindGroup({
             label: `aerial perspective LUT pass [${resources.label}]`,

@@ -135,7 +135,7 @@ export class SkyAtmosphereRenderer {
                 binding: 2,
                 resource: this.resources.lutSampler,
             },
-        ]
+        ];
 
         if (isComputePassConfig(config.skyRenderer.passConfig)) {
             const externalResourcesLayoutEntries: GPUBindGroupLayoutEntry[] = [
@@ -262,8 +262,8 @@ export class SkyAtmosphereRenderer {
                         }),
                         entryPoint: 'render_sky_atmosphere',
                         constants: {
-                            //IS_Y_UP: Number(config.coordinateSystem?.yUp ?? true),
                             IS_REVERSE_Z: Number(config.skyRenderer.depthBuffer.reverseZ ?? false),
+                            USE_MOON: Number(config.lights?.useMoon ?? false),
                         },
                     },
                 });
@@ -345,9 +345,10 @@ export class SkyAtmosphereRenderer {
                         }),
                         entryPoint: 'render_sky_atmosphere',
                         constants: {
-                            MULTI_SCATTERING_LUT_RES: this.resources.multiScatteringLut.texture.width,
-                            //IS_Y_UP: Number(config.coordinateSystem?.yUp ?? true),
+                            MULTI_SCATTERING_LUT_RES_X: this.resources.multiScatteringLut.texture.width,
+                            MULTI_SCATTERING_LUT_RES_Y: this.resources.multiScatteringLut.texture.height,
                             IS_REVERSE_Z: Number(config.skyRenderer.depthBuffer.reverseZ ?? false),
+                            USE_MOON: Number(config.lights?.useMoon ?? false),
                         },
                     },
                 });
@@ -454,37 +455,39 @@ export class SkyAtmosphereRenderer {
                     fragment: {
                         module,
                         constants: {
-                            //IS_Y_UP: Number(config.coordinateSystem?.yUp ?? true),
                             IS_REVERSE_Z: Number(config.skyRenderer.depthBuffer.reverseZ ?? false),
+                            USE_MOON: Number(config.lights?.useMoon ?? false),
                         },
-                        targets: [{
-                            format: config.skyRenderer.passConfig.renderTargetFormat,
-                            // todo: do I need to specifiy stuff for dual source blending if I don't use it here? - probably
-                            blend: useDualSourceBlending ? {
-                                color: {
-                                    operation: 'add',
-                                    srcFactor: 'one',
-                                    dstFactor: 'src1' as GPUBlendFactor, // dual-source-blending is a fairly new feature
+                        targets: [
+                            {
+                                format: config.skyRenderer.passConfig.renderTargetFormat,
+                                // todo: do I need to specifiy stuff for dual source blending if I don't use it here? - probably
+                                blend: useDualSourceBlending ? {
+                                    color: {
+                                        operation: 'add',
+                                        srcFactor: 'one',
+                                        dstFactor: 'src1' as GPUBlendFactor, // dual-source-blending is a fairly new feature
+                                    },
+                                    alpha: {
+                                        operation: 'add',
+                                        srcFactor: 'zero',
+                                        dstFactor: 'one',
+                                    },
+                                } : {
+                                    color: {
+                                        operation: 'add',
+                                        srcFactor: 'one',
+                                        dstFactor: 'one-minus-src-alpha',
+                                    },
+                                    alpha: {
+                                        operation: 'add',
+                                        srcFactor: 'zero',
+                                        dstFactor: 'one',
+                                    },
                                 },
-                                alpha: {
-                                    operation: 'add',
-                                    srcFactor: 'zero',
-                                    dstFactor: 'one',
-                                },
-                            } : {
-                                color: {
-                                    operation: 'add',
-                                    srcFactor: 'one',
-                                    dstFactor: 'one-minus-src-alpha',
-                                },
-                                alpha: {
-                                    operation: 'add',
-                                    srcFactor: 'zero',
-                                    dstFactor: 'one',
-                                },
+                                writeMask: GPUColorWrite.ALL,
                             },
-                            writeMask: GPUColorWrite.ALL,
-                        }],
+                        ],
                     },
                 });
 
@@ -558,37 +561,40 @@ export class SkyAtmosphereRenderer {
                     fragment: {
                         module,
                         constants: {
-                            MULTI_SCATTERING_LUT_RES: this.resources.multiScatteringLut.texture.width,
-                            //IS_Y_UP: Number(config.coordinateSystem?.yUp ?? true),
+                            MULTI_SCATTERING_LUT_RES_X: this.resources.multiScatteringLut.texture.width,
+                            MULTI_SCATTERING_LUT_RES_Y: this.resources.multiScatteringLut.texture.height,
                             IS_REVERSE_Z: Number(config.skyRenderer.depthBuffer.reverseZ ?? false),
+                            USE_MOON: Number(config.lights?.useMoon ?? false),
                         },
-                        targets: [{
-                            format: config.skyRenderer.passConfig.renderTargetFormat,
-                            // todo: do I need to specifiy stuff for dual source blending if I don't use it here? - probably
-                            blend: useDualSourceBlending ? {
-                                color: {
-                                    operation: 'add',
-                                    srcFactor: 'one',
-                                    dstFactor: 'src1' as GPUBlendFactor, // dual-source-blending is a fairly new feature
-                                },
-                                alpha: {
-                                    operation: 'add',
-                                    srcFactor: 'zero',
-                                    dstFactor: 'one',
-                                },
-                            } : {
-                                color: {
-                                    operation: 'add',
-                                    srcFactor: 'one',
-                                    dstFactor: 'one-minus-src-alpha',
-                                },
-                                alpha: {
-                                    operation: 'add',
-                                    srcFactor: 'zero',
-                                    dstFactor: 'one',
+                        targets: [
+                            {
+                                format: config.skyRenderer.passConfig.renderTargetFormat,
+                                // todo: do I need to specifiy stuff for dual source blending if I don't use it here? - probably
+                                blend: useDualSourceBlending ? {
+                                    color: {
+                                        operation: 'add',
+                                        srcFactor: 'one',
+                                        dstFactor: 'src1' as GPUBlendFactor, // dual-source-blending is a fairly new feature
+                                    },
+                                    alpha: {
+                                        operation: 'add',
+                                        srcFactor: 'zero',
+                                        dstFactor: 'one',
+                                    },
+                                } : {
+                                    color: {
+                                        operation: 'add',
+                                        srcFactor: 'one',
+                                        dstFactor: 'one-minus-src-alpha',
+                                    },
+                                    alpha: {
+                                        operation: 'add',
+                                        srcFactor: 'zero',
+                                        dstFactor: 'one',
+                                    },
                                 },
                             },
-                        }],
+                        ],
                     },
                 });
 

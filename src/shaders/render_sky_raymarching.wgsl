@@ -1,7 +1,5 @@
 
-override MULTI_SCATTERING_LUT_RES: f32 = 32.0;
-
-override USE_MOON: bool = true;
+override USE_MOON: bool = false;
 
 override RANDOMIZE_SAMPLE_OFFSET: bool = true;
 

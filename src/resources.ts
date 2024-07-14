@@ -1,7 +1,7 @@
-import { Atmosphere, makeEarthAtmosphere } from "./atmosphere.js";
-import { SkyAtmosphereConfig } from "./config.js";
-import { Uniforms } from "./uniforms.js";
-import { LookUpTable } from "./util.js";
+import { Atmosphere, makeEarthAtmosphere } from './atmosphere.js';
+import { SkyAtmosphereConfig } from './config.js';
+import { Uniforms } from './uniforms.js';
+import { LookUpTable } from './util.js';
 
 export const DEFAULT_TRANSMITTANCE_LUT_SIZE: [number, number] = [256, 64];
 export const DEFAULT_MULTISCATTERING_LUT_SIZE: number = 32;
@@ -63,29 +63,29 @@ export class SkyAtmosphereResources {
 
         this.transmittanceLut = new LookUpTable(device.createTexture({
             label: `transmittance LUT [${this.label}]`,
-            size: config.lookUpTables?.transmittanceLutSize ?? DEFAULT_TRANSMITTANCE_LUT_SIZE, // todo: validate / clamp
-            format: TRANSMITTANCE_LUT_FORMAT,
+            size: config.lookUpTables?.transmittanceLut?.size ?? DEFAULT_TRANSMITTANCE_LUT_SIZE,
+            format: config.lookUpTables?.transmittanceLut?.format ?? TRANSMITTANCE_LUT_FORMAT,
             usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING,
         }));
 
         this.multiScatteringLut = new LookUpTable(device.createTexture({
             label: `multi scattering LUT [${this.label}]`,
-            size: new Array(2).fill(config.lookUpTables?.multiScatteringLutSize ?? DEFAULT_MULTISCATTERING_LUT_SIZE), // todo: validate / clamp
-            format: MULTI_SCATTERING_LUT_FORMAT,
+            size: config.lookUpTables?.multiScatteringLut?.size ?? [DEFAULT_MULTISCATTERING_LUT_SIZE, DEFAULT_MULTISCATTERING_LUT_SIZE],
+            format: config.lookUpTables?.multiScatteringLut?.format ?? MULTI_SCATTERING_LUT_FORMAT,
             usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING,
         }));
 
         this.skyViewLut = new LookUpTable(device.createTexture({
             label: `sky view LUT [${this.label}]`,
-            size: config.lookUpTables?.skyViewLutSize ?? DEFAULT_SKY_VIEW_LUT_SIZE, // todo: validate / clamp
-            format: SKY_VIEW_LUT_FORMAT,
+            size: config.lookUpTables?.skyViewLut?.size ?? DEFAULT_SKY_VIEW_LUT_SIZE,
+            format: config.lookUpTables?.skyViewLut?.format ?? SKY_VIEW_LUT_FORMAT,
             usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING,
         }));
 
         this.aerialPerspectiveLut = new LookUpTable(device.createTexture({
             label: `aerial perspective LUT [${this.label}]`,
-            size: config.lookUpTables?.aerialPerspectiveLutSize ?? DEFAULT_AERIAL_PERSPECTIVE_LUT_SIZE, // todo: validate / clamp
-            format: AERIAL_PERSPECTIVE_LUT_FORMAT,
+            size: config.lookUpTables?.aerialPerspectiveLut?.size ?? DEFAULT_AERIAL_PERSPECTIVE_LUT_SIZE,
+            format: config.lookUpTables?.aerialPerspectiveLut?.format ?? AERIAL_PERSPECTIVE_LUT_FORMAT,
             dimension: '3d',
             usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING,
         }));

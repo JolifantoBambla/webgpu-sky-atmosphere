@@ -41,7 +41,7 @@ const params = {
         rayMarchingMaxSpp: 30,
         rayMarch: false,
     },
-    atmosphere: makeEarthAtmosphere([0.0, -makeEarthAtmosphere().bottomRadius, 0.0]),
+    atmosphere: makeEarthAtmosphere(1.0, [0.0, -makeEarthAtmosphere().bottomRadius, 0.0]),
     atmosphereHelper: {
         rayleigh: {
             scaleHeight: 8.0,

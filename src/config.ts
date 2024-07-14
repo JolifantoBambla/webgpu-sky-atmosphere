@@ -1,46 +1,135 @@
-import { Atmosphere } from "./atmosphere.js";
+import { Atmosphere } from './atmosphere.js';
+
+export interface TransmittanceLutConfig {
+    /**
+     * The size of the transmittance look up table.
+     *
+     * Defaults to [256, 64]
+     */
+    size?: [number, number],
+
+    /**
+     * The format of the transmittance look up table.
+     *
+     * Must support `GPUTextureUsage.STORAGE_BINDING` with `"write-only"` access.
+     * Must support `GPUTextureSampleType` `"float"`.
+     * Should be at least a three component format.
+     *
+     * Defaults to: 'rgba16float'
+     */
+    format?: GPUTextureFormat,
+
+    /**
+     * The ray marching sample count to use when rendering the transmittance look up table.
+     *
+     * Clamped to `max(40, sampleCount)`
+     *
+     * Defaults to 40
+     */
+    sampleCount?: number,
+}
+
+export interface MultiScatteringLutConfig {
+    /**
+     * The size of the multiple scattering look up table.
+     *
+     * Defaults to [32, 32]
+     */
+    size?: [number, number],
+
+    /**
+     * The format of the multiple scattering look up table.
+     *
+     * Must support `GPUTextureUsage.STORAGE_BINDING` with `"write-only"` access.
+     * Must support `GPUTextureSampleType` `"float"`.
+     * Should be at least a three component format.
+     *
+     * Defaults to: 'rgba16float'
+     */
+    format?: GPUTextureFormat,
+
+    /**
+     * The ray marching sample count to use when rendering the multiple scattering look up table.
+     *
+     * Clamped to `max(10, sampleCount)`
+     *
+     * Defaults to 20
+     */
+    sampleCount?: number,
+}
+
+export interface SkyViewLutConfig {
+    /**
+     * The size of the sky view look up table.
+     *
+     * Defaults to [192, 108]
+     */
+    size?: [number, number],
+
+    /**
+     * The format of the sky view look up table.
+     *
+     * Must support `GPUTextureUsage.STORAGE_BINDING` with `"write-only"` access.
+     * Must support `GPUTextureSampleType` `"float"`.
+     * Should be at least a three component format.
+     *
+     * Defaults to: 'rgba16float'
+     */
+    format?: GPUTextureFormat,
+}
+
+export interface AerialPerspectiveLutConfig {
+    /**
+     * The size of the aerial perspective look up table.
+     *
+     * Defaults to [32, 32, 32]
+     */
+    size?: [number, number, number],
+
+    /**
+     * The format of the aerial perspective look up table.
+     *
+     * Must support `GPUTextureUsage.STORAGE_BINDING` with `"write-only"` access.
+     * Must support `GPUTextureSampleType` `"float"`.
+     * Should be at least a three component format.
+     *
+     * Defaults to: 'rgba16float'
+     */
+    format?: GPUTextureFormat,
+
+    /**
+     * The distance each slice of the areal perspective look up table covers.
+     * 
+     * This distance should be measured in the same units as {@link Atmosphere} parameters (e.g., {@link Atmosphere.bottomRadius}).
+     *
+     * Defaults to 4.
+     */
+    distancePerSlice?: number
+}
 
 /**
  * Config for internally used look up tables.
  */
 export interface SkyAtmosphereLutConfig {
     /**
-     * The size of the transmittance look up table.
-     * Defaults to [256, 64]
+     * Settings for the transmittance look up table.
      */
-    transmittanceLutSize?: [number, number],
+    transmittanceLut?: TransmittanceLutConfig,
 
     /**
-     * The ray marching sample count to use when rendering the transmittance look up table.
-     * Defaults to 40
-     * Clamped to max(40, transmittanceLutSampleCount)
+     * Settings for the multiple scattering look up table.
      */
-    transmittanceLutSampleCount?: number,
+    multiScatteringLut?: MultiScatteringLutConfig,
 
     /**
-     * The size of the multiple scattering look up table.
-     * Defaults to 32
+     * Settings for the sky view look up table.
      */
-    multiScatteringLutSize?: number,
+    skyViewLut?: SkyViewLutConfig,
 
     /**
-     * The ray marching sample count to use when rendering the multiple scattering look up table.
-     * Defaults to 20
-     * Clamped to max(10, multiScatteringLutSampleCount)
+     * Settings for the aerial perspective look up table.
      */
-    multiScatteringLutSampleCount?: number,
-
-    /**
-     * The size of the sky view look up table.
-     * Defaults to [192, 108]
-     */
-    skyViewLutSize?: [number, number],
-
-    /**
-     * The size of of the aerial perspective look up table.
-     * Defaults to [32, 32, 32]
-     */
-    aerialPerspectiveLutSize?: [number, number, number],
+    aerialPerspectiveLut: AerialPerspectiveLutConfig,
 }
 
 /**
@@ -175,7 +264,7 @@ export interface SkyRendererPassConfig {
     /**
      * Results in less sampling artefacts (e.g., smoother volumetric shadows) but introduces visible noise.
      * It is recommended to use temporal anti-aliasing to get rid of this noise.
-     * 
+     *
      * Defaults to true.
      */
     randomizeRayOffsets?: boolean,
@@ -277,14 +366,14 @@ interface CustomUniformBuffersConfig {
 export interface AtmosphereLightsConfig {
     /**
      * Render a sun disk.
-     * 
+     *
      * Defaults to true.
      */
     renderSunDisk?: boolean,
 
     /**
      * Use the second atmosphere light source specified in {@link Uniforms.moon}.
-     * 
+     *
      * Defaults to false.
      */
     useMoon?: boolean,
