@@ -76,11 +76,11 @@ export class SkyAtmosphereResources {
 
     /**
      * {@link Atmosphere} parameters.
-     * 
+     *
      * Defaults to {@link makeEarthAtmosphere} using {@link SkyAtmosphereConfig.distanceScaleFactor} as {@link makeEarthAtmosphere}'s `scale` parameter.
-     * 
+     *
      * Set using {@link updateAtmosphere}.
-     * 
+     *
      * @see {@link updateAtmosphere}
      */
     #atmosphere: Atmosphere;
@@ -142,9 +142,9 @@ export class SkyAtmosphereResources {
 
     /**
      * Updates the {@link SkyAtmosphereResources.atmosphereBuffer} using a given {@link Atmosphere}.
-     * 
+     *
      * Overwrites this instance's internal {@link Atmosphere} parameters.
-     * 
+     *
      * @param atmosphere the {@link Atmosphere} to write to the {@link atmosphereBuffer}.
      * @see atmosphereToFloatArray Internally call {@link atmosphereToFloatArray} to convert the {@link Atmosphere} to a `Float32Array`.
      */

@@ -2,6 +2,7 @@
 override USE_MOON: bool = false;
 override RANDOMIZE_SAMPLE_OFFSET: bool = true;
 override INV_DISTANCE_TO_MAX_SAMPLE_COUNT: f32 = 1.0 / 100.0;
+override USE_COLORED_TRANSMISSION: bool = true;
 
 override WORKGROUP_SIZE_X: u32 = 16;
 override WORKGROUP_SIZE_Y: u32 = 16;
@@ -196,7 +197,10 @@ fn render_sky_atmosphere(@builtin(global_invocation_id) global_id: vec3<u32>) {
         return;
     }
     let result = render_sky(global_id.xy);
-    dual_source_blend(global_id.xy, result.luminance, result.transmittance);
-    //blend(global_id.xy, vec4(result.luminance.rgb, 1.0 - (dot(result.transmittance.rgb, vec3(1.0 / 3.0)))));
+    if USE_COLORED_TRANSMISSION {
+        dual_source_blend(global_id.xy, result.luminance, result.transmittance);
+    } else {
+        blend(global_id.xy, vec4(result.luminance.rgb, 1.0 - (dot(result.transmittance.rgb, vec3(1.0 / 3.0)))));
+    }
 }
 

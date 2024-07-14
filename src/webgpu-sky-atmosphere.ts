@@ -91,6 +91,8 @@ export class SkyAtmosphereRenderer {
 
     readonly skyAtmospherePipelines: SkyAtmospherePipelines;
 
+    readonly defaultToPerPixelRayMarch: boolean;
+
     private transmittanceLutPass: ComputePass;
     private multiScatteringLutPass: ComputePass;
     private skyViewLutPass: ComputePass;
@@ -105,6 +107,8 @@ export class SkyAtmosphereRenderer {
         } else {
             this.skyAtmospherePipelines = existingPipelines || new SkyAtmospherePipelines(device, config);
         }
+
+        this.defaultToPerPixelRayMarch = config.skyRenderer.defaultToPerPixelRayMarch ?? false;
 
         this.resources = new SkyAtmosphereResources(device, config, this.skyAtmospherePipelines.lutSampler);
 
@@ -193,15 +197,17 @@ export class SkyAtmosphereRenderer {
             const externalResourcesBindGroupEntries = [
                 {
                     binding: 5,
-                    resource: config.skyRenderer.depthBuffer.view!,
+                    resource: config.skyRenderer.depthBuffer.view ?? config.skyRenderer.depthBuffer.texture.createView(config.skyRenderer.depthBuffer.texture.format.includes('depth') ? {
+                        aspect: 'depth-only',
+                    } : {}),
                 },
                 {
                     binding: 6,
-                    resource: config.skyRenderer.passConfig.backBuffer.view!,
+                    resource: config.skyRenderer.passConfig.backBuffer.view ?? config.skyRenderer.passConfig.backBuffer.texture.createView(),
                 },
                 {
                     binding: 7,
-                    resource: config.skyRenderer.passConfig.renderTarget.view!,
+                    resource: config.skyRenderer.passConfig.renderTarget.view ?? config.skyRenderer.passConfig.renderTarget.texture.createView(),
                 },
             ];
 
@@ -284,6 +290,8 @@ export class SkyAtmosphereRenderer {
                         }),
                         entryPoint: 'render_sky_atmosphere',
                         constants: {
+                            SKY_VIEW_LUT_RES_X: this.resources.skyViewLut.texture.width,
+                            SKY_VIEW_LUT_RES_Y: this.resources.skyViewLut.texture.height,
                             IS_REVERSE_Z: Number(config.skyRenderer.depthBuffer.reverseZ ?? false),
                             USE_MOON: Number(config.lights?.useMoon ?? false),
                         },
@@ -368,10 +376,12 @@ export class SkyAtmosphereRenderer {
                         entryPoint: 'render_sky_atmosphere',
                         constants: {
                             INV_DISTANCE_TO_MAX_SAMPLE_COUNT: 1.0 / (config.skyRenderer.distanceToMaxSampleCount ?? (100.0 * (config.distanceScaleFactor ?? 1.0))),
+                            RANDOMIZE_SAMPLE_OFFSET: Number(config.skyRenderer.randomizeRayOffsets ?? true),
                             MULTI_SCATTERING_LUT_RES_X: this.resources.multiScatteringLut.texture.width,
                             MULTI_SCATTERING_LUT_RES_Y: this.resources.multiScatteringLut.texture.height,
                             IS_REVERSE_Z: Number(config.skyRenderer.depthBuffer.reverseZ ?? false),
                             USE_MOON: Number(config.lights?.useMoon ?? false),
+                            USE_COLORED_TRANSMISSION: Number(config.skyRenderer.passConfig.useColoredTransmittanceOnPerPixelRayMarch ?? true),
                         },
                     },
                 });
@@ -395,6 +405,31 @@ export class SkyAtmosphereRenderer {
                 console.warn('[SkyAtmosphereRenderer]: dual source blending was requested but the device feature is not enabled');
             }
 
+            const blendState: GPUBlendState = {
+                color: {
+                    operation: 'add',
+                    srcFactor: 'one',
+                    dstFactor: 'one-minus-src-alpha',
+                },
+                alpha: {
+                    operation: 'add',
+                    srcFactor: 'zero',
+                    dstFactor: 'one',
+                },
+            };
+            const dualBlendState: GPUBlendState = {
+                color: {
+                    operation: 'add',
+                    srcFactor: 'one',
+                    dstFactor: 'src1' as GPUBlendFactor, // dual-source-blending is a fairly new feature
+                },
+                alpha: {
+                    operation: 'add',
+                    srcFactor: 'zero',
+                    dstFactor: 'one',
+                },
+            };
+
             const externalResourcesLayoutEntries: GPUBindGroupLayoutEntry[] = [
                 {
                     binding: 5,
@@ -410,7 +445,9 @@ export class SkyAtmosphereRenderer {
             const externalResourcesBindGroupEntries: GPUBindGroupEntry[] = [
                 {
                     binding: 5,
-                    resource: config.skyRenderer.depthBuffer.view!,
+                    resource: config.skyRenderer.depthBuffer.view ?? config.skyRenderer.depthBuffer.texture.createView(config.skyRenderer.depthBuffer.texture.format.includes('depth') ? {
+                        aspect: 'depth-only',
+                    } : {}),
                 },
             ];
 
@@ -464,6 +501,18 @@ export class SkyAtmosphereRenderer {
                     code: makeRenderSkyWithLutsShaderCode(),
                 });
 
+                const writeTransmissionOnlyOnPerPixelRayMarch = config.skyRenderer.passConfig.writeTransmissionOnlyOnPerPixelRayMarch ?? true;
+                const targets: GPUColorTargetState[] = [
+                    {
+                        format: config.skyRenderer.passConfig.renderTargetFormat,
+                        blend: useDualSourceBlending && !writeTransmissionOnlyOnPerPixelRayMarch ? dualBlendState : blendState,
+                        writeMask: GPUColorWrite.ALL,
+                    },
+                ];
+                if (config.skyRenderer.passConfig.transmissionFormat && !writeTransmissionOnlyOnPerPixelRayMarch) {
+                    targets.push({ format: config.skyRenderer.passConfig.transmissionFormat, });
+                }
+
                 const renderSkyPipeline = device.createRenderPipeline({
                     label: 'Render sky with LUTs pipeline',
                     layout: device.createPipelineLayout({
@@ -478,39 +527,12 @@ export class SkyAtmosphereRenderer {
                     fragment: {
                         module,
                         constants: {
+                            SKY_VIEW_LUT_RES_X: this.resources.skyViewLut.texture.width,
+                            SKY_VIEW_LUT_RES_Y: this.resources.skyViewLut.texture.height,
                             IS_REVERSE_Z: Number(config.skyRenderer.depthBuffer.reverseZ ?? false),
                             USE_MOON: Number(config.lights?.useMoon ?? false),
                         },
-                        targets: [
-                            {
-                                format: config.skyRenderer.passConfig.renderTargetFormat,
-                                // todo: do I need to specifiy stuff for dual source blending if I don't use it here? - probably
-                                blend: useDualSourceBlending ? {
-                                    color: {
-                                        operation: 'add',
-                                        srcFactor: 'one',
-                                        dstFactor: 'src1' as GPUBlendFactor, // dual-source-blending is a fairly new feature
-                                    },
-                                    alpha: {
-                                        operation: 'add',
-                                        srcFactor: 'zero',
-                                        dstFactor: 'one',
-                                    },
-                                } : {
-                                    color: {
-                                        operation: 'add',
-                                        srcFactor: 'one',
-                                        dstFactor: 'one-minus-src-alpha',
-                                    },
-                                    alpha: {
-                                        operation: 'add',
-                                        srcFactor: 'zero',
-                                        dstFactor: 'one',
-                                    },
-                                },
-                                writeMask: GPUColorWrite.ALL,
-                            },
-                        ],
+                        targets,
                     },
                 });
 
@@ -520,7 +542,7 @@ export class SkyAtmosphereRenderer {
                 );
             }
 
-            // render sky raymarching - compute
+            // render sky raymarching - render
             {
                 const renderSkyRaymarchingBindGroupLayout = device.createBindGroupLayout({
                     label: 'Render sky raymarching bind group layout',
@@ -569,6 +591,17 @@ export class SkyAtmosphereRenderer {
                     code: `${config.shadow?.wgslCode || 'fn get_shadow(p: vec3<f32>) -> f32 { return 1.0; }'}\n${makeRenderSkyRaymarchingShaderCode()}`,
                 });
 
+                const targets: GPUColorTargetState[] = [
+                    {
+                        format: config.skyRenderer.passConfig.renderTargetFormat,
+                        blend: useDualSourceBlending ? dualBlendState : blendState,
+                        writeMask: GPUColorWrite.ALL,
+                    },
+                ];
+                if (config.skyRenderer.passConfig.transmissionFormat) {
+                    targets.push({ format: config.skyRenderer.passConfig.transmissionFormat, });
+                }
+
                 const renderSkyPipeline = device.createRenderPipeline({
                     label: 'Render sky raymarching pipeline',
                     layout: device.createPipelineLayout({
@@ -585,40 +618,13 @@ export class SkyAtmosphereRenderer {
                         module,
                         constants: {
                             INV_DISTANCE_TO_MAX_SAMPLE_COUNT: 1.0 / (config.skyRenderer.distanceToMaxSampleCount ?? (100.0 * (config.distanceScaleFactor ?? 1.0))),
+                            RANDOMIZE_SAMPLE_OFFSET: Number(config.skyRenderer.randomizeRayOffsets ?? true),
                             MULTI_SCATTERING_LUT_RES_X: this.resources.multiScatteringLut.texture.width,
                             MULTI_SCATTERING_LUT_RES_Y: this.resources.multiScatteringLut.texture.height,
                             IS_REVERSE_Z: Number(config.skyRenderer.depthBuffer.reverseZ ?? false),
                             USE_MOON: Number(config.lights?.useMoon ?? false),
                         },
-                        targets: [
-                            {
-                                format: config.skyRenderer.passConfig.renderTargetFormat,
-                                // todo: do I need to specifiy stuff for dual source blending if I don't use it here? - probably
-                                blend: useDualSourceBlending ? {
-                                    color: {
-                                        operation: 'add',
-                                        srcFactor: 'one',
-                                        dstFactor: 'src1' as GPUBlendFactor, // dual-source-blending is a fairly new feature
-                                    },
-                                    alpha: {
-                                        operation: 'add',
-                                        srcFactor: 'zero',
-                                        dstFactor: 'one',
-                                    },
-                                } : {
-                                    color: {
-                                        operation: 'add',
-                                        srcFactor: 'one',
-                                        dstFactor: 'one-minus-src-alpha',
-                                    },
-                                    alpha: {
-                                        operation: 'add',
-                                        srcFactor: 'zero',
-                                        dstFactor: 'one',
-                                    },
-                                },
-                            },
-                        ],
+                        targets,
                     },
                 });
 
@@ -690,7 +696,7 @@ export class SkyAtmosphereRenderer {
             this.updateConfig(config);
         }
 
-        if (isCameraInSpace) {
+        if (isCameraInSpace || this.defaultToPerPixelRayMarch) {
             this.renderSkyRaymarching(computePassEncoder);
         } else {
             this.renderSkyViewLut(computePassEncoder);
