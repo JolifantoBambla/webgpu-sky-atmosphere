@@ -14,7 +14,7 @@ export const SKY_VIEW_LUT_FORMAT: GPUTextureFormat = TRANSMITTANCE_LUT_FORMAT;
 export const AERIAL_PERSPECTIVE_LUT_FORMAT: GPUTextureFormat = TRANSMITTANCE_LUT_FORMAT;
 
 export const ATMOSPHERE_BUFFER_SIZE: number = 128;
-export const CONFIG_BUFFER_SIZE: number = 224;
+export const UNIFORMS_BUFFER_SIZE: number = 224;
 
 export class SkyAtmosphereResources {
     /**
@@ -33,9 +33,9 @@ export class SkyAtmosphereResources {
     readonly atmosphereBuffer: GPUBuffer;
 
     /**
-     * A uniform buffer of size {@link CONFIG_BUFFER_SIZE} storing parameters set through {@link Uniforms}.
+     * A uniform buffer of size {@link UNIFORMS_BUFFER_SIZE} storing parameters set through {@link Uniforms}.
      */
-    readonly configBuffer: GPUBuffer;
+    readonly uniformsBuffer: GPUBuffer;
 
     /**
      * A linear sampler used to sample the look up tables.
@@ -98,9 +98,9 @@ export class SkyAtmosphereResources {
         });
         this.updateAtmosphere(this.#atmosphere);
 
-        this.configBuffer = device.createBuffer({
+        this.uniformsBuffer = device.createBuffer({
             label: `config buffer [${this.label}]`,
-            size: CONFIG_BUFFER_SIZE,
+            size: UNIFORMS_BUFFER_SIZE,
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
         });
 
@@ -154,17 +154,17 @@ export class SkyAtmosphereResources {
     }
 
     /**
-     * Updates the {@link SkyAtmosphereResources.configBuffer} using a given {@link Uniforms}.
-     * @param config the {@link Uniforms} to write to the {@link atmosphereBuffer}.
-     * @see configToFloatArray Internally call {@link configToFloatArray} to convert the {@link Uniforms} to a `Float32Array`.
+     * Updates the {@link SkyAtmosphereResources.uniformsBuffer} using a given {@link Uniforms}.
+     * @param uniforms the {@link Uniforms} to write to the {@link atmosphereBuffer}.
+     * @see uniformsToFloatArray Internally call {@link uniformsToFloatArray} to convert the {@link Uniforms} to a `Float32Array`.
      */
-    public updateConfig(config: Uniforms) {
-        this.device.queue.writeBuffer(this.configBuffer, 0, configToFloatArray(config));
+    public updateUniforms(uniforms: Uniforms) {
+        this.device.queue.writeBuffer(this.uniformsBuffer, 0, uniformsToFloatArray(uniforms));
     }
 }
 
 /**
- * Converts an {@link Atmosphere} to a tightly packed `Float32Array`.
+ * Converts an {@link Atmosphere} to a tightly packed `Float32Array` of size {@link ATMOSPHERE_BUFFER_SIZE}.
  * @param atmosphere the {@link Atmosphere} to convert.
  * @returns a `Float32Array` containing the {@link Atmosphere} parameters.
  */
@@ -204,27 +204,27 @@ export function atmosphereToFloatArray(atmosphere: Atmosphere): Float32Array {
 }
 
 /**
- * Converts an {@link Uniforms} to a tightly packed `Float32Array`.
- * @param config the {@link Uniforms} to convert.
+ * Converts an {@link Uniforms} to a tightly packed `Float32Array` of size {@link UNIFORMS_BUFFER_SIZE}.
+ * @param uniforms the {@link Uniforms} to convert.
  * @returns a `Float32Array` containing the {@link Uniforms} parameters.
  */
-export function configToFloatArray(config: Uniforms): Float32Array {
+export function uniformsToFloatArray(uniforms: Uniforms): Float32Array {
     return new Float32Array([
-        ...config.camera.inverseProjection,
-        ...config.camera.inverseView,
-        ...config.camera.position,
-        config.frameId,
-        ...config.screenResolution,
-        config.rayMarchMinSPP,
-        config.rayMarchMaxSPP,
-        ...(config.sun.illuminance ?? [1.0, 1.0, 1.0]),
-        config.sun.diameter ?? (0.545 * (Math.PI / 180.0)),
-        ...config.sun.direction,
-        config.sun.luminance ?? 120000.0,
-        ...(config.moon?.illuminance ?? [1.0, 1.0, 1.0]),
-        config.moon?.diameter ?? (0.568 * Math.PI / 180.0),
-        ...(config.moon?.direction ?? config.sun.direction.map(d => d * -1)),
-        config.moon?.luminance ?? 0.26,
+        ...uniforms.camera.inverseProjection,
+        ...uniforms.camera.inverseView,
+        ...uniforms.camera.position,
+        uniforms.frameId,
+        ...uniforms.screenResolution,
+        uniforms.rayMarchMinSPP,
+        uniforms.rayMarchMaxSPP,
+        ...(uniforms.sun.illuminance ?? [1.0, 1.0, 1.0]),
+        uniforms.sun.diameter ?? (0.545 * (Math.PI / 180.0)),
+        ...uniforms.sun.direction,
+        uniforms.sun.luminance ?? 120000.0,
+        ...(uniforms.moon?.illuminance ?? [1.0, 1.0, 1.0]),
+        uniforms.moon?.diameter ?? (0.568 * Math.PI / 180.0),
+        ...(uniforms.moon?.direction ?? uniforms.sun.direction.map(d => d * -1)),
+        uniforms.moon?.luminance ?? 0.26,
     ]);
 }
 

@@ -79,7 +79,7 @@ export interface AbsorptionLayer1 {
  *
  * Computed as:
  *
- *      `{@link Absorption.extinction} * (linearTerm * h + constantTerm)`,
+ *      extinction * (linearTerm * h + constantTerm),
  *
  * where `h` is the altitude and `linearTerm` and `constantTerm` are the first or second layer's linear and constant terms.
  * If `h` is lower than {@link AbsorptionLayer0.height}, {@link Absorption.layer0} is used, otherwise {@link Absorption.layer1} is used.

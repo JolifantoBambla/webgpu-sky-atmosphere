@@ -1,5 +1,5 @@
 import { SkyAtmosphereConfig, ShadowConfig } from './config.js';
-import { AERIAL_PERSPECTIVE_LUT_FORMAT, ATMOSPHERE_BUFFER_SIZE, CONFIG_BUFFER_SIZE, DEFAULT_AERIAL_PERSPECTIVE_LUT_SIZE, DEFAULT_MULTISCATTERING_LUT_SIZE, DEFAULT_SKY_VIEW_LUT_SIZE, MULTI_SCATTERING_LUT_FORMAT, SKY_VIEW_LUT_FORMAT, SkyAtmosphereResources, TRANSMITTANCE_LUT_FORMAT } from './resources.js';
+import { AERIAL_PERSPECTIVE_LUT_FORMAT, ATMOSPHERE_BUFFER_SIZE, UNIFORMS_BUFFER_SIZE, DEFAULT_AERIAL_PERSPECTIVE_LUT_SIZE, DEFAULT_MULTISCATTERING_LUT_SIZE, DEFAULT_SKY_VIEW_LUT_SIZE, MULTI_SCATTERING_LUT_FORMAT, SKY_VIEW_LUT_FORMAT, SkyAtmosphereResources, TRANSMITTANCE_LUT_FORMAT } from './resources.js';
 import { makeAerialPerspectiveLutShaderCode, makeMultiScatteringLutShaderCode, makeSkyViewLutShaderCode, makeTransmittanceLutShaderCode } from './shaders.js';
 import { ComputePass, makeLutSampler } from './util.js';
 
@@ -271,7 +271,7 @@ export class SkyViewLutPipeline {
                     buffer: {
                         type: 'uniform',
                         hasDynamicOffset: false,
-                        minBindingSize: CONFIG_BUFFER_SIZE,
+                        minBindingSize: UNIFORMS_BUFFER_SIZE,
                     },
                 },
                 {
@@ -338,9 +338,9 @@ export class SkyViewLutPipeline {
             throw new Error(`[SkyViewLutPipeline::makeComputePass]: device mismatch`);
         }
         if (resources.atmosphereBuffer.size < ATMOSPHERE_BUFFER_SIZE) {
-            throw new Error(`[SkyViewLutPipeline::makeComputePass]: buffer too small for atmosphere parameters (${resources.configBuffer.size} < ${CONFIG_BUFFER_SIZE})`);
+            throw new Error(`[SkyViewLutPipeline::makeComputePass]: buffer too small for atmosphere parameters (${resources.uniformsBuffer.size} < ${UNIFORMS_BUFFER_SIZE})`);
         }
-        if (resources.configBuffer.size < CONFIG_BUFFER_SIZE) {
+        if (resources.uniformsBuffer.size < UNIFORMS_BUFFER_SIZE) {
             throw new Error(`[SkyViewLutPipeline::makeComputePass]: buffer too small for config (${resources.atmosphereBuffer.size} < ${ATMOSPHERE_BUFFER_SIZE})`);
         }
         if (resources.multiScatteringLut.texture.width !== this.multiscatteringLutSize[0] || resources.multiScatteringLut.texture.height !== this.multiscatteringLutSize[1]) {
@@ -365,7 +365,7 @@ export class SkyViewLutPipeline {
                 {
                     binding: 1,
                     resource: {
-                        buffer: resources.configBuffer,
+                        buffer: resources.uniformsBuffer,
                     },
                 },
                 {
@@ -425,7 +425,7 @@ export class AerialPerspectiveLutPipeline {
                     buffer: {
                         type: 'uniform',
                         hasDynamicOffset: false,
-                        minBindingSize: CONFIG_BUFFER_SIZE,
+                        minBindingSize: UNIFORMS_BUFFER_SIZE,
                     },
                 },
                 {
@@ -491,9 +491,9 @@ export class AerialPerspectiveLutPipeline {
             throw new Error(`[AerialPerspectiveLutPipeline::makeComputePass]: device mismatch`);
         }
         if (resources.atmosphereBuffer.size < ATMOSPHERE_BUFFER_SIZE) {
-            throw new Error(`[AerialPerspectiveLutPipeline::makeComputePass]: buffer too small for atmosphere parameters (${resources.configBuffer.size} < ${CONFIG_BUFFER_SIZE})`);
+            throw new Error(`[AerialPerspectiveLutPipeline::makeComputePass]: buffer too small for atmosphere parameters (${resources.uniformsBuffer.size} < ${UNIFORMS_BUFFER_SIZE})`);
         }
-        if (resources.configBuffer.size < CONFIG_BUFFER_SIZE) {
+        if (resources.uniformsBuffer.size < UNIFORMS_BUFFER_SIZE) {
             throw new Error(`[AerialPerspectiveLutPipeline::makeComputePass]: buffer too small for config (${resources.atmosphereBuffer.size} < ${ATMOSPHERE_BUFFER_SIZE})`);
         }
         if (resources.multiScatteringLut.texture.width !== this.multiscatteringLutSize[0] || resources.multiScatteringLut.texture.height !== this.multiscatteringLutSize[1]) {
@@ -518,7 +518,7 @@ export class AerialPerspectiveLutPipeline {
                 {
                     binding: 1,
                     resource: {
-                        buffer: resources.configBuffer,
+                        buffer: resources.uniformsBuffer,
                     },
                 },
                 {

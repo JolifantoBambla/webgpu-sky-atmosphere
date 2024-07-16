@@ -109,7 +109,7 @@
             });
 
             const distanceScaleFactor = 1.0;
-            const skyAtmosphereRenderer = new SkyAtmosphereRenderer(device, {
+            const skyAtmosphereRenderer = SkyAtmosphereRenderer.makeSkyAtmosphereRenderer(device, {
                 distanceScaleFactor,
                 skyRenderer: {
                     passConfig: {

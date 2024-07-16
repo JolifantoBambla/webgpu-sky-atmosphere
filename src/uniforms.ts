@@ -57,16 +57,13 @@ export interface Uniforms {
      * A directional light that influences the atmosphere.
      *
      * Defaults to the default sun.
-     *
-     * Ignored if custom light sources are used.
      */
     sun: AtmosphereLight,
 
     /**
      * A directional lights that influences the atmosphere.
      *
-     * Ignored if {@link SkyAtmosphereRenderer} is not configured to render 2 atmosphere lights.
-     * Ignored if custom light sources are used.
+     * Ignored if {@link SkyAtmosphereRenderer} is not configured to render the moon.
      */
     moon?: AtmosphereLight,
 
@@ -76,12 +73,12 @@ export interface Uniforms {
     camera: Camera,
 
     /**
-     * Minimum number of ray marching samples per pixel
+     * Minimum number of ray marching samples per pixel when rendering the sky view lookup table or rendering the sky using per-pixel ray marching.
      */
     rayMarchMinSPP: number,
 
     /**
-     * Maximum number of ray marching samples per pixel
+     * Maximum number of ray marching samples per pixel when rendering the sky view lookup table or rendering the sky using per-pixel ray marching.
      */
     rayMarchMaxSPP: number,
 

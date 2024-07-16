@@ -1,3 +1,6 @@
+/**
+ * A helper class for textures.
+ */
 export class LookUpTable {
     readonly texture: GPUTexture;
     readonly view: GPUTextureView;
@@ -8,6 +11,9 @@ export class LookUpTable {
     }
 }
 
+/**
+ * A helper class for compute passes
+ */
 export class ComputePass {
     constructor(readonly pipeline: GPUComputePipeline, readonly bindGroups: GPUBindGroup[], readonly dispatchDimensions: [number, number, number]) {}
     encode(computePassEncoder: GPUComputePassEncoder, resetBindGroups: boolean = false) {
@@ -24,6 +30,9 @@ export class ComputePass {
     }
 }
 
+/**
+ * A helper class for render passes
+ */
 export class RenderPass {
     constructor(readonly pipeline: GPURenderPipeline, readonly bindGroups: GPUBindGroup[]) {}
     encode(passEncoder: GPURenderPassEncoder | GPURenderBundleEncoder, resetBindGroups: boolean = false) {
