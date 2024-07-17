@@ -26,7 +26,7 @@ fn render_sky(pix: vec2<u32>) -> vec4<f32> {
 	let view_height = length(world_pos);
 	
     let depth = textureLoad(depth_buffer, pix, 0).r;
-    if view_height < atmosphere.top_radius && !is_valid_depth(depth) {
+    if !is_valid_depth(depth) || view_height > (atmosphere.top_radius + AP_SLICE_COUNT * AP_DISTANCE_PER_SLICE) {
         let zenith = normalize(world_pos);
         let cos_view_zenith = dot(world_dir, zenith);
 
@@ -38,7 +38,9 @@ fn render_sky(pix: vec2<u32>) -> vec4<f32> {
 
         let uv = sky_view_lut_params_to_uv(atmosphere, intersects_ground, cos_view_zenith, cos_light_view, view_height);
 
-        return vec4(textureSampleLevel(sky_view_lut, lut_sampler, uv, 0).rgb + get_sun_luminance(world_pos, world_dir, atmosphere, config), 1.0);
+        let sky_view = textureSampleLevel(sky_view_lut, lut_sampler, uv, 0);
+
+        return vec4(sky_view.rgb + get_sun_luminance(world_pos, world_dir, atmosphere, config), sky_view.a);
     }
 
     let depth_buffer_world_pos = uv_and_depth_to_world_pos(config.inverse_view * config.inverse_projection, uv, depth);

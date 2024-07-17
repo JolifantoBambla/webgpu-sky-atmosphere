@@ -15,11 +15,18 @@ override WORKGROUP_SIZE_Y: u32 = 16;
 @group(0) @binding(4) var multi_scattering_lut: texture_2d<f32>;
 @group(0) @binding(5) var sky_view_lut : texture_storage_2d<rgba16float, write>;
 
-fn integrate_scattered_luminance(world_pos: vec3<f32>, world_dir: vec3<f32>, sun_dir: vec3<f32>, moon_dir: vec3<f32>, atmosphere: Atmosphere, config: Uniforms) -> vec3<f32> {
+struct SingleScatteringResult {
+	luminance: vec3<f32>,				// Scattered light (luminance)
+	transmittance: vec3<f32>,			// transmittance in [0,1] (unitless)
+}
+
+fn integrate_scattered_luminance(world_pos: vec3<f32>, world_dir: vec3<f32>, sun_dir: vec3<f32>, moon_dir: vec3<f32>, atmosphere: Atmosphere, config: Uniforms) -> SingleScatteringResult {
+	var result = SingleScatteringResult();
+	
 	let planet_center = vec3<f32>();
     var t_max: f32 = 0.0;
     if !find_atmosphere_t_max(&t_max, world_pos, world_dir, planet_center, atmosphere.bottom_radius, atmosphere.top_radius) {
-        return vec3<f32>();
+        return result;
     }
 	t_max = min(t_max, t_max_max);
 
@@ -41,8 +48,8 @@ fn integrate_scattered_luminance(world_pos: vec3<f32>, world_dir: vec3<f32>, sun
     let mie_phase_val_moon = cornette_shanks_phase(atmosphere.mie_phase_g, -cos_theta_moon);
     let rayleigh_phase_val_moon = rayleigh_phase(cos_theta_moon);
 
-	var luminance = vec3(0.0);
-	var throughput = vec3(1.0);
+	result.luminance = vec3(0.0);
+	result.transmittance = vec3(1.0);
 	var t = 0.0;
 	var dt = t_max / sample_count;
 	for (var s: f32 = 0.0; s < sample_count; s += 1.0) {
@@ -92,11 +99,11 @@ fn integrate_scattered_luminance(world_pos: vec3<f32>, world_dir: vec3<f32>, sun
         }
 
         let scattering_int = (scattering - scattering * sample_transmittance) / medium.extinction;	// integrate along the current step segment
-        luminance += throughput * scattering_int;														// accumulate and also take into account the transmittance from previous steps
-        throughput *= sample_transmittance;
+        result.luminance += result.transmittance * scattering_int;														// accumulate and also take into account the transmittance from previous steps
+        result.transmittance *= sample_transmittance;
 	}
 	
-	return luminance;
+	return result;
 }
 
 fn compute_sun_dir(sun_dir: vec3<f32>, zenith: vec3<f32>) -> vec3<f32> {
@@ -165,7 +172,7 @@ fn render_sky_view_lut(@builtin(global_invocation_id) global_id: vec3<u32>) {
         return;
 	}
 
-	let luminance = integrate_scattered_luminance(world_pos, world_dir, sun_dir, moon_dir, atmosphere, config);
+	let ss = integrate_scattered_luminance(world_pos, world_dir, sun_dir, moon_dir, atmosphere, config);
 
-    textureStore(sky_view_lut, global_id.xy, vec4<f32>(luminance, 1));
+    textureStore(sky_view_lut, global_id.xy, vec4<f32>(ss.luminance, 1.0 - dot(ss.transmittance, vec3(1.0 / 3.0))));
 }
