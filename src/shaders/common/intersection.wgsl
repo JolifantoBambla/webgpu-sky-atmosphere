@@ -80,11 +80,9 @@ fn find_atmosphere_t_max_t_bottom(t_max: ptr<function, f32>, t_bottom: ptr<funct
 fn move_to_atmosphere_top(world_pos: ptr<function, vec3<f32>>, world_dir: vec3<f32>, top_radius: f32) -> bool {
 	let view_height = length(*world_pos);
 	if view_height > top_radius {
-		let t_top = find_closest_ray_sphere_intersection(*world_pos, world_dir, vec3(), top_radius);
+		let t_top = find_closest_ray_sphere_intersection(*world_pos, world_dir, vec3(), top_radius * 0.9999);
 		if t_top >= 0.0 {
-			let zenith = *world_pos / view_height;
-			let zenith_offset = zenith * -planet_radius_offset;
-			*world_pos = *world_pos + world_dir * t_top + zenith_offset;
+			*world_pos = *world_pos + world_dir * t_top;
 		} else {
 			return false;
 		}
