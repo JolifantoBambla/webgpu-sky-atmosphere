@@ -28,6 +28,14 @@ export class ComputePass {
             }
         }
     }
+    replaceBindGroup(index: number, bindGroup: GPUBindGroup) {
+        this.bindGroups[index] = bindGroup;
+    }
+    replaceDispatchDimensions(dispatchDimensions: [number, number, number]) {
+        this.dispatchDimensions[0] = dispatchDimensions[0];
+        this.dispatchDimensions[1] = dispatchDimensions[1];
+        this.dispatchDimensions[2] = dispatchDimensions[2];
+    }
 }
 
 /**
@@ -46,6 +54,9 @@ export class RenderPass {
                 passEncoder.setBindGroup(i, null);
             }
         }
+    }
+    replaceBindGroup(index: number, bindGroup: GPUBindGroup) {
+        this.bindGroups[index] = bindGroup;
     }
 }
 

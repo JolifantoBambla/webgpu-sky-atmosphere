@@ -8,16 +8,12 @@ export const DEFAULT_MULTI_SCATTERING_LUT_SAMPLE_COUNT: number = 20;
 export const MULTI_SCATTERING_LUT_MIN_SAMPLE_COUNT: number = 10;
 
 export class SkyAtmospherePipelines {
-    readonly lutSampler: GPUSampler;
-
     readonly transmittanceLutPipeline: TransmittanceLutPipeline;
     readonly multiScatteringLutPipeline: MultiScatteringLutPipeline;
     readonly skyViewLutPipeline: SkyViewLutPipeline;
     readonly aerialPerspectiveLutPipeline: AerialPerspectiveLutPipeline;
 
     constructor(device: GPUDevice, config: SkyAtmosphereConfig) {
-        this.lutSampler = makeLutSampler(device);
-
         this.transmittanceLutPipeline = new TransmittanceLutPipeline(
             device,
             config.lookUpTables?.transmittanceLut?.format ?? TRANSMITTANCE_LUT_FORMAT,

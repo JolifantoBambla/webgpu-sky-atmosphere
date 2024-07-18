@@ -209,7 +209,7 @@ export interface SkyRendererComputePassConfig {
     renderTarget: ComputeRenderTargetConfig,
 
     /**
-     * If this this true, colored transmittance will be used to blend the rendered sky and the texture data in the {@link backBuffer} when using the per-pixel ray marching pass to render the sky.
+     * If this this true, colored transmittance will be used to blend the rendered sky and the texture data in the {@link backBuffer} when using the full-screen ray marching pass to render the sky.
      *
      * Defaults to true.
      */
@@ -243,15 +243,15 @@ export interface SkyRenderPassConfig {
      * Use dual-source blending for colored transmissions.
      *
      * Note that...
-     *  - colored transmissions are only supported when using per-pixel ray marching instead of the aerial perspective lookup table.
-     *  - without the "dual-source-blending" feature enabled, colored transmissions can only be rendered using a compute pipeline or by blending scattered luminance and transmittance in an extra pass (this is currently not done by the {@link SkyAtmosphereRenderRenderer} and is left to the user).
+     *  - colored transmissions are only supported when using full-screen ray marching instead of the aerial perspective lookup table.
+     *  - without the "dual-source-blending" feature enabled, colored transmissions can only be rendered using a compute pipeline or by blending scattered luminance and transmittance in an extra pass (this is currently not done by the {@link SkyAtmosphereRenderer} and is left to the user).
      *
      * Defaults to false.
      */
     useDualSourceBlending?: boolean,
 
     /**
-     * Only configure the more expensive per-pixel ray marching pass to use a second render target and write colored transmittance.
+     * Only configure the more expensive full-screen ray marching pass to use a second render target and write colored transmittance.
      *
      * Note that the faster pass using the aerial perspective lookup table does not support colored transmittance anyway and thus writing to a second render target is an extra cost without any benefit.
      *
@@ -261,13 +261,13 @@ export interface SkyRenderPassConfig {
 }
 
 /**
- * External resources and settings required by a {@link SkyAtmosphereRenderer}.
+ * External resources and settings required by a {@link SkyAtmosphereLutRenderer}.
  */
 export interface SkyRendererPassConfig {
     /**
-     * External resources required by a {@link SkyAtmosphereRenderer} when using a render or compute pipeline for rendering the atmosphere.
+     * External resources required by a {@link SkyAtmosphereLutRenderer} when using a render or compute pipeline for rendering the atmosphere.
      *
-     * This setting defines whether {@link SkyAtmosphereRenderer.makeSkyAtmosphereRenderer} will create a {@link SkyAtmosphereComputeRenderer} or a {@link SkyAtmosphereRenderRenderer}.
+     * This setting defines whether {@link SkyAtmosphereLutRenderer.makeSkyAtmosphereRenderer} will create a {@link SkyAtmosphereComputeRenderer} or a {@link SkyAtmosphereRenderer}.
      */
     passConfig: SkyRendererComputePassConfig | SkyRenderPassConfig,
 
@@ -277,7 +277,7 @@ export interface SkyRendererPassConfig {
     depthBuffer: DepthBufferConfig,
 
     /**
-     * If this is true, {@link SkyAtmosphereRenderRenderer.renderSkyAtmosphere} / {@link SkyAtmosphereComputeRenderer.renderSkyAtmosphere} will default to per-pixel ray marching to render the atmosphere.
+     * If this is true, {@link SkyAtmosphereRenderer.renderSkyAtmosphere} / {@link SkyAtmosphereComputeRenderer.renderSkyAtmosphere} will default to full-screen ray marching to render the atmosphere.
      *
      * Defaults to false.
      */
@@ -302,13 +302,13 @@ export interface SkyRendererPassConfig {
 }
 
 /**
- * Config for external resources required for the aerial perspective lookup table to take shadowing into account and for render volumetric shadows when rendering the sky / atmosphere using per-pixel ray marching.
+ * Config for external resources required for the aerial perspective lookup table to take shadowing into account and for render volumetric shadows when rendering the sky / atmosphere using full-screen ray marching.
  * 
  * To integrate user-controlled shadow maps into the sky / atmosphere rendering passes, WGSL code needs to be injected into the shader code and the layouts of the respective sky rendering pipelines need to be created using external bind group layouts.
  */
 export interface ShadowConfig {
     /**
-     * A list of bind group layouts specifying all resources required to respect user-controlled shadow map(s) when rendering the aerial perspective lookup table or when doing per-pixel ray marching.
+     * A list of bind group layouts specifying all resources required to respect user-controlled shadow map(s) when rendering the aerial perspective lookup table or when doing full-screen ray marching.
      * 
      * This should not contain more than `maxBindGroups - 1` bind group layouts, where `maxBindGroups` is the maximum number of bind group layouts per pipeline layout supported by the device.
      */
@@ -320,7 +320,7 @@ export interface ShadowConfig {
     bindGroups: GPUBindGroup[],
 
     /**
-     * The shader code to inject into the aerial perspective & per-pixel ray marching pipelines.
+     * The shader code to inject into the aerial perspective & full-screen ray marching pipelines.
      *
      * This needs to provide at least a function with the following signature:
      *
@@ -381,14 +381,14 @@ export interface SkyAtmosphereConfig {
     distanceScaleFactor?: number,
 
     /**
-     * The atmosphere parameters for this {@link SkyAtmosphereRenderer}.
+     * The atmosphere parameters for this {@link SkyAtmosphereLutRenderer}.
      * Defaults to: {@link makeEarthAtmosphere} with the scale parameter set to {@link SkyAtmosphereConfig.distanceScaleFactor}.
      * @see {@link makeEarthAtmosphere}
      */
     atmosphere?: Atmosphere,
 
     /**
-     * Config parameters for rendering the sky required by a {@link SkyAtmosphereRenderer} (or a {@link SkyAtmosphereComputeRenderer} / {@link SkyAtmosphereRenderRenderer}).
+     * Config parameters for rendering the sky required by a {@link SkyAtmosphereLutRenderer} (or a {@link SkyAtmosphereComputeRenderer} / {@link SkyAtmosphereRenderer}).
      */
     skyRenderer: SkyRendererPassConfig,
 
@@ -398,7 +398,7 @@ export interface SkyAtmosphereConfig {
     lights?: AtmosphereLightsConfig,
 
     /**
-     * Config for external resources required by a {@link SkyAtmosphereRenderer} to integrate user-controlled shadow maps.
+     * Config for external resources required by a {@link SkyAtmosphereLutRenderer} to integrate user-controlled shadow maps.
      */
     shadow?: ShadowConfig,
 

@@ -410,7 +410,7 @@
                 geometryPass.end();
 
                 const computePass = encoder.beginComputePass();
-                skyAtmosphereRenderer.renderSkyAtmosphere(computePass, params.renderSettings.rayMarch, false, config, params.atmosphere);
+                skyAtmosphereRenderer.renderSkyAtmosphere(computePass, config, params.atmosphere, params.renderSettings.rayMarch);
                 computePass.end();
 
                 const pass = encoder.beginRenderPass({
