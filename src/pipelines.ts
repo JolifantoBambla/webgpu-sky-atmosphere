@@ -1,7 +1,7 @@
 import { SkyAtmosphereConfig, ShadowConfig } from './config.js';
 import { AERIAL_PERSPECTIVE_LUT_FORMAT, ATMOSPHERE_BUFFER_SIZE, UNIFORMS_BUFFER_SIZE, DEFAULT_AERIAL_PERSPECTIVE_LUT_SIZE, DEFAULT_MULTISCATTERING_LUT_SIZE, DEFAULT_SKY_VIEW_LUT_SIZE, MULTI_SCATTERING_LUT_FORMAT, SKY_VIEW_LUT_FORMAT, SkyAtmosphereResources, TRANSMITTANCE_LUT_FORMAT } from './resources.js';
 import { makeAerialPerspectiveLutShaderCode, makeMultiScatteringLutShaderCode, makeSkyViewLutShaderCode, makeTransmittanceLutShaderCode } from './shaders.js';
-import { ComputePass, makeLutSampler } from './util.js';
+import { ComputePass } from './util.js';
 
 export const DEFAULT_TRANSMITTANCE_LUT_SAMPLE_COUNT: number = 40;
 export const DEFAULT_MULTI_SCATTERING_LUT_SAMPLE_COUNT: number = 20;
@@ -31,6 +31,7 @@ export class SkyAtmospherePipelines {
             config.lookUpTables?.multiScatteringLut?.size ?? [DEFAULT_MULTISCATTERING_LUT_SIZE, DEFAULT_MULTISCATTERING_LUT_SIZE],
             config.skyRenderer.distanceToMaxSampleCount ?? (100.0 * (config.distanceScaleFactor ?? 1.0)),
             config.lights?.useMoon ?? false,
+            (config.lookUpTables?.skyViewLut?.affectedByShadow ?? true) ? config.shadow : undefined,
         );
         this.aerialPerspectiveLutPipeline = new AerialPerspectiveLutPipeline(
             device,
@@ -244,7 +245,7 @@ export class SkyViewLutPipeline {
     readonly skyViewLutSize: [number, number];
     readonly multiscatteringLutSize: [number, number];
 
-    constructor(device: GPUDevice, skyViewLutFormat: GPUTextureFormat, skyViewLutSize: [number, number], multiscatteringLutSize: [number, number], distanceToMaxSampleCount: number, useMoon: boolean) {
+    constructor(device: GPUDevice, skyViewLutFormat: GPUTextureFormat, skyViewLutSize: [number, number], multiscatteringLutSize: [number, number], distanceToMaxSampleCount: number, useMoon: boolean, shadowConfig?: ShadowConfig) {
         this.device = device;
         this.skyViewLutFormat = skyViewLutFormat;
         this.skyViewLutSize = skyViewLutSize;
@@ -310,11 +311,11 @@ export class SkyViewLutPipeline {
             label: 'sky view LUT pass',
             layout: device.createPipelineLayout({
                 label: 'sky view LUT pass',
-                bindGroupLayouts: [this.bindGroupLayout],
+                bindGroupLayouts: [this.bindGroupLayout, ...(shadowConfig?.bindGroupLayouts ?? [])],
             }),
             compute: {
                 module: device.createShaderModule({
-                    code: makeSkyViewLutShaderCode(skyViewLutFormat),
+                    code: `${shadowConfig?.wgslCode || 'fn get_shadow(p: vec3<f32>) -> f32 { return 1.0; }'}\n${makeSkyViewLutShaderCode(skyViewLutFormat)}`,
                 }),
                 entryPoint: 'render_sky_view_lut',
                 constants: {
@@ -329,7 +330,7 @@ export class SkyViewLutPipeline {
         });
     }
 
-    public makeComputePass(resources: SkyAtmosphereResources): ComputePass {
+    public makeComputePass(resources: SkyAtmosphereResources, shadowBindGroups?: GPUBindGroup[]): ComputePass {
         if (this.device !== resources.device) {
             throw new Error(`[SkyViewLutPipeline::makeComputePass]: device mismatch`);
         }
@@ -384,7 +385,7 @@ export class SkyViewLutPipeline {
         });
         return new ComputePass(
             this.pipeline,
-            [bindGroup],
+            [bindGroup, ...(shadowBindGroups ?? [])],
             [Math.ceil(resources.skyViewLut.texture.width / 16.0), Math.ceil(resources.skyViewLut.texture.height / 16.0), 1],
         );
     }

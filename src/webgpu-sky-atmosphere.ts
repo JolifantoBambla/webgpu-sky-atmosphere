@@ -86,7 +86,7 @@ export {
     ComputePass,
     LookUpTable,
     RenderPass,
-}
+};
 
 function isComputePassConfig(passConfig: SkyRendererComputePassConfig | SkyRenderPassConfig): passConfig is SkyRendererComputePassConfig {
     return (passConfig as SkyRendererComputePassConfig).backBuffer !== undefined;
@@ -124,7 +124,7 @@ export class SkyAtmosphereLutRenderer {
 
         this.transmittanceLutPass = this.skyAtmospherePipelines.transmittanceLutPipeline.makeComputePass(this.resources);
         this.multiScatteringLutPass = this.skyAtmospherePipelines.multiScatteringLutPipeline.makeComputePass(this.resources);
-        this.skyViewLutPass = this.skyAtmospherePipelines.skyViewLutPipeline.makeComputePass(this.resources);
+        this.skyViewLutPass = this.skyAtmospherePipelines.skyViewLutPipeline.makeComputePass(this.resources, (config.lookUpTables?.skyViewLut?.affectedByShadow ?? true) ? config.shadow?.bindGroups : undefined,);
         this.aerialPerspectiveLutPass = this.skyAtmospherePipelines.aerialPerspectiveLutPipeline.makeComputePass(this.resources, config.shadow?.bindGroups);
 
         if (config.initializeConstantLuts ?? true) {
@@ -154,7 +154,7 @@ export class SkyAtmosphereLutRenderer {
     /**
      * Updates the renderer's internal uniform buffer containing the {@link Atmosphere} parameters as well as its host-side copy of {@link Atmosphere} parameters.
      * @param atmosphere The new {@link Atmosphere} to override the current parameters.
-     * 
+     *
      * @see {@link SkyAtmosphereResources.updateAtmosphere}: Called internally to update the {@link Atmosphere} parameters.
      */
     public updateAtmosphere(atmosphere: Atmosphere) {
@@ -164,7 +164,7 @@ export class SkyAtmosphereLutRenderer {
     /**
      * Updates the renderer's internal uniform buffer containing the {@link Uniforms} as well as its host-side copy of {@link Uniforms}.
      * @param uniforms The new {@link Uniforms} to override the current parameters.
-     * 
+     *
      * @see {@link SkyAtmosphereResources.updateUniforms}: Called internally to update the {@link Uniforms}.
      */
     public updateUniforms(uniforms: Uniforms) {
@@ -173,14 +173,14 @@ export class SkyAtmosphereLutRenderer {
 
     /**
      * Renders the transmittance lookup table.
-     * 
+     *
      * To produce meaningful results, this requires the internal uniform buffer containing the {@link Atmosphere} parameters to hold valid data.
      * Call {@link updateAtmosphere} to ensure this is the case.
-     * 
+     *
      * Since the transmittance lookup table is not view or light souce dependent, this only needs to be called if the {@link Atmosphere} parameters change.
-     * 
+     *
      * @param passEncoder Used to encode rendering of the lookup table. The encoder is not `end()`ed by this function.
-     * 
+     *
      * @see {@link updateAtmosphere}: To write {@link Atmosphere} parameters to the internal uniform buffer, call this function.
      */
     public renderTransmittanceLut(passEncoder: GPUComputePassEncoder) {
@@ -189,14 +189,14 @@ export class SkyAtmosphereLutRenderer {
 
     /**
      * Renders the multiple scattering lookup table.
-     * 
+     *
      * To produce meaningful results, this requires the internal uniform buffer containing the {@link Atmosphere} parameters to hold valid data.
      * Call {@link updateAtmosphere} to ensure this is the case.
-     * 
+     *
      * Since the multiple scattering lookup table is not view or light souce dependent, this only needs to be called if the {@link Atmosphere} parameters change.
-     * 
+     *
      * @param passEncoder Used to encode rendering of the lookup table. The encoder is not `end()`ed by this function.
-     * 
+     *
      * @see {@link updateAtmosphere}: To write {@link Atmosphere} parameters to the internal uniform buffer, call this function.
      */
     public renderMultiScatteringLut(passEncoder: GPUComputePassEncoder) {
@@ -205,15 +205,15 @@ export class SkyAtmosphereLutRenderer {
 
     /**
      * Renders the transmittance and multiple scattering lookup tables.
-     * 
+     *
      * To produce meaningful results, this requires the internal uniform buffer containing the {@link Atmosphere} parameters to hold valid data.
      * Use the {@link atmosphere} parameter to implicitly update the {@link Atmosphere} parameters or call {@link updateAtmosphere} to ensure this is the case.
-     * 
+     *
      * Since the transmittance and multiple scattering lookup tables are not view or light souce dependent, this only needs to be called if the {@link Atmosphere} parameters change.
-     * 
+     *
      * @param passEncoder Used to encode rendering of the lookup tables. The encoder is not `end()`ed by this function.
      * @param atmosphere If this is defined, {@link updateAtmosphere} is called before rendering the lookup tables.
-     * 
+     *
      * @see {@link updateAtmosphere}: Called internally, if the {@link atmosphere} parameter is not undefined.
      * @see {@link renderTransmittanceLut}: Called internally to render the transmittance lookup table.
      * @see {@link renderMultiScatteringLut}: Called internally to render the multiple scattering lookup table.
@@ -228,12 +228,12 @@ export class SkyAtmosphereLutRenderer {
 
     /**
      * Renders the sky view table.
-     * 
+     *
      * To produce meaningful results, this requires the transmittance and multiple scattering lookup tables, as well as the uniform buffers containing the {@link Atmosphere} and {@link Uniforms} parameters to hold valid data.
      * Call {@link renderConstantLuts} and {@link updateUniforms} to ensure this is the case.
-     * 
+     *
      * @param passEncoder Used to encode rendering of the lookup table. The encoder is not `end()`ed by this function.
-     * 
+     *
      * @see {@link renderConstantLuts}: To initialize the transmittance and multiple scattering lookup tables, as well as the internal uniform buffer storing the {@link Atmosphere} parameters, call this function.
      * @see {@link updateUniforms}: To write {@link Uniforms} to the internal uniform buffer, call this function.
      */
@@ -243,14 +243,14 @@ export class SkyAtmosphereLutRenderer {
 
     /**
      * Renders the aerial perspective lookup table.
-     * 
+     *
      * To produce meaningful results, this requires the transmittance and multiple scattering lookup tables, as well as the uniform buffers containing the {@link Atmosphere} and {@link Uniforms} parameters to hold valid data.
      * Call {@link renderConstantLuts} and {@link updateUniforms} to ensure this is the case.
-     * 
+     *
      * If (a) user-defined shadow map(s) is used (see {@link SkyAtmosphereConfig.shadow}), make sure to encode any updates of the shadow map(s) before encoding this pass.
-     * 
+     *
      * @param passEncoder Used to encode rendering of the lookup table. The encoder is not `end()`ed by this function.
-     * 
+     *
      * @see {@link renderConstantLuts}: To initialize the transmittance and multiple scattering lookup tables, as well as the internal uniform buffer storing the {@link Atmosphere} parameters, call this function.
      * @see {@link updateUniforms}: To write {@link Uniforms} to the internal uniform buffer, call this function.
      */
@@ -260,15 +260,15 @@ export class SkyAtmosphereLutRenderer {
 
     /**
      * Renders the sky view and aerial perspective lookup tables.
-     * 
+     *
      * To produce meaningful results, this requires the transmittance and multiple scattering lookup tables, as well as the uniform buffers containing the {@link Atmosphere} and {@link Uniforms} parameters to hold valid data.
      * Call {@link renderConstantLuts} and {@link updateUniforms} to ensure this is the case.
-     * 
+     *
      * If (a) user-defined shadow map(s) is used (see {@link SkyAtmosphereConfig.shadow}), make sure to encode any updates of the shadow map(s) before encoding this pass.
-     * 
+     *
      * @param passEncoder Used to encode rendering of the lookup tables. The encoder is not `end()`ed by this function.
      * @param uniforms If this is defined, {@link updateUniforms} is called before rendering the lookup tables.
-     * 
+     *
      * @see {@link renderConstantLuts}: To initialize the transmittance and multiple scattering lookup tables, as well as the internal uniform buffer storing the {@link Atmosphere} parameters, call this function.
      * @see {@link updateUniforms}: Called internally, if the {@link uniforms} parameter is not undefined.
      * @see {@link renderSkyViewLut}: Called internally to render the sky view lookup table.
@@ -284,15 +284,15 @@ export class SkyAtmosphereLutRenderer {
 
     /**
      * Renders the lookup tables required for rendering the sky / atmosphere.
-     * 
+     *
      * To initialize or update the transmittance and multiple scattering lookup tables, pass new {@link Atmosphere} paramters to this function or use the `forceConstantLutRendering` parameter.
-     * 
+     *
      * @param passEncoder A `GPUComputePassEncoder` to encode passes with. The encoder is not `end()`ed by this function.
      * @param uniforms {@link Uniforms} to use for this frame. If this is given, the internal uniform buffer will be updated using {@link updateUniforms}.
      * @param atmosphere {@link Atmosphere} parameters to use for this frame. If this is given, the internal uniform buffer storing the {@link Atmosphere} parameters will be updated and the transmittance and multiple scattering lookup tables will be rendered.
      * @param useFullScreenRayMarch If this is true, the sky view and aerial perspective lookup tables will not be rendered. Defaults to {@link defaultToPerPixelRayMarch}.
      * @param forceConstantLutRendering If this is true, the transmittance and multiple scattering lookup tables will be rendered regardless of whether the `atmosphere` parameter is `undefined` or not.
-     * 
+     *
      * @see {@link renderConstantLuts}: Called internally, if either `atmosphere` is defined or `forceConstantLutRendering` is true.
      * @see {@link updateUniforms}: Called internally, if full-screen ray marching is used and the `uniforms` parameter is not undefined.
      * @see {@link renderDynamicLuts}: Called internally, if the the `useFullScreenRayMarch` is true or if it is undefined and {@link defaultToPerPixelRayMarch} is true.
@@ -314,37 +314,37 @@ export class SkyAtmosphereLutRenderer {
 export interface SkyAtmosphereComputeRendererResizeConfig {
     /**
      * The back buffer texture to use as back ground when rendering the sky / atmosphere using a GPUComputePipeline.
-     * 
+     *
      * If this is a texture, a texture view will be created.
-     * 
+     *
      * Should have the same size as the other textures.
      */
     backBuffer: GPUTextureView | GPUTexture,
 
     /**
      * The depth buffer to limit the ray marching distance when rendering the sky / atmosphere.
-     * 
+     *
      * If this is a textue, a texture view will be created.
-     * 
+     *
      * If this is a texture view, it must be allowed to be bound as a `texture<f32>`.
-     * I.e., if the texture has a depth-stencil format, the texture view must be a `"depth-only"` view. 
-     * 
+     * I.e., if the texture has a depth-stencil format, the texture view must be a `"depth-only"` view.
+     *
      * Should have the same size as the other textures.
      */
     depthBuffer: GPUTextureView | GPUTexture,
 
     /**
      * The render target to render into when using a GPUComputePipeline to render the sky / atmosphere.
-     * 
+     *
      * If this is a texture, a texture view will be created.
-     * 
+     *
      * Should have the same size as the other textures.
      */
     renderTarget: GPUTextureView | GPUTexture,
 
     /**
      * The new size of the textures.
-     * 
+     *
      * If this is undefined, the new size is determined from the given resources, i.e., at least one of {@link backBuffer}, {@link depthBuffer}, and {@link renderTarget} must be a `GPUTexture`.
      */
     size?: [number, number],
@@ -596,7 +596,7 @@ export class SkyAtmosphereComputeRenderer extends SkyAtmosphereLutRenderer {
                 binding: 5,
                 resource: config.depthBuffer instanceof GPUTextureView ? config.depthBuffer : config.depthBuffer.createView(config.depthBuffer.format.includes('depth') ? {
                     aspect: 'depth-only',
-                }: {}),
+                } : {}),
             },
             {
                 binding: 6,
@@ -655,7 +655,7 @@ export class SkyAtmosphereComputeRenderer extends SkyAtmosphereLutRenderer {
 
     /**
      * Replaces potentially screen-size dependent external resources (back buffer, depth buffer, and render target) in the internal bind groups.
-     * 
+     *
      * @param config Configuration of external resources.
      */
     public onResize(config: SkyAtmosphereComputeRendererResizeConfig) {
@@ -689,12 +689,12 @@ export class SkyAtmosphereComputeRenderer extends SkyAtmosphereLutRenderer {
 
     /**
      * Renders the sky / atmosphere using precomputed lookup tables.
-     * 
+     *
      * Requires the sky view and aerial perspective lookup tables to be initialized.
      * To initialize these lookup tables, call {@link renderDynamicLuts}.
-     * 
+     *
      * @param passEncoder A `GPUComputePassEncoder` to encode the pass with. Can be the same encoder used to initialize the sky view and aerial perspective lookup tables. The encoder is not `end()`ed by this function.
-     * 
+     *
      * @see {@link renderDynamicLuts}: To initialize the lookup tables required, call this function.
      */
     public renderSkyWithLuts(passEncoder: GPUComputePassEncoder) {
@@ -703,12 +703,12 @@ export class SkyAtmosphereComputeRenderer extends SkyAtmosphereLutRenderer {
 
     /**
      * Renders the sky / atmosphere using full-screen ray marching.
-     * 
+     *
      * Requires the transmittance and multiple scattering lookup tables to be initialized.
      * Either initialize these lookup tables in the constructor using {@link SkyAtmosphereConfig.initializeConstantLuts}, or call {@link renderConstantLuts}.
-     * 
+     *
      * @param passEncoder A `GPUComputePassEncoder` to encode the pass with. Can be the same encoder used to initialize the transmittance and multiple scattering lookup tables. The encoder is not `end()`ed by this function.
-     * 
+     *
      * @see {@link renderConstantLuts}: To initialize the lookup tables required, call this function.
      */
     public renderSkyRaymarching(passEncoder: GPUComputePassEncoder) {
@@ -717,15 +717,15 @@ export class SkyAtmosphereComputeRenderer extends SkyAtmosphereLutRenderer {
 
     /**
      * Renders the sky / atmosphere using either lookup tables or full-screen ray marching, as well as all look up tables required by the respective approach.
-     * 
+     *
      * To initialize or update the transmittance and multiple scattering lookup tables, pass new {@link Atmosphere} paramters to this function or use the `forceConstantLutRendering` parameter.
-     * 
+     *
      * @param passEncoder A `GPUComputePassEncoder` to encode passes with. The encoder is not `end()`ed by this function.
      * @param uniforms {@link Uniforms} to use for this frame. If this is given, the internal uniform buffer will be updated using {@link updateUniforms}.
      * @param atmosphere {@link Atmosphere} parameters to use for this frame. If this is given, the internal uniform buffer storing the {@link Atmosphere} parameters will be updated and the transmittance and multiple scattering lookup tables will be rendered.
      * @param useFullScreenRayMarch If this is true, full-screen ray marching will be used to render the sky / atmosphere. In that case, the sky view and aerial perspective lookup tables will not be rendered. Defaults to {@link defaultToPerPixelRayMarch}.
      * @param forceConstantLutRendering If this is true, the transmittance and multiple scattering lookup tables will be rendered regardless of whether the `atmosphere` parameter is `undefined` or not.
-     * 
+     *
      * @see {@link renderConstantLuts}: Called internally, if either `atmosphere` is defined or `forceConstantLutRendering` is true.
      * @see {@link updateUniforms}: Called internally, if full-screen ray marching is used and the `uniforms` parameter is not undefined.
      * @see {@link renderSkyRaymarching}: Called internally, if full-screen ray-marching is used.
@@ -892,7 +892,7 @@ export class SkyAtmosphereRenderer extends SkyAtmosphereLutRenderer {
             const [withLutsBindGroup, rayMarchingBindGroup] = this.makeBindGroups(
                 config.skyRenderer.depthBuffer.view ?? config.skyRenderer.depthBuffer.texture,
             );
-            
+
             // render sky with luts pass
             {
                 const module = device.createShaderModule({
@@ -1060,7 +1060,7 @@ export class SkyAtmosphereRenderer extends SkyAtmosphereLutRenderer {
 
     /**
      * Replaces potentially screen-size dependent external resources (depth buffer) in the internal bind groups.
-     * 
+     *
      * @param depthBuffer The depth buffer to limit the ray marching distance when rendering the sky / atmosphere.
      *                    If this is a textue, a texture view will be created.
      *                    If this is a texture view, it must be allowed to be bound as a `texture<f32>`.
@@ -1074,12 +1074,12 @@ export class SkyAtmosphereRenderer extends SkyAtmosphereLutRenderer {
 
     /**
      * Renders the sky / atmosphere using precomputed lookup tables.
-     * 
+     *
      * Requires the sky view and aerial perspective lookup tables to be initialized.
      * To initialize these lookup tables, call {@link renderDynamicLuts}.
-     * 
+     *
      * @param passEncoder A `GPURenderPassEncoder` or `GPURenderBundleEncoder` to encode the pass with. The encoder is not `end()`ed by this function.
-     * 
+     *
      * @see {@link renderDynamicLuts}: To initialize the lookup tables required, call this function.
      */
     public renderSkyWithLuts(passEncoder: GPURenderPassEncoder | GPURenderBundleEncoder) {
@@ -1088,12 +1088,12 @@ export class SkyAtmosphereRenderer extends SkyAtmosphereLutRenderer {
 
     /**
      * Renders the sky / atmosphere using full-screen ray marching.
-     * 
+     *
      * Requires the transmittance and multiple scattering lookup tables to be initialized.
      * Either initialize these lookup tables in the constructor using {@link SkyAtmosphereConfig.initializeConstantLuts}, or call {@link renderConstantLuts}.
-     * 
+     *
      * @param passEncoder A `GPURenderPassEncoder` or `GPURenderBundleEncoder` to encode the pass with. The encoder is not `end()`ed by this function.
-     * 
+     *
      * @see {@link renderConstantLuts}: To initialize the lookup tables required, call this function.
      */
     public renderSkyRaymarching(passEncoder: GPURenderPassEncoder | GPURenderBundleEncoder) {
@@ -1102,10 +1102,10 @@ export class SkyAtmosphereRenderer extends SkyAtmosphereLutRenderer {
 
     /**
      * Renders the sky / atmosphere using either lookup tables or full-screen ray marching, as well as all look up tables required by the respective approach.
-     * 
+     *
      * @param passEncoder A `GPURenderPassEncoder` or `GPURenderBundleEncoder` to encode the sky / atmosphere rendering pass with. The encoder is not `end()`ed by this function.
      * @param useFullScreenRayMarch If this is true, full-screen ray marching will be used to render the sky / atmosphere. Defaults to {@link defaultToPerPixelRayMarch}.
-     * 
+     *
      * @see {@link renderSkyWithLuts}: Called internally, if rendering the sky with lookup tables.
      * @see {@link renderSkyRaymarching}: Called internally, if rendering the sky with full-screen ray marching.
      */
@@ -1119,14 +1119,14 @@ export class SkyAtmosphereRenderer extends SkyAtmosphereLutRenderer {
 
     /**
      * Renders the sky / atmosphere using either lookup tables or full-screen ray marching, as well as all look up tables required by the respective approach.
-     * 
+     *
      * @param computePassEncoder A `GPUComputePassEncoder` to encode lookup table passes with. The encoder is not `end()`ed by this function.
      * @param renderPassEncoder A `GPURenderPassEncoder` or `GPURenderBundleEncoder` to encode the sky / atmosphere rendering pass with. The encoder is not `end()`ed by this function.
      * @param uniforms {@link Uniforms} to use for this frame. If this is given, the internal uniform buffer will be updated using {@link updateUniforms}.
      * @param atmosphere {@link Atmosphere} parameters to use for this frame. If this is given, the internal uniform buffer storing the {@link Atmosphere} parameters will be updated and the transmittance and multiple scattering lookup tables will be rendered.
      * @param useFullScreenRayMarch If this is true, full-screen ray marching will be used to render the sky / atmosphere. In that case, the sky view and aerial perspective lookup tables will not be rendered. Defaults to {@link defaultToPerPixelRayMarch}.
      * @param forceConstantLutRendering If this is true, the transmittance and multiple scattering lookup tables will be rendered regardless of whether the `atmosphere` parameter is `undefined` or not.
-     * 
+     *
      * @see {@link renderSkyAtmosphereLuts}: Called internally before rendering the sky / atmosphere.
      * @see {@link renderSky}: Called internally, to render the sky / atmosphere.
      */

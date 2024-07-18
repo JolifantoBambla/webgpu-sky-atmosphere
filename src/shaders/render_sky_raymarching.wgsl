@@ -69,41 +69,49 @@ fn integrate_scattered_luminance(uv: vec2<f32>, world_pos: vec3<f32>, world_dir:
 
     let sample_count = mix(config.ray_march_min_spp, config.ray_march_max_spp, saturate(t_max * INV_DISTANCE_TO_MAX_SAMPLE_COUNT));
     let sample_count_floored = floor(sample_count);
+    let inv_sample_count_floored = 1.0 / sample_count_floored;
     let t_max_floored = t_max * sample_count_floored / sample_count;
     let sample_segment_t = get_sample_segment_t(uv, config);
 
     let sun_direction = normalize(config.sun.direction);
 	let sun_illuminance = config.sun.illuminance;
 
-    let moon_direction = normalize(config.moon.direction);
-	let moon_illuminance = config.moon.illuminance;
-
-	// Phase functions
     let cos_theta = dot(sun_direction, world_dir);
     let mie_phase_val = cornette_shanks_phase(atmosphere.mie_phase_g, -cos_theta);
     let rayleigh_phase_val = rayleigh_phase(cos_theta);
 
-    let cos_theta_moon = dot(moon_direction, world_dir);
-    let mie_phase_val_moon = cornette_shanks_phase(atmosphere.mie_phase_g, -cos_theta_moon);
-    let rayleigh_phase_val_moon = rayleigh_phase(cos_theta_moon);
+    var moon_direction = config.moon.direction;
+	var moon_illuminance = config.moon.illuminance;
 
-	// Ray march the atmosphere to integrate optical depth
+    var cos_theta_moon = 0.0;
+    var mie_phase_val_moon = 0.0;
+    var rayleigh_phase_val_moon = 0.0;
+
+    if USE_MOON {
+        moon_direction = normalize(moon_direction);
+	    moon_illuminance = config.moon.illuminance;
+
+        cos_theta_moon = dot(moon_direction, world_dir);
+        mie_phase_val_moon = cornette_shanks_phase(atmosphere.mie_phase_g, -cos_theta_moon);
+        rayleigh_phase_val_moon = rayleigh_phase(cos_theta_moon);
+    }
+
+	result.luminance = vec3(0.0);
 	result.transmittance = vec3(1.0);
 	var t = 0.0;
 	var dt = t_max / sample_count;
-	for (var s: f32 = 0.0; s < sample_count; s += 1.0) {
-        var t0: f32 = s / sample_count_floored;
-        var t1: f32 = (s + 1.0) / sample_count_floored;
-        t0 = t0 * t0;
+	for (var s = 0.0; s < sample_count; s += 1.0) {
+        var t0 = s * inv_sample_count_floored;
+        var t1 = (s + 1.0) * inv_sample_count_floored;
+        t0 = (t0 * t0) * t_max_floored;
         t1 = t1 * t1;
-        t0 = t_max_floored * t0;
         if t1 > 1.0 {
             t1 = t_max;
         } else {
             t1 = t_max_floored * t1;
         }
-        t = t0 + (t1 - t0) * sample_segment_t;
         dt = t1 - t0;
+        t = t0 + dt * sample_segment_t;
 
         let sample_pos = world_pos + t * world_dir;
         let sample_height= length(sample_pos);
@@ -112,33 +120,29 @@ fn integrate_scattered_luminance(uv: vec2<f32>, world_pos: vec3<f32>, world_dir:
 		let sample_transmittance = exp(-medium.extinction * dt);
 
         let zenith = sample_pos / sample_height;
+ 
         let cos_sun_zenith = dot(sun_direction, zenith);
-        let uv = transmittance_lut_params_to_uv(atmosphere, sample_height, cos_sun_zenith);
-        let transmittance_to_sun = textureSampleLevel(transmittance_lut, lut_sampler, uv, 0).rgb;
-
-        let planet_shadow = compute_planet_shadow(sample_pos, sun_direction, planet_center + planet_radius_offset * zenith, atmosphere.bottom_radius);
-
+        let transmittance_to_sun = textureSampleLevel(transmittance_lut, lut_sampler, transmittance_lut_params_to_uv(atmosphere, sample_height, cos_sun_zenith), 0).rgb;
         let phase_times_scattering = medium.mie_scattering * mie_phase_val + medium.rayleigh_scattering * rayleigh_phase_val;
-
         let multi_scattered_luminance = get_multiple_scattering(atmosphere, medium.scattering, medium.extinction, sample_pos, cos_sun_zenith);
-
+        let planet_shadow = compute_planet_shadow(sample_pos, sun_direction, planet_center + planet_radius_offset * zenith, atmosphere.bottom_radius);
         let shadow = get_sample_shadow(atmosphere, sample_pos, 0);
 
-        var scattering = sun_illuminance * (planet_shadow * shadow * transmittance_to_sun * phase_times_scattering + multi_scattered_luminance * medium.scattering);
+        var scattered_luminance = sun_illuminance * (planet_shadow * shadow * transmittance_to_sun * phase_times_scattering + multi_scattered_luminance * medium.scattering);
 
         if USE_MOON {
             let cos_moon_zenith = dot(moon_direction, zenith);
             let transmittance_to_moon = textureSampleLevel(transmittance_lut, lut_sampler, transmittance_lut_params_to_uv(atmosphere, sample_height, cos_moon_zenith), 0).rgb;
-            let planet_shadow_moon = compute_planet_shadow(sample_pos, moon_direction, planet_center + planet_radius_offset * zenith, atmosphere.bottom_radius);
             let phase_times_scattering_moon = medium.mie_scattering * mie_phase_val_moon + medium.rayleigh_scattering * rayleigh_phase_val_moon;
             let multi_scattered_luminance_moon = get_multiple_scattering(atmosphere, medium.scattering, medium.extinction, sample_pos, cos_moon_zenith);
+            let planet_shadow_moon = compute_planet_shadow(sample_pos, moon_direction, planet_center + planet_radius_offset * zenith, atmosphere.bottom_radius);
             let shadow_moon = get_sample_shadow(atmosphere, sample_pos, 1);
 
-            scattering += moon_illuminance * (planet_shadow_moon * shadow_moon * transmittance_to_moon * phase_times_scattering_moon + multi_scattered_luminance_moon * medium.scattering);
+            scattered_luminance += moon_illuminance * (planet_shadow_moon * shadow_moon * transmittance_to_moon * phase_times_scattering_moon + multi_scattered_luminance_moon * medium.scattering);
         }
 
-        let scattering_int = (scattering - scattering * sample_transmittance) / medium.extinction;
-        result.luminance += result.transmittance * scattering_int;
+        let intergrated_luminance = (scattered_luminance - scattered_luminance * sample_transmittance) / medium.extinction;
+        result.luminance += result.transmittance * intergrated_luminance;
         result.transmittance *= sample_transmittance;
 	}
 

@@ -76,6 +76,13 @@ export interface SkyViewLutConfig {
      * Defaults to: `"rgba16float"`
      */
     format?: GPUTextureFormat,
+
+    /**
+     * If this is true and {@link SkyAtmosphereConfig.shadow} is defined, user-controlled shadow mapping will be evaluated for every sample when rendering the sky view lookup table.
+     *
+     * Defaults to true.
+     */
+    affectedByShadow?: boolean,
 }
 
 export interface AerialPerspectiveLutConfig {
@@ -303,13 +310,13 @@ export interface SkyRendererPassConfig {
 
 /**
  * Config for external resources required for the aerial perspective lookup table to take shadowing into account and for render volumetric shadows when rendering the sky / atmosphere using full-screen ray marching.
- * 
+ *
  * To integrate user-controlled shadow maps into the sky / atmosphere rendering passes, WGSL code needs to be injected into the shader code and the layouts of the respective sky rendering pipelines need to be created using external bind group layouts.
  */
 export interface ShadowConfig {
     /**
      * A list of bind group layouts specifying all resources required to respect user-controlled shadow map(s) when rendering the aerial perspective lookup table or when doing full-screen ray marching.
-     * 
+     *
      * This should not contain more than `maxBindGroups - 1` bind group layouts, where `maxBindGroups` is the maximum number of bind group layouts per pipeline layout supported by the device.
      */
     bindGroupLayouts: GPUBindGroupLayout[],
@@ -345,7 +352,7 @@ export interface AtmosphereLightsConfig {
 
     /**
      * Render a moon disk.
-     * 
+     *
      * Defaults to {@link useMoon}.
      */
     renderMoonDisk?: boolean,
@@ -361,7 +368,7 @@ export interface AtmosphereLightsConfig {
 export interface SkyAtmosphereConfig {
     /**
      * A name used to lable internal resources and pipelines.
-     * 
+     *
      * Defaults to `"atmosphere"`
      */
     label?: string,

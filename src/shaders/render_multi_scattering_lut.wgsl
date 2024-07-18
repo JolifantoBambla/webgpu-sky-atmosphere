@@ -40,7 +40,7 @@ fn integrate_scattered_luminance(world_pos: vec3<f32>, world_dir: vec3<f32>, sun
 	var throughput = vec3<f32>(1.0);
 	var t = 0.0;
 	var dt_exact = 0.0;
-	for (var s: f32 = 0.0; s < sample_count; s += 1.0) {
+	for (var s = 0.0; s < sample_count; s += 1.0) {
         let t_new = (s + sample_segment_t) * dt;
         dt_exact = t_new - t;
         t = t_new;
@@ -55,10 +55,10 @@ fn integrate_scattered_luminance(world_pos: vec3<f32>, world_dir: vec3<f32>, sun
 		let sample_transmittance = exp(-medium.extinction * dt_exact);
 
 		let planet_shadow = compute_planet_shadow(sample_pos, sun_dir, planet_center + planet_radius_offset * zenith, atmosphere.bottom_radius);
-        let scat = planet_shadow * transmittance_to_sun * (medium.scattering * isotropic_phase);
+        let scattered_luminance = planet_shadow * transmittance_to_sun * (medium.scattering * isotropic_phase);
 
         result.multi_scattering += throughput * (medium.scattering - medium.scattering * sample_transmittance) / medium.extinction;
-        result.luminance += throughput * (scat - scat * sample_transmittance) / medium.extinction;
+        result.luminance += throughput * (scattered_luminance - scattered_luminance * sample_transmittance) / medium.extinction;
 
         throughput *= sample_transmittance;
 	}
@@ -72,7 +72,7 @@ fn integrate_scattered_luminance(world_pos: vec3<f32>, world_dir: vec3<f32>, sun
 		let zenith = sample_pos / sample_height;
         let transmittance_to_sun = get_transmittance_to_sun(sun_dir, zenith, atmosphere, sample_height);
 
-		let n_dot_l = saturate(dot(normalize(zenith), normalize(sun_dir)));
+		let n_dot_l = saturate(dot(zenith, sun_dir));
 		result.luminance += transmittance_to_sun * throughput * n_dot_l * atmosphere.ground_albedo / pi;
 	}
 
@@ -113,7 +113,7 @@ fn render_multi_scattering_lut(@builtin(global_invocation_id) global_id: vec3<u3
 	let world_pos = vec3<f32>(0.0, 0.0, view_height);
 	let world_dir = compute_sample_direction(direction_index);
 
-    let scattering_result = integrate_scattered_luminance(world_pos, world_dir, sun_dir, atmosphere);
+    let scattering_result = integrate_scattered_luminance(world_pos, world_dir, normalize(sun_dir), atmosphere);
 
     shared_multi_scattering[direction_index] = scattering_result.multi_scattering / direction_sample_count;
     shared_luminance[direction_index] = scattering_result.luminance / direction_sample_count;
