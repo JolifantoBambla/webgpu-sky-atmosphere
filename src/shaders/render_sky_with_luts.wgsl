@@ -58,9 +58,15 @@ fn render_sky(pix: vec2<u32>) -> vec4<f32> {
     return weight * textureSampleLevel(aerial_perspective_lut, lut_sampler, vec3<f32>(uv, w), 0);
 }
 
+struct RenderSkyFragment {
+    @location(0) luminance: vec4<f32>,
+    @location(1) transmittance: vec4<f32>,
+}
+
 @fragment
-fn fragment(@builtin(position) coord: vec4<f32>) -> @location(0) vec4<f32> {
-    return render_sky(vec2<u32>(floor(coord.xy)));
+fn fragment(@builtin(position) coord: vec4<f32>) -> RenderSkyFragment {
+    let result = render_sky(vec2<u32>(floor(coord.xy)));
+    return RenderSkyFragment(vec4(result.rgb, 1.0), vec4(vec3(result.a), 1.0));
 }
 
 @compute

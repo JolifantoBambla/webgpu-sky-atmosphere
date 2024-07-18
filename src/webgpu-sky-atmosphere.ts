@@ -141,13 +141,14 @@ export class SkyAtmosphereLutRenderer {
      * @param device The `GPUDevice` used to create internal resources (textures, pipelines, etc.).
      * @param config A {@link SkyAtmosphereConfig} used to configure internal resources and behavior. Determines if a {@link SkyAtmosphereComputeRenderer} or a {@link SkyAtmosphereRenderer} is returned.
      * @param existingPipelines If this is defined, no new pipelines for rendering the internal lookup tables will be created. Instead, the existing pipelines given will be reused. The existing pipelines must be compatible with the {@link SkyAtmosphereConfig}. Especially, {@link SkyAtmosphereConfig.lookUpTables} and {@link SkyAtmosphereConfig.shadow} should be the same.
+     * @param existingResources If this is defined, no new resources (buffers, textures, samplers) will be created. Instead, the existing resources given will be used.
      * @returns Returns a {@link SkyAtmosphereComputeRenderer} or a {@link SkyAtmosphereRenderer}, depending on the {@link SkyRendererPassConfig} given as part of the {@link SkyAtmosphereConfig}.
      */
-    public static makeSkyAtmosphereRenderer(device: GPUDevice, config: SkyAtmosphereConfig, existingPipelines?: SkyAtmospherePipelines): SkyAtmosphereComputeRenderer | SkyAtmosphereRenderer {
+    public static makeSkyAtmosphereRenderer(device: GPUDevice, config: SkyAtmosphereConfig, existingPipelines?: SkyAtmospherePipelines, existingResources?: SkyAtmosphereResources): SkyAtmosphereComputeRenderer | SkyAtmosphereRenderer {
         if (isComputePassConfig(config.skyRenderer.passConfig)) {
-            return new SkyAtmosphereComputeRenderer(device, config, existingPipelines);
+            return new SkyAtmosphereComputeRenderer(device, config, existingPipelines, existingResources);
         } else {
-            return new SkyAtmosphereRenderer(device, config, existingPipelines);
+            return new SkyAtmosphereRenderer(device, config, existingPipelines, existingResources);
         }
     }
 
@@ -802,7 +803,7 @@ export class SkyAtmosphereRenderer extends SkyAtmosphereLutRenderer {
             const renderSkyBindGroupLayoutBaseEntries: GPUBindGroupLayoutEntry[] = [
                 {
                     binding: 0,
-                    visibility: GPUShaderStage.COMPUTE,
+                    visibility: GPUShaderStage.FRAGMENT,
                     buffer: {
                         type: 'uniform',
                         hasDynamicOffset: false,
@@ -811,7 +812,7 @@ export class SkyAtmosphereRenderer extends SkyAtmosphereLutRenderer {
                 },
                 {
                     binding: 1,
-                    visibility: GPUShaderStage.COMPUTE,
+                    visibility: GPUShaderStage.FRAGMENT,
                     buffer: {
                         type: 'uniform',
                         hasDynamicOffset: false,
@@ -820,15 +821,24 @@ export class SkyAtmosphereRenderer extends SkyAtmosphereLutRenderer {
                 },
                 {
                     binding: 2,
-                    visibility: GPUShaderStage.COMPUTE,
+                    visibility: GPUShaderStage.FRAGMENT,
                     sampler: {
                         type: 'filtering',
+                    },
+                },
+                {
+                    binding: 3,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    texture: {
+                        sampleType: 'float',
+                        viewDimension: this.resources.transmittanceLut.texture.dimension,
+                        multisampled: false,
                     },
                 },
             ];
             const externalResourcesLayoutEntries: GPUBindGroupLayoutEntry[] = [
                 {
-                    binding: 5,
+                    binding: 6,
                     visibility: GPUShaderStage.FRAGMENT,
                     texture: {
                         sampleType: 'unfilterable-float',
@@ -843,7 +853,7 @@ export class SkyAtmosphereRenderer extends SkyAtmosphereLutRenderer {
                 entries: [
                     ...renderSkyBindGroupLayoutBaseEntries,
                     {
-                        binding: 3,
+                        binding: 4,
                         visibility: GPUShaderStage.FRAGMENT,
                         texture: {
                             sampleType: 'float',
@@ -852,7 +862,7 @@ export class SkyAtmosphereRenderer extends SkyAtmosphereLutRenderer {
                         },
                     },
                     {
-                        binding: 4,
+                        binding: 5,
                         visibility: GPUShaderStage.FRAGMENT,
                         texture: {
                             sampleType: 'float',
@@ -868,7 +878,7 @@ export class SkyAtmosphereRenderer extends SkyAtmosphereLutRenderer {
                 entries: [
                     ...renderSkyBindGroupLayoutBaseEntries,
                     {
-                        binding: 3,
+                        binding: 4,
                         visibility: GPUShaderStage.FRAGMENT,
                         texture: {
                             sampleType: 'float',
@@ -877,7 +887,7 @@ export class SkyAtmosphereRenderer extends SkyAtmosphereLutRenderer {
                         },
                     },
                     {
-                        binding: 4,
+                        binding: 5,
                         visibility: GPUShaderStage.FRAGMENT,
                         texture: {
                             sampleType: 'float',
@@ -895,10 +905,6 @@ export class SkyAtmosphereRenderer extends SkyAtmosphereLutRenderer {
 
             // render sky with luts pass
             {
-                const module = device.createShaderModule({
-                    code: makeRenderSkyWithLutsShaderCode(),
-                });
-
                 const writeTransmissionOnlyOnPerPixelRayMarch = config.skyRenderer.passConfig.writeTransmissionOnlyOnPerPixelRayMarch ?? true;
                 const targets: GPUColorTargetState[] = [
                     {
@@ -910,6 +916,23 @@ export class SkyAtmosphereRenderer extends SkyAtmosphereLutRenderer {
                 if (config.skyRenderer.passConfig.transmissionFormat && !writeTransmissionOnlyOnPerPixelRayMarch) {
                     targets.push({ format: config.skyRenderer.passConfig.transmissionFormat, });
                 }
+
+                let code = makeRenderSkyWithLutsShaderCode();
+                if (useDualSourceBlending) {
+                    code = code.replace('@location(0)', '@location(0) @blend_src(0)');
+                    code = code.replace('@location(1)', '@location(1) @blend_src(1)');
+                } else if (targets.length !== 2) {
+                    code = code.replace('@location(1) transmittance: vec4<f32>,', '');
+                    code = code.replace(
+                        'RenderSkyFragment(vec4(result.rgb, 1.0), vec4(vec3(result.a), 1.0))',
+                        'RenderSkyFragment(result)',
+                    );
+                }
+
+                const module = device.createShaderModule({
+                    label: 'Render sky with LUTs',
+                    code,
+                });
 
                 this.renderSkyWithLutsPass = new RenderPass(
                     device.createRenderPipeline({
@@ -942,10 +965,6 @@ export class SkyAtmosphereRenderer extends SkyAtmosphereLutRenderer {
 
             // render sky raymarching
             {
-                const module = device.createShaderModule({
-                    code: `${config.shadow?.wgslCode || 'fn get_shadow(p: vec3<f32>) -> f32 { return 1.0; }'}\n${makeRenderSkyRaymarchingShaderCode()}`,
-                });
-
                 const targets: GPUColorTargetState[] = [
                     {
                         format: config.skyRenderer.passConfig.renderTargetFormat,
@@ -956,6 +975,22 @@ export class SkyAtmosphereRenderer extends SkyAtmosphereLutRenderer {
                 if (config.skyRenderer.passConfig.transmissionFormat) {
                     targets.push({ format: config.skyRenderer.passConfig.transmissionFormat, });
                 }
+
+                let code = makeRenderSkyRaymarchingShaderCode();
+                if (useDualSourceBlending) {
+                    code = code.replace('@location(0)', '@location(0) @blend_src(0)');
+                    code = code.replace('@location(1)', '@location(1) @blend_src(1)');
+                } else if (targets.length !== 2) {
+                    code = code.replace('@location(1) transmittance: vec4<f32>,', '');
+                    code = code.replace(
+                        'RenderSkyFragment(result.luminance, result.transmittance)',
+                        'RenderSkyFragment(vec4(result.luminance.rgb, 1.0 - dot(result.transmittance.rgb, vec3(1.0 / 3.0))))',
+                    );
+                }
+                const module = device.createShaderModule({
+                    label: 'Render sky raymarching',
+                    code: `${config.shadow?.wgslCode || 'fn get_shadow(p: vec3<f32>) -> f32 { return 1.0; }'}\n${code}`,
+                });
 
                 this.renderSkyRaymarchingPass = new RenderPass(
                     device.createRenderPipeline({
@@ -1013,10 +1048,14 @@ export class SkyAtmosphereRenderer extends SkyAtmosphereLutRenderer {
                 binding: 2,
                 resource: this.resources.lutSampler,
             },
+            {
+                binding: 3,
+                resource: this.resources.transmittanceLut.view,
+            },
         ];
         const externalResourcesBindGroupEntries: GPUBindGroupEntry[] = [
             {
-                binding: 5,
+                binding: 6,
                 resource: depthBuffer instanceof GPUTextureView ? depthBuffer : depthBuffer.createView(depthBuffer.format.includes('depth') ? {
                     aspect: 'depth-only',
                 } : {}),
@@ -1029,11 +1068,11 @@ export class SkyAtmosphereRenderer extends SkyAtmosphereLutRenderer {
                 entries: [
                     ...renderSkyBindGroupBaseEntries,
                     {
-                        binding: 3,
+                        binding: 4,
                         resource: this.resources.skyViewLut.view,
                     },
                     {
-                        binding: 4,
+                        binding: 5,
                         resource: this.resources.aerialPerspectiveLut.view,
                     },
                     ...externalResourcesBindGroupEntries,
@@ -1045,11 +1084,11 @@ export class SkyAtmosphereRenderer extends SkyAtmosphereLutRenderer {
                 entries: [
                     ...renderSkyBindGroupBaseEntries,
                     {
-                        binding: 3,
+                        binding: 4,
                         resource: this.resources.transmittanceLut.view,
                     },
                     {
-                        binding: 4,
+                        binding: 5,
                         resource: this.resources.multiScatteringLut.view,
                     },
                     ...externalResourcesBindGroupEntries,
@@ -1115,24 +1154,6 @@ export class SkyAtmosphereRenderer extends SkyAtmosphereLutRenderer {
         } else {
             this.renderSkyRaymarching(passEncoder);
         }
-    }
-
-    /**
-     * Renders the sky / atmosphere using either lookup tables or full-screen ray marching, as well as all look up tables required by the respective approach.
-     *
-     * @param computePassEncoder A `GPUComputePassEncoder` to encode lookup table passes with. The encoder is not `end()`ed by this function.
-     * @param renderPassEncoder A `GPURenderPassEncoder` or `GPURenderBundleEncoder` to encode the sky / atmosphere rendering pass with. The encoder is not `end()`ed by this function.
-     * @param uniforms {@link Uniforms} to use for this frame. If this is given, the internal uniform buffer will be updated using {@link updateUniforms}.
-     * @param atmosphere {@link Atmosphere} parameters to use for this frame. If this is given, the internal uniform buffer storing the {@link Atmosphere} parameters will be updated and the transmittance and multiple scattering lookup tables will be rendered.
-     * @param useFullScreenRayMarch If this is true, full-screen ray marching will be used to render the sky / atmosphere. In that case, the sky view and aerial perspective lookup tables will not be rendered. Defaults to {@link defaultToPerPixelRayMarch}.
-     * @param forceConstantLutRendering If this is true, the transmittance and multiple scattering lookup tables will be rendered regardless of whether the `atmosphere` parameter is `undefined` or not.
-     *
-     * @see {@link renderSkyAtmosphereLuts}: Called internally before rendering the sky / atmosphere.
-     * @see {@link renderSky}: Called internally, to render the sky / atmosphere.
-     */
-    public renderSkyAtmosphere(computePassEncoder: GPUComputePassEncoder, renderPassEncoder: GPURenderPassEncoder | GPURenderBundleEncoder, uniforms?: Uniforms, atmosphere?: Atmosphere, useFullScreenRayMarch?: boolean, forceConstantLutRendering?: boolean) {
-        this.renderSkyAtmosphereLuts(computePassEncoder, uniforms, atmosphere, useFullScreenRayMarch, forceConstantLutRendering);
-        this.renderSky(renderPassEncoder, useFullScreenRayMarch);
     }
 }
 

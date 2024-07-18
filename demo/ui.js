@@ -27,6 +27,7 @@ export function makeUi(atmosphere, camera, scaleFromKilometers = 1.0) {
             rayMarchingMinSpp: 14,
             rayMarchingMaxSpp: 30,
             rayMarch: false,
+            compute: true,
             viewHeight: 1.0,
         },
         atmosphereHelper: {
@@ -116,7 +117,8 @@ export function makeUi(atmosphere, camera, scaleFromKilometers = 1.0) {
         });
     
     renderSettingsFolder.addBinding(params.renderSettings, 'rayMarch', {label: 'Force ray marching'});
-    renderSettingsFolder.addBinding(params.renderSettings, 'viewHeight', {min: 1, max: 110.0, label: 'View height (% of atmosphere height)'})
+    renderSettingsFolder.addBinding(params.renderSettings, 'compute', {label: 'Use compute'});
+    renderSettingsFolder.addBinding(params.renderSettings, 'viewHeight', {min: 1, max: 110000.0, label: 'View height (% of atmosphere height)'})
         .on('change', e => {
             camera.height = (e.value / 100.0) * params.atmosphere.height;
         });

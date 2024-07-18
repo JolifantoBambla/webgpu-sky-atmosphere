@@ -150,9 +150,8 @@ fn integrate_scattered_luminance(uv: vec2<f32>, world_pos: vec3<f32>, world_dir:
 }
 
 struct RenderSkyResult {
-    // todo: blend_src is not allowed without feature enabled - define type in extra file
-    @location(0) /*@blend_src(0)*/ luminance: vec4<f32>,
-    @location(1) /*@blend_src(1)*/ transmittance: vec4<f32>,
+    luminance: vec4<f32>,
+    transmittance: vec4<f32>,
 }
 
 fn render_sky(pix: vec2<u32>) -> RenderSkyResult {
@@ -188,9 +187,15 @@ fn render_sky(pix: vec2<u32>) -> RenderSkyResult {
     return RenderSkyResult(max(vec4(luminance, 1.0), vec4()), max(vec4(ss.transmittance, 1.0), vec4()));
 }
 
+struct RenderSkyFragment {
+    @location(0) luminance: vec4<f32>,
+    @location(1) transmittance: vec4<f32>,
+}
+
 @fragment
-fn fragment(@builtin(position) coord: vec4<f32>) -> RenderSkyResult {
-    return render_sky(vec2<u32>(floor(coord.xy)));
+fn fragment(@builtin(position) coord: vec4<f32>) -> RenderSkyFragment {
+    let result = render_sky(vec2<u32>(floor(coord.xy)));
+    return RenderSkyFragment(result.luminance, result.transmittance);
 }
 
 @compute
@@ -204,7 +209,7 @@ fn render_sky_atmosphere(@builtin(global_invocation_id) global_id: vec3<u32>) {
     if USE_COLORED_TRANSMISSION {
         dual_source_blend(global_id.xy, result.luminance, result.transmittance);
     } else {
-        blend(global_id.xy, vec4(result.luminance.rgb, 1.0 - (dot(result.transmittance.rgb, vec3(1.0 / 3.0)))));
+        blend(global_id.xy, vec4(result.luminance.rgb, 1.0 - dot(result.transmittance.rgb, vec3(1.0 / 3.0))));
     }
 }
 

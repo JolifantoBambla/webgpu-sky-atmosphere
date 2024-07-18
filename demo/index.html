@@ -80,7 +80,7 @@
                 entries: [
                     {
                         binding: 0,
-                        visibility: GPUShaderStage.COMPUTE,
+                        visibility: GPUShaderStage.COMPUTE | GPUShaderStage.FRAGMENT,
                         buffer: {
                             type: 'uniform',
                             minBindingSize: 16 * Float32Array.BYTES_PER_ELEMENT,
@@ -88,14 +88,14 @@
                     },
                     {
                         binding: 1,
-                        visibility: GPUShaderStage.COMPUTE,
+                        visibility: GPUShaderStage.COMPUTE | GPUShaderStage.FRAGMENT,
                         sampler: {
                             type: 'comparison',
                         },
                     },
                     {
                         binding: 2,
-                        visibility: GPUShaderStage.COMPUTE,
+                        visibility: GPUShaderStage.COMPUTE | GPUShaderStage.FRAGMENT,
                         texture: {
                             sampleType: 'depth',
                             viewDimension: '2d',
@@ -109,25 +109,8 @@
             });
 
             const distanceScaleFactor = 1.0;
-            const skyAtmosphereRenderer = SkyAtmosphereRenderer.makeSkyAtmosphereRenderer(device, {
+            const skyAtmosphereConfigBase = {
                 distanceScaleFactor,
-                skyRenderer: {
-                    passConfig: {
-                        backBuffer: {
-                            texture: backBuffer,
-                            view: backBufferView,
-                        },
-                        renderTarget: {
-                            texture: skyRenderTarget,
-                            view: skyRenderTarget.createView(),
-                        },
-                    },
-                    depthBuffer: {
-                        texture: depthBuffer,
-                        view: depthBufferView,
-                        reverseZ: true,
-                    },
-                },
                 shadow: {
                     bindGroupLayouts: [shadowBindGroupLayout],
                     bindGroups: [device.createBindGroup({
@@ -156,7 +139,45 @@
                         }
                     `
                 },
+            };
+            const skyAtmosphereRenderer = SkyAtmosphereRenderer.makeSkyAtmosphereRenderer(device, {
+                ...skyAtmosphereConfigBase,
+                skyRenderer: {
+                    passConfig: {
+                        backBuffer: {
+                            texture: backBuffer,
+                            view: backBufferView,
+                        },
+                        renderTarget: {
+                            texture: skyRenderTarget,
+                            view: skyRenderTarget.createView(),
+                        },
+                    },
+                    depthBuffer: {
+                        texture: depthBuffer,
+                        view: depthBufferView,
+                        reverseZ: true,
+                    },
+                },
             });
+            const skyAtmosphereRenderer2 = SkyAtmosphereRenderer.makeSkyAtmosphereRenderer(
+                device,
+                {
+                    ...skyAtmosphereConfigBase,
+                    skyRenderer: {
+                        passConfig: {
+                            renderTargetFormat: skyRenderTarget.format,
+                        },
+                        depthBuffer: {
+                            texture: depthBuffer,
+                            view: depthBufferView,
+                            reverseZ: true,
+                        },
+                    },
+                },
+                skyAtmosphereRenderer.skyAtmospherePipelines,
+                skyAtmosphereRenderer.resources,  
+            );
 
             function makePipeline() {
                 const module = device.createShaderModule({
@@ -287,6 +308,37 @@
                     },
                 ],
             });
+            const bindGroupRender = device.createBindGroup({
+                layout: presentPipeline.getBindGroupLayout(0),
+                entries: [
+                    {
+                        binding: 0,
+                        resource: {
+                            buffer: debugViewConfigBuffer,
+                        },
+                    },
+                    {
+                        binding: 1,
+                        resource: skyAtmosphereRenderer.resources.transmittanceLut.view,
+                    },
+                    {
+                        binding: 2,
+                        resource: skyAtmosphereRenderer.resources.multiScatteringLut.view,
+                    },
+                    {
+                        binding: 3,
+                        resource: skyAtmosphereRenderer.resources.skyViewLut.view,
+                    },
+                    {
+                        binding: 4,
+                        resource: skyAtmosphereRenderer.resources.aerialPerspectiveLut.view,
+                    },
+                    {
+                        binding: 5,
+                        resource: backBuffer.createView(),
+                    },
+                ],
+            });
 
             const dragonRenderer = makeDragonRenderer(device, backBuffer.format, depthBuffer.format, true, shadowMap);
 
@@ -410,8 +462,24 @@
                 geometryPass.end();
 
                 const computePass = encoder.beginComputePass();
-                skyAtmosphereRenderer.renderSkyAtmosphere(computePass, config, params.atmosphere, params.renderSettings.rayMarch);
+                if (params.renderSettings.compute) {
+                    skyAtmosphereRenderer.renderSkyAtmosphere(computePass, config, params.atmosphere, params.renderSettings.rayMarch);
+                } else {
+                    skyAtmosphereRenderer2.renderSkyAtmosphereLuts(computePass, config, params.atmosphere, params.renderSettings.rayMarch);
+                }
                 computePass.end();
+
+                if (!params.renderSettings.compute) {
+                    const renderPass = encoder.beginRenderPass({
+                        colorAttachments: [{
+                            view: backBufferView,
+                            loadOp: 'load',
+                            storeOp: 'store',
+                        }],
+                    });
+                    skyAtmosphereRenderer2.renderSky(renderPass, params.renderSettings.rayMarch);
+                    renderPass.end();
+                }
 
                 const pass = encoder.beginRenderPass({
                     colorAttachments: [{
@@ -422,7 +490,7 @@
                     }],
                 });
                 pass.setPipeline(presentPipeline);
-                pass.setBindGroup(0, bindGroup);
+                pass.setBindGroup(0, params.renderSettings.compute ? bindGroup : bindGroupRender);
                 pass.draw(3);
                 pass.end();
 
