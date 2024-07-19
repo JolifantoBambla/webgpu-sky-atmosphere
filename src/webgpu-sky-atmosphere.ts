@@ -882,21 +882,15 @@ export class SkyAtmosphereRenderer extends SkyAtmosphereLutRenderer {
                         visibility: GPUShaderStage.FRAGMENT,
                         texture: {
                             sampleType: 'float',
-                            viewDimension: this.resources.transmittanceLut.texture.dimension,
-                            multisampled: false,
-                        },
-                    },
-                    {
-                        binding: 5,
-                        visibility: GPUShaderStage.FRAGMENT,
-                        texture: {
-                            sampleType: 'float',
                             viewDimension: this.resources.multiScatteringLut.texture.dimension,
                             multisampled: false,
                         },
                     },
                     ...externalResourcesLayoutEntries,
-                ],
+                ].map((v, i) => {
+                    v.binding = i;
+                    return v;
+                }) as GPUBindGroupLayoutEntry[],
             });
 
             const [withLutsBindGroup, rayMarchingBindGroup] = this.makeBindGroups(
@@ -1085,14 +1079,13 @@ export class SkyAtmosphereRenderer extends SkyAtmosphereLutRenderer {
                     ...renderSkyBindGroupBaseEntries,
                     {
                         binding: 4,
-                        resource: this.resources.transmittanceLut.view,
-                    },
-                    {
-                        binding: 5,
                         resource: this.resources.multiScatteringLut.view,
                     },
                     ...externalResourcesBindGroupEntries,
-                ],
+                ].map((v, i) => {
+                    v.binding = i;
+                    return v;
+                }) as GPUBindGroupEntry[],
             }),
         ];
     }
@@ -1150,9 +1143,9 @@ export class SkyAtmosphereRenderer extends SkyAtmosphereLutRenderer {
      */
     public renderSky(passEncoder: GPURenderPassEncoder | GPURenderBundleEncoder, useFullScreenRayMarch?: boolean) {
         if (useFullScreenRayMarch ?? this.defaultToPerPixelRayMarch) {
-            this.renderSkyWithLuts(passEncoder);
-        } else {
             this.renderSkyRaymarching(passEncoder);
+        } else {
+            this.renderSkyWithLuts(passEncoder);
         }
     }
 }
