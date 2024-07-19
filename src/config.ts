@@ -363,6 +363,20 @@ export interface AtmosphereLightsConfig {
      * Defaults to false.
      */
     useMoon?: boolean,
+
+    /**
+     * If this is true, limb darkening is applied to the disk rendered for the first atmosphere light.
+     * 
+     * Defaults to true.
+     */
+    applyLimbDarkeningOnSun?: boolean,
+
+    /**
+     * If this is true, limb darkening is applied to the disk rendered for the second atmosphere light.
+     * 
+     * Defaults to false.
+     */
+    applyLimbDarkeningOnMoon?: boolean,
 }
 
 export interface SkyAtmosphereConfig {
