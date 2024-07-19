@@ -47,7 +47,7 @@ fn integrate_scattered_luminance(world_pos: vec3<f32>, world_dir: vec3<f32>, atm
     var rayleigh_phase_val_moon = 0.0;
 
     if USE_MOON {
-        moon_direction = normalize(config.moon.direction);
+        moon_direction = normalize(moon_direction);
 	    moon_illuminance = config.moon.illuminance;
 
         cos_theta_moon = dot(moon_direction, world_dir);
@@ -117,7 +117,7 @@ fn render_aerial_perspective_lut(@builtin(global_invocation_id) global_id: vec3<
     let config = config_buffer;
 
 	let pix = vec2<f32>(global_id.xy) + 0.5;
-	let uv = pix / vec2<f32>(config.screen_resolution);
+	let uv = pix / vec2<f32>(output_size.xy);
 
     var world_dir = uv_to_world_dir(uv, config.inverse_projection, config.inverse_view);
     let cam_pos = config.camera_world_position - atmosphere.planet_center;

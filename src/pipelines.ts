@@ -397,12 +397,14 @@ export class AerialPerspectiveLutPipeline {
     readonly bindGroupLayout: GPUBindGroupLayout;
     readonly aerialPerspectiveLutFormat: GPUTextureFormat;
     readonly aerialPerspectiveSliceCount: number;
+    readonly aerialPerspectiveDistancePerSlice: number;
     readonly multiscatteringLutSize: [number, number];
 
     constructor(device: GPUDevice, aerialPerspectiveLutFormat: GPUTextureFormat, aerialPerspectiveSliceCount: number, aerialPerspectiveDistancePerSlice: number, multiscatteringLutSize: [number, number], useMoon: boolean, shadowConfig?: ShadowConfig) {
         this.device = device;
         this.aerialPerspectiveLutFormat = aerialPerspectiveLutFormat;
         this.aerialPerspectiveSliceCount = aerialPerspectiveSliceCount;
+        this.aerialPerspectiveDistancePerSlice = aerialPerspectiveDistancePerSlice;
         this.multiscatteringLutSize = multiscatteringLutSize;
         this.bindGroupLayout = device.createBindGroupLayout({
             label: 'aerial perspective LUT pass',
@@ -474,7 +476,7 @@ export class AerialPerspectiveLutPipeline {
                 entryPoint: 'render_aerial_perspective_lut',
                 constants: {
                     AP_SLICE_COUNT: this.aerialPerspectiveSliceCount,
-                    AP_DISTANCE_PER_SLICE: aerialPerspectiveDistancePerSlice,
+                    AP_DISTANCE_PER_SLICE: this.aerialPerspectiveDistancePerSlice,
                     MULTI_SCATTERING_LUT_RES_X: this.multiscatteringLutSize[0],
                     MULTI_SCATTERING_LUT_RES_Y: this.multiscatteringLutSize[1],
                     USE_MOON: Number(useMoon),
@@ -545,5 +547,9 @@ export class AerialPerspectiveLutPipeline {
                 resources.aerialPerspectiveLut.texture.depthOrArrayLayers,
             ],
         );
+    }
+
+    get aerialPerspectiveInvDistancePerSlice(): number {
+        return 1.0 / this.aerialPerspectiveDistancePerSlice;
     }
 }

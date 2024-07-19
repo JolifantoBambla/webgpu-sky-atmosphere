@@ -62,10 +62,10 @@ fn integrate_scattered_luminance(uv: vec2<f32>, world_pos: vec3<f32>, world_dir:
     }
 
     if is_valid_depth(depth) {
-        let depth_buffer_world_pos = uv_and_depth_to_world_pos(config.inverse_view * config.inverse_projection, uv, depth);
+        let depth_buffer_world_pos = uv_and_depth_to_world_pos(uv, config.inverse_projection, config.inverse_view, depth);
         t_max = min(t_max, length(depth_buffer_world_pos - (world_pos + atmosphere.planet_center)));
     }
-	t_max = min(t_max, t_max_max);
+    t_max = min(t_max, t_max_max);
 
     let sample_count = mix(config.ray_march_min_spp, config.ray_march_max_spp, saturate(t_max * INV_DISTANCE_TO_MAX_SAMPLE_COUNT));
     let sample_count_floored = floor(sample_count);
@@ -99,7 +99,7 @@ fn integrate_scattered_luminance(uv: vec2<f32>, world_pos: vec3<f32>, world_dir:
 	result.luminance = vec3(0.0);
 	result.transmittance = vec3(1.0);
 	var t = 0.0;
-	var dt = t_max / sample_count;
+	var dt = 0.0;
 	for (var s = 0.0; s < sample_count; s += 1.0) {
         var t0 = s * inv_sample_count_floored;
         var t1 = (s + 1.0) * inv_sample_count_floored;
@@ -167,7 +167,7 @@ fn render_sky(pix: vec2<u32>) -> RenderSkyResult {
 	let min_sample_count = config.ray_march_min_spp;
 	let max_sample_count = config.ray_march_max_spp;
 
-	let view_height: f32 = length(world_pos);
+	let view_height = length(world_pos);
 	
     var luminance = vec3<f32>();
 	

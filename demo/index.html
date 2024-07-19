@@ -25,9 +25,7 @@
             const resolution = [1920, 1080];
 
             const adapter = await navigator.gpu.requestAdapter();
-            const device = await adapter.requestDevice({requiredFeatures: ['dual-source-blending']});
-
-            console.log([...adapter.features]);
+            const device = await adapter.requestDevice({requiredFeatures: adapter.features.has('dual-source-blending') ? ['dual-source-blending'] : []});
 
             const canvas = document.querySelector('canvas');
             canvas.width = resolution[0];

@@ -521,6 +521,9 @@ export class SkyAtmosphereComputeRenderer extends SkyAtmosphereRenderer {
                         }),
                         entryPoint: 'render_sky_atmosphere',
                         constants: {
+                            AP_SLICE_COUNT: this.resources.aerialPerspectiveLut.texture.depthOrArrayLayers,
+                            AP_DISTANCE_PER_SLICE: this.skyAtmospherePipelines.aerialPerspectiveLutPipeline.aerialPerspectiveDistancePerSlice,
+                            AP_INV_DISTANCE_PER_SLICE: this.skyAtmospherePipelines.aerialPerspectiveLutPipeline.aerialPerspectiveInvDistancePerSlice,
                             SKY_VIEW_LUT_RES_X: this.resources.skyViewLut.texture.width,
                             SKY_VIEW_LUT_RES_Y: this.resources.skyViewLut.texture.height,
                             IS_REVERSE_Z: Number(config.skyRenderer.depthBuffer.reverseZ ?? false),
@@ -950,6 +953,9 @@ export class SkyAtmosphereRasterRenderer extends SkyAtmosphereRenderer {
                         fragment: {
                             module,
                             constants: {
+                                AP_SLICE_COUNT: this.resources.aerialPerspectiveLut.texture.depthOrArrayLayers,
+                                AP_DISTANCE_PER_SLICE: this.skyAtmospherePipelines.aerialPerspectiveLutPipeline.aerialPerspectiveDistancePerSlice,
+                                AP_INV_DISTANCE_PER_SLICE: this.skyAtmospherePipelines.aerialPerspectiveLutPipeline.aerialPerspectiveInvDistancePerSlice,
                                 SKY_VIEW_LUT_RES_X: this.resources.skyViewLut.texture.width,
                                 SKY_VIEW_LUT_RES_Y: this.resources.skyViewLut.texture.height,
                                 IS_REVERSE_Z: Number(config.skyRenderer.depthBuffer.reverseZ ?? false),

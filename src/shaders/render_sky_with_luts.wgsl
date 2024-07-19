@@ -43,9 +43,10 @@ fn render_sky(pix: vec2<u32>) -> vec4<f32> {
         return vec4(sky_view.rgb + get_sun_luminance(world_pos, world_dir, atmosphere, config), sky_view.a);
     }
 
-    let depth_buffer_world_pos = uv_and_depth_to_world_pos(config.inverse_view * config.inverse_projection, uv, depth);
+    let depth_buffer_world_pos = uv_and_depth_to_world_pos(uv, config.inverse_projection, config.inverse_view, depth);
 
     let t_depth = length(depth_buffer_world_pos - (world_pos + atmosphere.planet_center));
+
     var slice = aerial_perspective_depth_to_slice(t_depth);
     var weight = 1.0;
     if slice < 0.5 {
