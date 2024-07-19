@@ -92,7 +92,7 @@ function isComputePassConfig(passConfig: SkyRendererComputePassConfig | SkyRende
     return (passConfig as SkyRendererComputePassConfig).backBuffer !== undefined;
 }
 
-export class SkyAtmosphereLutRenderer {
+export class SkyAtmosphereRenderer {
     readonly resources: SkyAtmosphereResources;
 
     readonly skyAtmospherePipelines: SkyAtmospherePipelines;
@@ -105,7 +105,7 @@ export class SkyAtmosphereLutRenderer {
     private aerialPerspectiveLutPass: ComputePass;
 
     /**
-     * Creates a {@link SkyAtmosphereLutRenderer}.
+     * Creates a {@link SkyAtmosphereRenderer}.
      * @param device The `GPUDevice` used to create internal resources (textures, pipelines, etc.).
      * @param config A {@link SkyAtmosphereConfig} used to configure internal resources and behavior.
      * @param existingPipelines If this is defined, no new pipelines for rendering the internal lookup tables will be created. Instead, the existing pipelines given will be reused. The existing pipelines must be compatible with the {@link SkyAtmosphereConfig}. Especially, {@link SkyAtmosphereConfig.lookUpTables} and {@link SkyAtmosphereConfig.shadow} should be the same.
@@ -137,18 +137,18 @@ export class SkyAtmosphereLutRenderer {
     }
 
     /**
-     * Creates a new instance of a {@link SkyAtmosphereComputeRenderer} or a {@link SkyAtmosphereRenderer}, depending on the {@link SkyRendererPassConfig} given as part of the {@link SkyAtmosphereConfig}.
+     * Creates a new instance of a {@link SkyAtmosphereComputeRenderer} or a {@link SkyAtmosphereRasterRenderer}, depending on the {@link SkyRendererPassConfig} given as part of the {@link SkyAtmosphereConfig}.
      * @param device The `GPUDevice` used to create internal resources (textures, pipelines, etc.).
-     * @param config A {@link SkyAtmosphereConfig} used to configure internal resources and behavior. Determines if a {@link SkyAtmosphereComputeRenderer} or a {@link SkyAtmosphereRenderer} is returned.
+     * @param config A {@link SkyAtmosphereConfig} used to configure internal resources and behavior. Determines if a {@link SkyAtmosphereComputeRenderer} or a {@link SkyAtmosphereRasterRenderer} is returned.
      * @param existingPipelines If this is defined, no new pipelines for rendering the internal lookup tables will be created. Instead, the existing pipelines given will be reused. The existing pipelines must be compatible with the {@link SkyAtmosphereConfig}. Especially, {@link SkyAtmosphereConfig.lookUpTables} and {@link SkyAtmosphereConfig.shadow} should be the same.
      * @param existingResources If this is defined, no new resources (buffers, textures, samplers) will be created. Instead, the existing resources given will be used.
-     * @returns Returns a {@link SkyAtmosphereComputeRenderer} or a {@link SkyAtmosphereRenderer}, depending on the {@link SkyRendererPassConfig} given as part of the {@link SkyAtmosphereConfig}.
+     * @returns Returns a {@link SkyAtmosphereComputeRenderer} or a {@link SkyAtmosphereRasterRenderer}, depending on the {@link SkyRendererPassConfig} given as part of the {@link SkyAtmosphereConfig}.
      */
-    public static makeSkyAtmosphereRenderer(device: GPUDevice, config: SkyAtmosphereConfig, existingPipelines?: SkyAtmospherePipelines, existingResources?: SkyAtmosphereResources): SkyAtmosphereComputeRenderer | SkyAtmosphereRenderer {
+    public static makeSkyAtmosphereRenderer(device: GPUDevice, config: SkyAtmosphereConfig, existingPipelines?: SkyAtmospherePipelines, existingResources?: SkyAtmosphereResources): SkyAtmosphereComputeRenderer | SkyAtmosphereRasterRenderer {
         if (isComputePassConfig(config.skyRenderer.passConfig)) {
             return new SkyAtmosphereComputeRenderer(device, config, existingPipelines, existingResources);
         } else {
-            return new SkyAtmosphereRenderer(device, config, existingPipelines, existingResources);
+            return new SkyAtmosphereRasterRenderer(device, config, existingPipelines, existingResources);
         }
     }
 
@@ -352,9 +352,9 @@ export interface SkyAtmosphereComputeRendererResizeConfig {
 }
 
 /**
- * A {@link SkyAtmosphereLutRenderer} that uses `GPUComputePipeline`s to render the sky / atmosphere.
+ * A {@link SkyAtmosphereRenderer} that uses `GPUComputePipeline`s to render the sky / atmosphere.
  */
-export class SkyAtmosphereComputeRenderer extends SkyAtmosphereLutRenderer {
+export class SkyAtmosphereComputeRenderer extends SkyAtmosphereRenderer {
     private renderSkyWithLutsBindGroupLayout: GPUBindGroupLayout;
     private renderSkyWithLutsPass: ComputePass;
     private renderSkyRaymarchingBindGroupLayout: GPUBindGroupLayout;
@@ -750,16 +750,16 @@ export class SkyAtmosphereComputeRenderer extends SkyAtmosphereLutRenderer {
 }
 
 /**
- * A {@link SkyAtmosphereLutRenderer} that uses `GPURenderPipeline`s to render the sky / atmosphere.
+ * A {@link SkyAtmosphereRenderer} that uses `GPURenderPipeline`s to render the sky / atmosphere.
  */
-export class SkyAtmosphereRenderer extends SkyAtmosphereLutRenderer {
+export class SkyAtmosphereRasterRenderer extends SkyAtmosphereRenderer {
     private renderSkyWithLutsBindGroupLayout: GPUBindGroupLayout;
     private renderSkyWithLutsPass: RenderPass;
     private renderSkyRaymarchingBindGroupLayout: GPUBindGroupLayout;
     private renderSkyRaymarchingPass: RenderPass;
 
     /**
-     * Creates a {@link SkyAtmosphereRenderer}.
+     * Creates a {@link SkyAtmosphereRasterRenderer}.
      * @param device The `GPUDevice` used to create internal resources (textures, pipelines, etc.).
      * @param config A {@link SkyAtmosphereConfig} used to configure internal resources and behavior.
      * @param existingPipelines If this is defined, no new pipelines for rendering the internal lookup tables will be created. Instead, the existing pipelines given will be reused. The existing pipelines must be compatible with the {@link SkyAtmosphereConfig}. Especially, {@link SkyAtmosphereConfig.lookUpTables} and {@link SkyAtmosphereConfig.shadow} should be the same.

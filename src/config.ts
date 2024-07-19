@@ -251,7 +251,7 @@ export interface SkyRenderPassConfig {
      *
      * Note that...
      *  - colored transmissions are only supported when using full-screen ray marching instead of the aerial perspective lookup table.
-     *  - without the "dual-source-blending" feature enabled, colored transmissions can only be rendered using a compute pipeline or by blending scattered luminance and transmittance in an extra pass (this is currently not done by the {@link SkyAtmosphereRenderer} and is left to the user).
+     *  - without the "dual-source-blending" feature enabled, colored transmissions can only be rendered using a compute pipeline or by blending scattered luminance and transmittance in an extra pass (this is currently not done by the {@link SkyAtmosphereRasterRenderer} and is left to the user).
      *
      * Defaults to false.
      */
@@ -268,13 +268,13 @@ export interface SkyRenderPassConfig {
 }
 
 /**
- * External resources and settings required by a {@link SkyAtmosphereLutRenderer}.
+ * External resources and settings required by a {@link SkyAtmosphereRenderer}.
  */
 export interface SkyRendererPassConfig {
     /**
-     * External resources required by a {@link SkyAtmosphereLutRenderer} when using a render or compute pipeline for rendering the atmosphere.
+     * External resources required by a {@link SkyAtmosphereRenderer} when using a render or compute pipeline for rendering the atmosphere.
      *
-     * This setting defines whether {@link SkyAtmosphereLutRenderer.makeSkyAtmosphereRenderer} will create a {@link SkyAtmosphereComputeRenderer} or a {@link SkyAtmosphereRenderer}.
+     * This setting defines whether {@link SkyAtmosphereRenderer.makeSkyAtmosphereRenderer} will create a {@link SkyAtmosphereComputeRenderer} or a {@link SkyAtmosphereRasterRenderer}.
      */
     passConfig: SkyRendererComputePassConfig | SkyRenderPassConfig,
 
@@ -284,7 +284,7 @@ export interface SkyRendererPassConfig {
     depthBuffer: DepthBufferConfig,
 
     /**
-     * If this is true, {@link SkyAtmosphereRenderer.renderSkyAtmosphere} / {@link SkyAtmosphereComputeRenderer.renderSkyAtmosphere} will default to full-screen ray marching to render the atmosphere.
+     * If this is true, {@link SkyAtmosphereRasterRenderer.renderSky} / {@link SkyAtmosphereComputeRenderer.renderSkyAtmosphere} will default to full-screen ray marching to render the atmosphere.
      *
      * Defaults to false.
      */
@@ -388,14 +388,14 @@ export interface SkyAtmosphereConfig {
     distanceScaleFactor?: number,
 
     /**
-     * The atmosphere parameters for this {@link SkyAtmosphereLutRenderer}.
+     * The atmosphere parameters for this {@link SkyAtmosphereRenderer}.
      * Defaults to: {@link makeEarthAtmosphere} with the scale parameter set to {@link SkyAtmosphereConfig.distanceScaleFactor}.
      * @see {@link makeEarthAtmosphere}
      */
     atmosphere?: Atmosphere,
 
     /**
-     * Config parameters for rendering the sky required by a {@link SkyAtmosphereLutRenderer} (or a {@link SkyAtmosphereComputeRenderer} / {@link SkyAtmosphereRenderer}).
+     * Config parameters for rendering the sky required by a {@link SkyAtmosphereRenderer} (or a {@link SkyAtmosphereComputeRenderer} / {@link SkyAtmosphereRasterRenderer}).
      */
     skyRenderer: SkyRendererPassConfig,
 
@@ -405,7 +405,7 @@ export interface SkyAtmosphereConfig {
     lights?: AtmosphereLightsConfig,
 
     /**
-     * Config for external resources required by a {@link SkyAtmosphereLutRenderer} to integrate user-controlled shadow maps.
+     * Config for external resources required by a {@link SkyAtmosphereRenderer} to integrate user-controlled shadow maps.
      */
     shadow?: ShadowConfig,
 
