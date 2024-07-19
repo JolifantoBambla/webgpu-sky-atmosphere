@@ -389,8 +389,8 @@
                             params.renderSettings.sun.direction.y,
                             params.renderSettings.sun.direction.x,
                         ]),
-                        luminance: params.renderSettings.sun.diskIlluminance,
-                        diameter: params.renderSettings.sun.diskDiameter * Math.PI / 180.0,
+                        diskLuminanceScale: params.renderSettings.sun.diskIlluminance,
+                        diskAngularDiameter: params.renderSettings.sun.diskDiameter * Math.PI / 180.0,
                     },
                     moon: {
                         illuminance: [
@@ -403,8 +403,8 @@
                             -params.renderSettings.sun.direction.y,
                             -params.renderSettings.sun.direction.x,
                         ]),
-                        luminance: 0.26,
-                        diameter: 0.568 * Math.PI / 180.0,
+                        diskLuminanceScale: 0.26,
+                        diskAngularDiameter: 0.568 * Math.PI / 180.0,
                     },
                     screenResolution: resolution,
                     rayMarchMinSPP: params.renderSettings.rayMarchingMinSpp,

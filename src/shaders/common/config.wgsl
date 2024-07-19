@@ -9,7 +9,7 @@ struct AtmosphereLight {
     direction: vec3<f32>,
 
     // Sun disk's luminance
-    disk_luminance: f32,
+    disk_luminance_scale: f32,
 }
 
 struct Uniforms {

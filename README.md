@@ -24,7 +24,7 @@ import { SkyAtmosphereRenderer } from 'webgpu-sky-atmosphere';
 ### From GitHub
 
 ```
-import { WebGPUSinglePassDownsampler } from 'https://jolifantobambla.github.io/webgpu-spd/dist/1.x/webgpu-sky-atmosphere.module.min.js';
+import { WebGPUSinglePassDownsampler } from 'https://jolifantobambla.github.io/webgpu-sky-atmosphere/dist/1.x/webgpu-sky-atmosphere.module.min.js';
 ```
 
 ## Usage

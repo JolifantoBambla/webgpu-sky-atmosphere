@@ -218,13 +218,13 @@ export function uniformsToFloatArray(uniforms: Uniforms): Float32Array {
         uniforms.rayMarchMinSPP,
         uniforms.rayMarchMaxSPP,
         ...(uniforms.sun.illuminance ?? [1.0, 1.0, 1.0]),
-        uniforms.sun.diameter ?? (0.545 * (Math.PI / 180.0)),
+        uniforms.sun.diskAngularDiameter ?? (0.545 * (Math.PI / 180.0)),
         ...uniforms.sun.direction,
-        uniforms.sun.luminance ?? 120000.0,
+        uniforms.sun.diskLuminanceScale ?? 1.0,
         ...(uniforms.moon?.illuminance ?? [1.0, 1.0, 1.0]),
-        uniforms.moon?.diameter ?? (0.568 * Math.PI / 180.0),
+        uniforms.moon?.diskAngularDiameter ?? (0.568 * Math.PI / 180.0),
         ...(uniforms.moon?.direction ?? uniforms.sun.direction.map(d => d * -1)),
-        uniforms.moon?.luminance ?? 0.26,
+        uniforms.moon?.diskLuminanceScale ?? 1.0,
     ]);
 }
 

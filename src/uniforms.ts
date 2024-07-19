@@ -20,7 +20,7 @@ export interface Camera {
  */
 export interface AtmosphereLight {
     /**
-     * Light's illuminance.
+     * Light's illuminance at the top of the atmosphere.
      *
      * Defaults to [1.0, 1.0, 1.0]
      */
@@ -34,13 +34,11 @@ export interface AtmosphereLight {
     direction: [number, number, number],
 
     /**
-     * Light disk's luminance.
+     * Light disk's luminance scale.
      *
-     * For the sun, defaults to 120000.0
-     *
-     * For the moon, defaults to 0.26
+     * Defaults to 1.0.
      */
-    luminance?: number,
+    diskLuminanceScale?: number,
 
     /**
      * Light disk's angular diameter in radians.
@@ -49,7 +47,7 @@ export interface AtmosphereLight {
      *
      * For the moon, defaults to ~0.0099134702 (0.568 degrees)
      */
-    diameter?: number,
+    diskAngularDiameter?: number,
 }
 
 export interface Uniforms {

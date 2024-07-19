@@ -19,18 +19,15 @@ fn sun_disk_luminance(world_pos: vec3<f32>, world_dir: vec3<f32>, atmosphere: At
 
     let height = length(world_pos);
 
-    let e_zenith = light.disk_luminance;
     let disk_solid_angle = tau * cos_disk_radius;
-    let l_zenith = e_zenith / disk_solid_angle;
-    let transmittance_zenith = textureLoad(transmittance_lut, vec2(0, 0), 0).rgb;
-    let l_outer_space = l_zenith / transmittance_zenith;
+    let l_outer_space = (light.illuminance / disk_solid_angle) * light.disk_luminance_scale;
 
     let zenith = world_pos / height;
     let cos_view_zenith = dot(world_dir, zenith);
     let uv = transmittance_lut_params_to_uv(atmosphere, height, cos_view_zenith);
     let transmittance_sun = textureSampleLevel(transmittance_lut, lut_sampler, uv, 0).rgb;
-
-    let center_to_edge = (cos_view_sun - cos_disk_radius) / (1.0 - cos_disk_radius);
+    
+    let center_to_edge = 1.0 - ((2.0 * acos(cos_view_sun)) / light.disk_diameter);
 
     return transmittance_sun * l_outer_space * limb_darkeining_factor(center_to_edge);
 }
