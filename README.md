@@ -29,9 +29,103 @@ import { WebGPUSinglePassDownsampler } from 'https://jolifantobambla.github.io/w
 
 ## Usage
 
+The clear sky / atmosphere can either be rendered using low-resolution lookup tables or by doing a full-resolution ray marching pass.
+While the former method is faster, full-resolution ray marching produces smoother volumetric shadows.
+
+Both methods depend on a transmittance and a multiple scattering lookup table that are constant for a given atmosphere.
+By default, these lookup tables are rendered at the time the renderer is created.
+To re-render these lookup tables, e.g., if the atmosphere parameters change, call
+
+```js
+skyRenderer.renderConstantLuts(
+  computePassEncoder,
+  // this is optional
+  // if this is undefined, the internal atmosphere parameters will not be updated
+  atmosphere,
+);
+```
+
+When not doing a full-screen ray marching pass, an additional low resolution lookup table for the distant sky as well as an aerial perspectivr lookup table (as a  volume around the camera) need to be rendered. These lookup tables are view-dependent and need to be re-rendered each frame they are used:
+
+```js
+skyRenderer.renderDynamicLuts(
+  computePassEncoder,
+  // passing the uniforms is optional
+  // if this is undefined, the internal uniform buffer will not be updated
+  uniforms,
+);
+```
+
+Alternatively, each lookup table can be rendered individually.
+See the documentation for more details.
+
 The `SkyAtmosphereRenderer` comes in two flavors:
  * `SkyAtmosphereComputeRenderer`: renders the sky / atmosphere using a compute pass.
  * `SkyAtmosphereRasterRenderer`: render the sky / atmosphere using a render (rasterization) pass.
+
+### Using render passes / bundles
+
+The `SkyAtmosphereRasterRenderer` renders the sky using a render pass or render bundle.
+However, the lookup tables are still rendered using compute passes.
+
+To render the loopup tables and the sky call:
+
+```js
+const uniforms = {
+  ... // set uniforms
+}
+
+// first render the lookup tables
+const computePassEncoder = commandEncoder.beginComputePass();
+skyRenderer.renderAtmosphere(computePassEncoder, uniforms);
+computePassEncoder.end();
+
+// then render the sky using a render pass
+const renderPass = commandEncoder.beginRenderPass({
+  color: [{
+    ...
+  }],
+});
+skyRenderer.renderSky(renderPass);
+renderPass.end();
+
+// alternatively, use a render bundle
+const renderBundle ...
+
+```
+
+### Using compute passes
+
+The `SkyAtmosphereComputeRenderer` renders both the internal lookup tables using compute passes.
+
+To render the lookup tables and the sky using a single compute pass encoder call `renderSkyAtmosphere`:
+
+```js
+const uniforms = {
+  ... // set uniforms
+}
+
+const computePassEncoder = commandEncoder.beginComputePass();
+skyRenderer.renderSkyAtmosphere(computePassEncoder, uniforms);
+computePassEncoder.end();
+```
+
+Alternatively, all lookup tables can be rendered individually.
+Read the docs for more details.
+
+To create a `SkyAtmosphereComputeRenderer` configure the `skyRenderer.passConfig` property as a `SkyAtmosphereComputePassConfig`:
+
+```js
+const skyRenderer = SkyAtmosphererRenderer.makeSkyAtmosphereRenderer({
+  skyRenderer: {
+    passConfig: {
+      backBuffer: {},
+      renderTarget: {},
+    },
+    depthBuffer: {},
+  },
+});
+```
 
 ### Light sources
 
