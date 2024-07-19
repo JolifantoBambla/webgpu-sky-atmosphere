@@ -236,29 +236,28 @@ export interface SkyRenderPassConfig {
     renderTargetFormat: GPUTextureFormat,
 
     /**
-     * If this is set, all render passes will be configured to use two render targets, where transmission will be written to the second render target using this format.
-     *
-     * If {@link useDualSourceBlending} is true and the device supports the `"dual-source-blending"` feature, both targets will be blended with the render target at location 0 using dual-source blending.
-     * If {@link useDualSourceBlending} is true and the device does not support the `"dual-source-blending"` feature, both targets will be overwritten and no blending will be performed. It is the user's responsibility to blend the results in an extra pass.
-     * If {@link useDualSourceBlending} is false, scattered luminance is blended with the texture at location 0 based on monochrome transmittance, and transmittance will be written to the render target at location 1 separately.
-     *
-     * If {@link writeTransmissionOnlyOnPerPixelRayMarch} is true, this setting does not affect the sky rendering pass using the aerial perspective lookup table. It will instead be configured to expect a single render target at location 0.
-     */
-    transmissionFormat?: GPUTextureFormat,
-
-    /**
      * Use dual-source blending for colored transmissions.
      *
-     * Note that...
-     *  - colored transmissions are only supported when using full-screen ray marching instead of the aerial perspective lookup table.
-     *  - without the "dual-source-blending" feature enabled, colored transmissions can only be rendered using a compute pipeline or by blending scattered luminance and transmittance in an extra pass (this is currently not done by the {@link SkyAtmosphereRasterRenderer} and is left to the user).
+     * Note that colored transmissions are only supported when using full-screen ray marching instead of the aerial perspective lookup table.
+     * 
+     * Without the "dual-source-blending" feature enabled, colored transmissions can only be rendered using a compute pipeline or by writing luminance and transmittance to extra targets and blending them in an extra pass (see {@link transmissionFormat}, the blending step is then left to the user).
      *
      * Defaults to false.
      */
     useDualSourceBlending?: boolean,
 
     /**
-     * Only configure the more expensive full-screen ray marching pass to use a second render target and write colored transmittance.
+     * If this is set and dual source blending is not enabled or not available, all render passes will be configured to use two render targets, where transmission will be written to the second render target using this format.
+     * In this case, no blend state will be configured for the render target at location 0. Instead, blending is left to the user.
+     * 
+     * If {@link useDualSourceBlending} is true and the device support the `"dual-source-blending"` feature, this option is ignored.
+     * 
+     * If {@link writeTransmissionOnlyOnPerPixelRayMarch} is true, this setting does not affect the sky rendering pass using the aerial perspective lookup table. It will instead be configured to expect a single render target at location 0 and a blend state will be configured for the pipeline.
+     */
+    transmissionFormat?: GPUTextureFormat,
+
+    /**
+     * If this is true, a {@link transmissionFormat} is set, and dual source blending is not enabled or not available, only configure the more expensive full-screen ray marching pass to use a second render target and write colored transmittance.
      *
      * Note that the faster pass using the aerial perspective lookup table does not support colored transmittance anyway and thus writing to a second render target is an extra cost without any benefit.
      *

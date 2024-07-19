@@ -25,7 +25,7 @@
             const resolution = [1920, 1080];
 
             const adapter = await navigator.gpu.requestAdapter();
-            const device = await adapter.requestDevice();
+            const device = await adapter.requestDevice({requiredFeatures: ['dual-source-blending']});
 
             console.log([...adapter.features]);
 
@@ -167,6 +167,7 @@
                     skyRenderer: {
                         passConfig: {
                             renderTargetFormat: skyRenderTarget.format,
+                            useDualSourceBlending: true,
                         },
                         depthBuffer: {
                             texture: depthBuffer,

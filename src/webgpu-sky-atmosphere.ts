@@ -795,7 +795,7 @@ export class SkyAtmosphereRasterRenderer extends SkyAtmosphereRenderer {
                 color: {
                     operation: 'add',
                     srcFactor: 'one',
-                    dstFactor: 'src1' as GPUBlendFactor, // dual-source-blending is a fairly new feature
+                    dstFactor: 'src1',
                 },
                 alpha: {
                     operation: 'add',
@@ -904,21 +904,24 @@ export class SkyAtmosphereRasterRenderer extends SkyAtmosphereRenderer {
             // render sky with luts pass
             {
                 const writeTransmissionOnlyOnPerPixelRayMarch = config.skyRenderer.passConfig.writeTransmissionOnlyOnPerPixelRayMarch ?? true;
+                const useTwoTargets = config.skyRenderer.passConfig.transmissionFormat && !useDualSourceBlending && !writeTransmissionOnlyOnPerPixelRayMarch;
                 const targets: GPUColorTargetState[] = [
                     {
                         format: config.skyRenderer.passConfig.renderTargetFormat,
-                        blend: useDualSourceBlending && !writeTransmissionOnlyOnPerPixelRayMarch ? dualBlendState : blendState,
                         writeMask: GPUColorWrite.ALL,
                     },
                 ];
-                if (config.skyRenderer.passConfig.transmissionFormat && !writeTransmissionOnlyOnPerPixelRayMarch) {
-                    targets.push({ format: config.skyRenderer.passConfig.transmissionFormat, });
+                if (useTwoTargets) {
+                    targets.push({ format: config.skyRenderer.passConfig.transmissionFormat!, });
+                } else {
+                    targets[0].blend = useDualSourceBlending && !writeTransmissionOnlyOnPerPixelRayMarch ? dualBlendState : blendState;
                 }
 
                 let code = makeRenderSkyWithLutsShaderCode();
-                if (useDualSourceBlending) {
+                if (useDualSourceBlending && !writeTransmissionOnlyOnPerPixelRayMarch) {
+                    code = `enable dual_source_blending;\n${code}`;
                     code = code.replace('@location(0)', '@location(0) @blend_src(0)');
-                    code = code.replace('@location(1)', '@location(1) @blend_src(1)');
+                    code = code.replace('@location(1)', '@location(0) @blend_src(1)');
                 } else if (targets.length !== 2) {
                     code = code.replace('@location(1) transmittance: vec4<f32>,', '');
                     code = code.replace(
@@ -965,21 +968,23 @@ export class SkyAtmosphereRasterRenderer extends SkyAtmosphereRenderer {
 
             // render sky raymarching
             {
+                const useTwoTargets = config.skyRenderer.passConfig.transmissionFormat && !useDualSourceBlending;
                 const targets: GPUColorTargetState[] = [
                     {
                         format: config.skyRenderer.passConfig.renderTargetFormat,
-                        blend: useDualSourceBlending ? dualBlendState : blendState,
                         writeMask: GPUColorWrite.ALL,
                     },
                 ];
-                if (config.skyRenderer.passConfig.transmissionFormat) {
-                    targets.push({ format: config.skyRenderer.passConfig.transmissionFormat, });
+                if (useTwoTargets) {
+                    targets.push({ format: config.skyRenderer.passConfig.transmissionFormat!, });
+                } else {
+                    targets[0].blend = useDualSourceBlending ? dualBlendState : blendState;
                 }
 
                 let code = makeRenderSkyRaymarchingShaderCode();
                 if (useDualSourceBlending) {
                     code = code.replace('@location(0)', '@location(0) @blend_src(0)');
-                    code = code.replace('@location(1)', '@location(1) @blend_src(1)');
+                    code = code.replace('@location(1)', '@location(0) @blend_src(1)');
                 } else if (targets.length !== 2) {
                     code = code.replace('@location(1) transmittance: vec4<f32>,', '');
                     code = code.replace(
@@ -989,7 +994,7 @@ export class SkyAtmosphereRasterRenderer extends SkyAtmosphereRenderer {
                 }
                 const module = device.createShaderModule({
                     label: 'Render sky raymarching',
-                    code: `${config.shadow?.wgslCode || 'fn get_shadow(p: vec3<f32>) -> f32 { return 1.0; }'}\n${code}`,
+                    code: `${useDualSourceBlending ? 'enable dual_source_blending;\n' : ''}${config.shadow?.wgslCode || 'fn get_shadow(p: vec3<f32>) -> f32 { return 1.0; }'}\n${code}`,
                 });
 
                 this.renderSkyRaymarchingPass = new RenderPass(
