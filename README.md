@@ -1,4 +1,4 @@
-# webgpu-sky-atmosphere
+# WebGPU Sky / Atmosphere
 A WebGPU implementation of Hillaire's atmosphere model ([A Scalable and Production Ready
 Sky and Atmosphere Rendering Technique](https://sebh.github.io/publications/egsr2020.pdf)).
 Renders the clear sky / atmosphere as a post process.
@@ -13,23 +13,89 @@ Try it out [here](https://jolifantobambla.github.io/webgpu-sky-atmosphere/demo/)
 
 ### NPM
 
-```
+```bash
 npm install webgpu-sky-atmosphre
 ```
 
-```
+```js
 import { SkyAtmosphereRenderer } from 'webgpu-sky-atmosphere';
 ```
 
 ### From GitHub
 
-```
+```js
 import { WebGPUSinglePassDownsampler } from 'https://jolifantobambla.github.io/webgpu-sky-atmosphere/dist/1.x/webgpu-sky-atmosphere.module.min.js';
 ```
 
 ## Usage
 
-The clear sky / atmosphere can either be rendered using low-resolution lookup tables or by doing a full-resolution ray marching pass.
+To render the clear sky / atmosphere, use a `SkyAtmosphereComputeRenderer`:
+
+```js
+import { SkyAtmisphereComputeRenderer } from 'webgpu-sky-atmosphere';
+
+// during setup
+const skyRenderer = new SkyAtmosphereComputeRenderer(device, {
+  // configurate the renderer here
+});
+
+// during render loop
+const skyUniforms = {
+  // set camera paramters, etc.
+};
+const skyPass = commandEncoder.beginComputePass();
+skyRenderer.renderSkyAtmosphere(skyPass, skyUniforms);
+skyPass.end();
+```
+
+Or, if you prefer render passes / bundles, use a `SkyAtmosphereRasterRenderer`:
+
+```js
+import { SkyAtmisphereRasterRenderer } from 'webgpu-sky-atmosphere';
+
+// during setup
+const skyRenderer = new SkyAtmosphereRasterRenderer(device, {
+  // configurate the renderer here
+});
+
+// during render loop
+const skyUniforms = {
+  // set camera paramters, etc.
+};
+
+// the lookup tables are rendered using a compute pass
+const lutsPass = commandEncoder.beginComputePass();
+skyRenderer.renderSkyAtmosphereLuts(lutsPass, skyUniforms);
+lutsPass.end();
+
+// the sky is then rendered using a render pass or render bundle
+const skyPass = commandEncoder.beginRenderPass({
+  // configure target
+});
+skyRenderer.renderSky(skyPass);
+skyPass.end();
+```
+
+Or, if you only need the lookup tables and want to roll your own sky renderer, use a `SkyAtmosphereRenderer`:
+
+```js
+import { SkyAtmisphereRenderer } from 'webgpu-sky-atmosphere';
+
+// during setup
+const skyRenderer = new SkyAtmosphereRenderer(device, {
+  // configurate the renderer here
+});
+
+// during render loop
+const skyUniforms = {
+  // set camera paramters, etc.
+};
+const skyPass = commandEncoder.beginComputePass();
+skyRenderer.renderSkyAtmosphereLutd(skyPass, skyUniforms);
+skyPass.end();
+```
+
+The above renderers default to rendering the clear sky / atmosphere using low-resolution lookup tables. However, it can also be rendered by doing a full-resolution ray marching pass.
 While the former method is faster, full-resolution ray marching produces smoother volumetric shadows.
 
 Both methods depend on a transmittance and a multiple scattering lookup table that are constant for a given atmosphere.
