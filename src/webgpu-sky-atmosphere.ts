@@ -17,9 +17,12 @@ import {
     DepthBufferConfig,
     MultiScatteringLutConfig,
     ShadowConfig,
+    SkyRendererComputeConfig,
     SkyAtmosphereLutConfig,
     SkyAtmosphereRendererConfig,
     SkyAtmosphereComputeRendererConfig,
+    SkyRendererConfigBase,
+    SkyRendererRasterConfig,
     SkyAtmosphereRasterRendererConfig,
     SkyViewLutConfig,
     TransmittanceLutConfig,
@@ -60,9 +63,12 @@ export {
     DepthBufferConfig,
     MultiScatteringLutConfig,
     ShadowConfig,
+    SkyRendererComputeConfig,
     SkyAtmosphereLutConfig,
     SkyAtmosphereRendererConfig,
     SkyAtmosphereComputeRendererConfig,
+    SkyRendererConfigBase,
+    SkyRendererRasterConfig,
     SkyAtmosphereRasterRendererConfig,
     SkyViewLutConfig,
     TransmittanceLutConfig,
@@ -104,7 +110,7 @@ export class SkyAtmosphereRenderer {
      * Creates a {@link SkyAtmosphereRenderer}.
      * @param device The `GPUDevice` used to create internal resources (textures, pipelines, etc.).
      * @param config A {@link SkyAtmosphereRendererConfig} used to configure internal resources and behavior.
-     * @param existingPipelines If this is defined, no new pipelines for rendering the internal lookup tables will be created. Instead, the existing pipelines given will be reused. The existing pipelines must be compatible with the {@link SkyAtmosphereConfig}. Especially, {@link SkyAtmosphereConfig.lookUpTables} and {@link SkyAtmosphereConfig.shadow} should be the same.
+     * @param existingPipelines If this is defined, no new pipelines for rendering the internal lookup tables will be created. Instead, the existing pipelines given will be reused. The existing pipelines must be compatible with the {@link SkyAtmosphereRendererConfig}. Especially, {@link SkyAtmosphereRendererConfig.lookUpTables} and {@link SkyAtmosphereRendererConfig.shadow} should be the same.
      * @param existingResources If this is defined, no new resources (buffers, textures, samplers) will be created. Instead, the existing resources given will be used.
      */
     constructor(device: GPUDevice, config: SkyAtmosphereRendererConfig, existingPipelines?: SkyAtmospherePipelines, existingResources?: SkyAtmosphereResources) {
@@ -233,7 +239,7 @@ export class SkyAtmosphereRenderer {
      * To produce meaningful results, this requires the transmittance and multiple scattering lookup tables, as well as the uniform buffers containing the {@link Atmosphere} and {@link Uniforms} parameters to hold valid data.
      * Call {@link renderConstantLuts} and {@link updateUniforms} to ensure this is the case.
      *
-     * If (a) user-defined shadow map(s) is used (see {@link SkyAtmosphereConfig.shadow}), make sure to encode any updates of the shadow map(s) before encoding this pass.
+     * If (a) user-defined shadow map(s) is used (see {@link SkyAtmosphereRendererConfig.shadow}), make sure to encode any updates of the shadow map(s) before encoding this pass.
      *
      * @param passEncoder Used to encode rendering of the lookup table. The encoder is not `end()`ed by this function.
      *
@@ -250,7 +256,7 @@ export class SkyAtmosphereRenderer {
      * To produce meaningful results, this requires the transmittance and multiple scattering lookup tables, as well as the uniform buffers containing the {@link Atmosphere} and {@link Uniforms} parameters to hold valid data.
      * Call {@link renderConstantLuts} and {@link updateUniforms} to ensure this is the case.
      *
-     * If (a) user-defined shadow map(s) is used (see {@link SkyAtmosphereConfig.shadow}), make sure to encode any updates of the shadow map(s) before encoding this pass.
+     * If (a) user-defined shadow map(s) is used (see {@link SkyAtmosphereRendererConfig.shadow}), make sure to encode any updates of the shadow map(s) before encoding this pass.
      *
      * @param passEncoder Used to encode rendering of the lookup tables. The encoder is not `end()`ed by this function.
      * @param uniforms If this is defined, {@link updateUniforms} is called before rendering the lookup tables.
@@ -348,8 +354,8 @@ export class SkyAtmosphereComputeRenderer extends SkyAtmosphereRenderer {
     /**
      * Creates a {@link SkyAtmosphereComputeRenderer}.
      * @param device The `GPUDevice` used to create internal resources (textures, pipelines, etc.).
-     * @param config A {@link SkyAtmosphereConfig} used to configure internal resources and behavior.
-     * @param existingPipelines If this is defined, no new pipelines for rendering the internal lookup tables will be created. Instead, the existing pipelines given will be reused. The existing pipelines must be compatible with the {@link SkyAtmosphereConfig}. Especially, {@link SkyAtmosphereConfig.lookUpTables} and {@link SkyAtmosphereConfig.shadow} should be the same.
+     * @param config A {@link SkyAtmosphereRendererConfig} used to configure internal resources and behavior.
+     * @param existingPipelines If this is defined, no new pipelines for rendering the internal lookup tables will be created. Instead, the existing pipelines given will be reused. The existing pipelines must be compatible with the {@link SkyAtmosphereRendererConfig}. Especially, {@link SkyAtmosphereRendererConfig.lookUpTables} and {@link SkyAtmosphereRendererConfig.shadow} should be the same.
      * @param existingResources If this is defined, no new resources (buffers, textures, samplers) will be created. Instead, the existing resources given will be used.
      */
     constructor(device: GPUDevice, config: SkyAtmosphereComputeRendererConfig, existingPipelines?: SkyAtmospherePipelines, existingResources?: SkyAtmosphereResources) {
@@ -698,7 +704,7 @@ export class SkyAtmosphereComputeRenderer extends SkyAtmosphereRenderer {
      * Renders the sky / atmosphere using full-screen ray marching.
      *
      * Requires the transmittance and multiple scattering lookup tables to be initialized.
-     * Either initialize these lookup tables in the constructor using {@link SkyAtmosphereConfig.initializeConstantLuts}, or call {@link renderConstantLuts}.
+     * Either initialize these lookup tables in the constructor using {@link SkyAtmosphereRendererConfig.initializeConstantLuts}, or call {@link renderConstantLuts}.
      *
      * @param passEncoder A `GPUComputePassEncoder` to encode the pass with. Can be the same encoder used to initialize the transmittance and multiple scattering lookup tables. The encoder is not `end()`ed by this function.
      *
@@ -770,8 +776,8 @@ export class SkyAtmosphereRasterRenderer extends SkyAtmosphereRenderer {
     /**
      * Creates a {@link SkyAtmosphereRasterRenderer}.
      * @param device The `GPUDevice` used to create internal resources (textures, pipelines, etc.).
-     * @param config A {@link SkyAtmosphereConfig} used to configure internal resources and behavior.
-     * @param existingPipelines If this is defined, no new pipelines for rendering the internal lookup tables will be created. Instead, the existing pipelines given will be reused. The existing pipelines must be compatible with the {@link SkyAtmosphereConfig}. Especially, {@link SkyAtmosphereConfig.lookUpTables} and {@link SkyAtmosphereConfig.shadow} should be the same.
+     * @param config A {@link SkyAtmosphereRendererConfig} used to configure internal resources and behavior.
+     * @param existingPipelines If this is defined, no new pipelines for rendering the internal lookup tables will be created. Instead, the existing pipelines given will be reused. The existing pipelines must be compatible with the {@link SkyAtmosphereRendererConfig}. Especially, {@link SkyAtmosphereRendererConfig.lookUpTables} and {@link SkyAtmosphereRendererConfig.shadow} should be the same.
      * @param existingResources If this is defined, no new resources (buffers, textures, samplers) will be created. Instead, the existing resources given will be used.
      */
     constructor(device: GPUDevice, config: SkyAtmosphereRasterRendererConfig, existingPipelines?: SkyAtmospherePipelines, existingResources?: SkyAtmosphereResources) {
@@ -1149,7 +1155,7 @@ export class SkyAtmosphereRasterRenderer extends SkyAtmosphereRenderer {
      * Renders the sky / atmosphere using full-screen ray marching.
      *
      * Requires the transmittance and multiple scattering lookup tables to be initialized.
-     * Either initialize these lookup tables in the constructor using {@link SkyAtmosphereConfig.initializeConstantLuts}, or call {@link renderConstantLuts}.
+     * Either initialize these lookup tables in the constructor using {@link SkyAtmosphereRendererConfig.initializeConstantLuts}, or call {@link renderConstantLuts}.
      *
      * @param passEncoder A `GPURenderPassEncoder` or `GPURenderBundleEncoder` to encode the pass with. The encoder is not `end()`ed by this function.
      *

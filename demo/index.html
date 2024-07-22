@@ -27,6 +27,56 @@
             const adapter = await navigator.gpu.requestAdapter();
             const device = await adapter.requestDevice({requiredFeatures: adapter.features.has('dual-source-blending') ? ['dual-source-blending'] : []});
 
+            let useDualSourceBlending = device.features.has('dual-source-blending');
+            if (useDualSourceBlending) {
+                // older chromium versions allow enabling dual source blending but don't allow use of 'src1' in blend state
+                // --> check if dummy pipeline throws
+                try {
+                    const module = device.createShaderModule({code: `
+                        enable dual_source_blending;
+                        @vertex
+                        fn vertex() -> @builtin(position) vec4<f32> {
+                            return vec4(0, 0, 0, 1);
+                        }
+                        struct FragOut {
+                            @location(0) @blend_src(0) c1: vec4<f32>,
+                            @location(0) @blend_src(1) c2: vec4<f32>,
+                        }
+                        @fragment
+                        fn fragment() -> FragOut {
+                            return FragOut();
+                        }
+                    `});
+                    device.createRenderPipeline({
+                        layout: 'auto',
+                        vertex: {
+                            module,
+                        },
+                        fragment: {
+                            module,
+                            targets: [{
+                                format: 'rgba16float',
+                                blend: {
+                                    color: {
+                                        operation: 'add',
+                                        srcFactor: 'one',
+                                        dstFactor: 'src1',
+                                    },
+                                    alpha: {
+                                        operation: 'add',
+                                        srcFactor: 'zero',
+                                        dstFactor: 'one',
+                                    },
+                                },
+                            }],
+                        }
+                    });
+                } catch (e) {
+                    console.warn('dual source blending not supported - disabling it', e);
+                    useDualSourceBlending = false;
+                }
+            }
+
             const canvas = document.querySelector('canvas');
             canvas.width = resolution[0];
             canvas.height = resolution[1];
@@ -162,7 +212,7 @@
                     ...skyAtmosphereConfigBase,
                     skyRenderer: {
                         renderTargetFormat: skyRenderTarget.format,
-                        useDualSourceBlending: true,
+                        useDualSourceBlending,
                         depthBuffer: {
                             texture: depthBuffer,
                             view: depthBufferView,

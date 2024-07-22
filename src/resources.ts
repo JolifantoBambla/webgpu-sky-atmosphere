@@ -79,7 +79,7 @@ export class SkyAtmosphereResources {
     /**
      * {@link Atmosphere} parameters.
      *
-     * Defaults to {@link makeEarthAtmosphere} using {@link SkyAtmosphereConfig.distanceScaleFactor} as {@link makeEarthAtmosphere}'s `scale` parameter.
+     * Defaults to {@link makeEarthAtmosphere} using {@link SkyAtmosphereRendererConfig.distanceScaleFactor} as {@link makeEarthAtmosphere}'s `scale` parameter.
      *
      * Set using {@link updateAtmosphere}.
      *

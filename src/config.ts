@@ -78,7 +78,7 @@ export interface SkyViewLutConfig {
     format?: GPUTextureFormat,
 
     /**
-     * If this is true and {@link SkyAtmosphereConfig.shadow} is defined, user-controlled shadow mapping will be evaluated for every sample when rendering the sky view lookup table.
+     * If this is true and {@link SkyAtmosphereRendererConfig.shadow} is defined, user-controlled shadow mapping will be evaluated for every sample when rendering the sky view lookup table.
      *
      * Defaults to true.
      */
@@ -109,7 +109,7 @@ export interface AerialPerspectiveLutConfig {
      *
      * This distance should be measured in the same units as {@link Atmosphere} parameters (e.g., {@link Atmosphere.bottomRadius}).
      *
-     * Defaults to 4 * {@link SkyAtmosphereConfig.distanceScaleFactor}.
+     * Defaults to 4 * {@link SkyAtmosphereRendererConfig.distanceScaleFactor}.
      */
     distancePerSlice?: number
 }
@@ -217,7 +217,7 @@ export interface SkyRendererConfigBase {
      *
      * Should be in the same distance unit used for the {@link Atmosphere} parameters.
      *
-     * Defaults to 100 * {@link SkyAtmosphereConfig.distanceScaleFactor}.
+     * Defaults to 100 * {@link SkyAtmosphereRendererConfig.distanceScaleFactor}.
      */
     distanceToMaxSampleCount?: number,
 
@@ -454,7 +454,7 @@ export interface SkyAtmosphereRendererConfig {
 
     /**
      * The atmosphere parameters for this {@link SkyAtmosphereRenderer}.
-     * Defaults to: {@link makeEarthAtmosphere} with the scale parameter set to {@link SkyAtmosphereConfig.distanceScaleFactor}.
+     * Defaults to: {@link makeEarthAtmosphere} with the scale parameter set to {@link SkyAtmosphereRendererConfig.distanceScaleFactor}.
      * @see {@link makeEarthAtmosphere}
      */
     atmosphere?: Atmosphere,
