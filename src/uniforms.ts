@@ -35,6 +35,9 @@ export interface AtmosphereLight {
 
     /**
      * Light disk's luminance scale.
+     * 
+     * The light disk's luminance is computed from the given {@link illuminance} and the disk's {@link diskAngularDiameter}.
+     * This scale is applied to the computed luminance value to give users more control over the sun disk's appearance.
      *
      * Defaults to 1.0.
      */
@@ -72,13 +75,17 @@ export interface Uniforms {
 
     /**
      * Minimum number of ray marching samples per pixel when rendering the sky view lookup table or rendering the sky using per-pixel ray marching.
+     * 
+     * Defaults to 14.
      */
-    rayMarchMinSPP: number,
+    rayMarchMinSPP?: number,
 
     /**
      * Maximum number of ray marching samples per pixel when rendering the sky view lookup table or rendering the sky using per-pixel ray marching.
+     * 
+     * Defaults to 30.
      */
-    rayMarchMaxSPP: number,
+    rayMarchMaxSPP?: number,
 
     /**
      * Resolution of the output texture.
@@ -87,6 +94,10 @@ export interface Uniforms {
 
     /**
      * The current frame id.
+     * 
+     * This is only used if {@link SkyRendererConfigBase.randomizeRayOffsets} is true.
+     * 
+     * Defaults to 0.
      */
-    frameId: number,
+    frameId?: number,
 }

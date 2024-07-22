@@ -24,19 +24,35 @@ import { SkyAtmosphereRenderer } from 'webgpu-sky-atmosphere';
 ### From GitHub
 
 ```js
-import { WebGPUSinglePassDownsampler } from 'https://jolifantobambla.github.io/webgpu-sky-atmosphere/dist/1.x/webgpu-sky-atmosphere.module.min.js';
+import { SkyAtmosphereRenderer } from 'https://jolifantobambla.github.io/webgpu-sky-atmosphere/dist/1.x/webgpu-sky-atmosphere.module.min.js';
 ```
 
 ## Usage
 
+### Quick Start
+
 To render the clear sky / atmosphere, use a `SkyAtmosphereComputeRenderer`:
 
 ```js
-import { SkyAtmisphereComputeRenderer } from 'webgpu-sky-atmosphere';
+import { SkyAtmosphereComputeRenderer } from 'webgpu-sky-atmosphere';
 
 // during setup
 const skyRenderer = new SkyAtmosphereComputeRenderer(device, {
   // configurate the renderer here
+  skyRenderer: {
+    backBuffer: {
+      // the sky will be rendered on top of the contents of this...
+      texture: afterLightingTexture,
+    },
+    renderTarget: {
+      // ... results will be written to this texture
+      texture: withSkyAppliedTexture,
+    },
+    depthBuffer: {
+      // ...using the depth buffer to limit ray marching
+      texture: depthBuffer,
+    },
+  }
 });
 
 // during render loop
@@ -51,11 +67,19 @@ skyPass.end();
 Or, if you prefer render passes / bundles, use a `SkyAtmosphereRasterRenderer`:
 
 ```js
-import { SkyAtmisphereRasterRenderer } from 'webgpu-sky-atmosphere';
+import { SkyAtmosphereRasterRenderer } from 'webgpu-sky-atmosphere';
 
 // during setup
 const skyRenderer = new SkyAtmosphereRasterRenderer(device, {
   // configurate the renderer here
+  skyRenderer: {
+    // the format of the render target at location 0
+    renderTargetFormat: 'rgba16float',
+    // the depth buffer is used to limit the ray marching distance
+    depthBuffer: {
+      texture: depthBuffer,
+    }
+  }
 });
 
 // during render loop
@@ -83,7 +107,7 @@ import { SkyAtmisphereRenderer } from 'webgpu-sky-atmosphere';
 
 // during setup
 const skyRenderer = new SkyAtmosphereRenderer(device, {
-  // configurate the renderer here
+  // configurate the renderer here or use the defaults
 });
 
 // during render loop
@@ -91,14 +115,38 @@ const skyUniforms = {
   // set camera paramters, etc.
 };
 const skyPass = commandEncoder.beginComputePass();
-skyRenderer.renderSkyAtmosphereLutd(skyPass, skyUniforms);
+skyRenderer.renderSkyAtmosphereLuts(skyPass, skyUniforms);
 skyPass.end();
 ```
+
+### Full-resolution ray marching
 
 The above renderers default to rendering the clear sky / atmosphere using low-resolution lookup tables. However, it can also be rendered by doing a full-resolution ray marching pass.
 While the former method is faster, full-resolution ray marching produces smoother volumetric shadows.
 
-Both methods depend on a transmittance and a multiple scattering lookup table that are constant for a given atmosphere.
+To use full-resolution ray marching instead of the faster lookup table-based approach, set the default behavior for `renderSkyAtmosphere` and `renderSky` via the config:
+
+```js
+const config = {
+  skyRenderer: {
+    defaultToPerPixelRayMarch: true,
+  }
+} 
+```
+
+Or pass the corresponding flag to `renderSkyAtmosphere` / `renderSky` directly:
+
+```js
+const useFullResolutionRayMarch = true;
+
+skyRenderer.renderSkyAtmosphere(computePass, config, null, useFullResolutionRayMarch);
+
+skyRenderer.renderSky(renderPass, useFullResolutionRayMarch);
+```
+
+### Lookup tables
+
+Both sky rendering methods depend on a transmittance and a multiple scattering lookup table that are constant for a given atmosphere.
 By default, these lookup tables are rendered at the time the renderer is created.
 To re-render these lookup tables, e.g., if the atmosphere parameters change, call
 
@@ -111,7 +159,7 @@ skyRenderer.renderConstantLuts(
 );
 ```
 
-When not doing a full-screen ray marching pass, an additional low resolution lookup table for the distant sky as well as an aerial perspectivr lookup table (as a  volume around the camera) need to be rendered. These lookup tables are view-dependent and need to be re-rendered each frame they are used:
+When not doing a full-resolution ray marching pass, an additional low resolution lookup table for the distant sky as well as an aerial perspective lookup table (as a volume around the camera) need to be rendered. These lookup tables are view-dependent and need to be re-rendered each frame they are used:
 
 ```js
 skyRenderer.renderDynamicLuts(
@@ -124,74 +172,6 @@ skyRenderer.renderDynamicLuts(
 
 Alternatively, each lookup table can be rendered individually.
 See the documentation for more details.
-
-The `SkyAtmosphereRenderer` comes in two flavors:
- * `SkyAtmosphereComputeRenderer`: renders the sky / atmosphere using a compute pass.
- * `SkyAtmosphereRasterRenderer`: render the sky / atmosphere using a render (rasterization) pass.
-
-### Using render passes / bundles
-
-The `SkyAtmosphereRasterRenderer` renders the sky using a render pass or render bundle.
-However, the lookup tables are still rendered using compute passes.
-
-To render the loopup tables and the sky call:
-
-```js
-const uniforms = {
-  ... // set uniforms
-}
-
-// first render the lookup tables
-const computePassEncoder = commandEncoder.beginComputePass();
-skyRenderer.renderAtmosphere(computePassEncoder, uniforms);
-computePassEncoder.end();
-
-// then render the sky using a render pass
-const renderPass = commandEncoder.beginRenderPass({
-  color: [{
-    ...
-  }],
-});
-skyRenderer.renderSky(renderPass);
-renderPass.end();
-
-// alternatively, use a render bundle
-const renderBundle ...
-
-```
-
-### Using compute passes
-
-The `SkyAtmosphereComputeRenderer` renders both the internal lookup tables using compute passes.
-
-To render the lookup tables and the sky using a single compute pass encoder call `renderSkyAtmosphere`:
-
-```js
-const uniforms = {
-  ... // set uniforms
-}
-
-const computePassEncoder = commandEncoder.beginComputePass();
-skyRenderer.renderSkyAtmosphere(computePassEncoder, uniforms);
-computePassEncoder.end();
-```
-
-Alternatively, all lookup tables can be rendered individually.
-Read the docs for more details.
-
-To create a `SkyAtmosphereComputeRenderer` configure the `skyRenderer.passConfig` property as a `SkyAtmosphereComputePassConfig`:
-
-```js
-const skyRenderer = SkyAtmosphererRenderer.makeSkyAtmosphereRenderer({
-  skyRenderer: {
-    passConfig: {
-      backBuffer: {},
-      renderTarget: {},
-    },
-    depthBuffer: {},
-  },
-});
-```
 
 ### Light sources
 
@@ -276,4 +256,45 @@ const config = {
 }
 ```
 
+### Custom uniform buffers
 
+It is likely that some or even all uniforms used by a `SkyAtmosphereRenderer` are already available on the GPU in some other buffers in your engine.
+To replace the `SkyAtmosphereRenderer`'s internal uniform buffer by one or more user-controlled uniform buffers, configure the renderer to inject external bind groups and WGSL code, similar to how shadows were integrated into the renderer:
+
+```js
+const config = {
+    ...
+    customUniformsSource: {
+        bindGroupLayouts: [uniformsBindGroupLayout],
+        bindGroups: [uniformsBindGroup],
+        wgslCode: `
+            @group(2) @binding(0) var<uniform> custom_uniform_buffer: CustomUniforms;
+            
+            fn get_camera_world_position() -> vec3<f32> {
+              return custom_uniform_buffer.camera.position;
+            }
+
+            fn get_ray_march_min_spp() -> f32 {
+              return 16.0;
+            }
+
+            // ... and so on
+            
+            // this needs to implement a larger interface
+            // read the docs for more information
+        `
+    },
+    ...
+}
+```
+
+## Contributions
+
+Contributions are very welcome. If you find a bug or think some important functionality is missing, please file an issue [here](https://github.com/JolifantoBambla/webgpu-sky-atmosphere/issues). If want to help out yourself, feel free to submit a pull request [here](https://github.com/JolifantoBambla/webgpu-sky-atmosphere/pulls).
+
+
+## Acknowledgements
+
+This library is originally a WebGPU port of Hillaire's [demo implementation](https://github.com/sebh/UnrealEngineSkyAtmosphere) for his paper [A Scalable and Production Ready
+Sky and Atmosphere Rendering Technique](https://sebh.github.io/publications/egsr2020.pdf).
+The original demo was released under the MIT licence by Epic Games, Inc.
