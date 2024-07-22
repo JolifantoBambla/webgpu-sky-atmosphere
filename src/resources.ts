@@ -1,5 +1,5 @@
 import { Atmosphere, makeEarthAtmosphere } from './atmosphere.js';
-import { SkyAtmosphereConfig } from './config.js';
+import { SkyAtmosphereRendererConfig } from './config.js';
 import { Uniforms } from './uniforms.js';
 import { LookUpTable, makeLutSampler } from './util.js';
 
@@ -34,8 +34,10 @@ export class SkyAtmosphereResources {
 
     /**
      * A uniform buffer of size {@link UNIFORMS_BUFFER_SIZE} storing parameters set through {@link Uniforms}.
+     *
+     * If custom uniform buffers are used, this is undefined (see {@link CustomUniformsSourceConfig}).
      */
-    readonly uniformsBuffer: GPUBuffer;
+    readonly uniformsBuffer?: GPUBuffer;
 
     /**
      * A linear sampler used to sample the look up tables.
@@ -85,7 +87,7 @@ export class SkyAtmosphereResources {
      */
     #atmosphere: Atmosphere;
 
-    constructor(device: GPUDevice, config: SkyAtmosphereConfig, lutSampler?: GPUSampler) {
+    constructor(device: GPUDevice, config: SkyAtmosphereRendererConfig, lutSampler?: GPUSampler) {
         this.label = config.label ?? 'atmosphere';
         this.device = device;
 
@@ -98,11 +100,15 @@ export class SkyAtmosphereResources {
         });
         this.updateAtmosphere(this.#atmosphere);
 
-        this.uniformsBuffer = device.createBuffer({
-            label: `config buffer [${this.label}]`,
-            size: UNIFORMS_BUFFER_SIZE,
-            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-        });
+        if (config.customUniformsSource) {
+            this.uniformsBuffer = undefined;
+        } else {
+            this.uniformsBuffer = device.createBuffer({
+                label: `config buffer [${this.label}]`,
+                size: UNIFORMS_BUFFER_SIZE,
+                usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+            });
+        }
 
         this.lutSampler = lutSampler || makeLutSampler(device);
 
@@ -159,7 +165,9 @@ export class SkyAtmosphereResources {
      * @see uniformsToFloatArray Internally call {@link uniformsToFloatArray} to convert the {@link Uniforms} to a `Float32Array`.
      */
     public updateUniforms(uniforms: Uniforms) {
-        this.device.queue.writeBuffer(this.uniformsBuffer, 0, uniformsToFloatArray(uniforms));
+        if (this.uniformsBuffer) {
+            this.device.queue.writeBuffer(this.uniformsBuffer, 0, uniformsToFloatArray(uniforms));
+        }
     }
 }
 

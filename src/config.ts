@@ -201,86 +201,9 @@ export interface ComputeRenderTargetConfig {
 }
 
 /**
- * Config for rendering the sky / atmosphere using a GPUComputePipeline.
- */
-export interface SkyRendererComputePassConfig {
-    /**
-     * The back buffer texture to use as back ground for rendering the sky / atmosphere.
-     */
-    backBuffer: ComputeBackBufferConfig,
-
-    /**
-     * The render target to render into.
-     * The result will be blended with the texture data in the {@link backBuffer}.
-     */
-    renderTarget: ComputeRenderTargetConfig,
-
-    /**
-     * If this this true, colored transmittance will be used to blend the rendered sky and the texture data in the {@link backBuffer} when using the full-screen ray marching pass to render the sky.
-     *
-     * Defaults to true.
-     */
-    useColoredTransmittanceOnPerPixelRayMarch?: boolean,
-}
-
-/**
- * Config for rendering the sky / atmosphere using a `GPURenderPipeline`.
- */
-export interface SkyRenderPassConfig {
-    /**
-     * The format of the render target at location 0.
-     *
-     * Must support `RENDER_ATTACHMENT` usage.
-     * Should have at least 16 bit precision per channel.
-     */
-    renderTargetFormat: GPUTextureFormat,
-
-    /**
-     * Use dual-source blending for colored transmissions.
-     *
-     * Note that colored transmissions are only supported when using full-screen ray marching instead of the aerial perspective lookup table.
-     * 
-     * Without the "dual-source-blending" feature enabled, colored transmissions can only be rendered using a compute pipeline or by writing luminance and transmittance to extra targets and blending them in an extra pass (see {@link transmissionFormat}, the blending step is then left to the user).
-     *
-     * Defaults to false.
-     */
-    useDualSourceBlending?: boolean,
-
-    /**
-     * If this is set and dual source blending is not enabled or not available, all render passes will be configured to use two render targets, where transmission will be written to the second render target using this format.
-     * In this case, no blend state will be configured for the render target at location 0. Instead, blending is left to the user.
-     * 
-     * If {@link useDualSourceBlending} is true and the device support the `"dual-source-blending"` feature, this option is ignored.
-     * 
-     * If {@link writeTransmissionOnlyOnPerPixelRayMarch} is true, this setting does not affect the sky rendering pass using the aerial perspective lookup table. It will instead be configured to expect a single render target at location 0 and a blend state will be configured for the pipeline.
-     */
-    transmissionFormat?: GPUTextureFormat,
-
-    /**
-     * If this is true, a {@link transmissionFormat} is set, and dual source blending is not enabled or not available, only configure the more expensive full-screen ray marching pass to use a second render target and write colored transmittance.
-     *
-     * Note that the faster pass using the aerial perspective lookup table does not support colored transmittance anyway and thus writing to a second render target is an extra cost without any benefit.
-     *
-     * Defaults to true.
-     */
-    writeTransmissionOnlyOnPerPixelRayMarch?: boolean,
-}
-
-/**
  * External resources and settings required by a {@link SkyAtmosphereRenderer}.
  */
-export interface SkyRendererPassConfig {
-    /**
-     * External resources required by a {@link SkyAtmosphereRenderer} when using a render or compute pipeline for rendering the atmosphere.
-     *
-     * This setting defines whether {@link SkyAtmosphereRenderer.makeSkyAtmosphereRenderer} will create a {@link SkyAtmosphereComputeRenderer} or a {@link SkyAtmosphereRasterRenderer}.
-     */
-    passConfig: SkyRendererComputePassConfig | SkyRenderPassConfig,
-
-    /**
-     * The depth buffer to limit the ray marching distance when rendering the sky / atmosphere.
-     */
-    depthBuffer: DepthBufferConfig,
+export interface SkyRendererConfigBase {
 
     /**
      * If this is true, {@link SkyAtmosphereRasterRenderer.renderSky} / {@link SkyAtmosphereComputeRenderer.renderSkyAtmosphere} will default to full-screen ray marching to render the atmosphere.
@@ -305,6 +228,76 @@ export interface SkyRendererPassConfig {
      * Defaults to true.
      */
     randomizeRayOffsets?: boolean,
+}
+
+export interface SkyRendererComputeConfig extends SkyRendererConfigBase {
+    /**
+     * The depth buffer to limit the ray marching distance when rendering the sky / atmosphere.
+     */
+    depthBuffer: DepthBufferConfig,
+
+    /**
+     * The back buffer texture to use as back ground for rendering the sky / atmosphere.
+     */
+    backBuffer: ComputeBackBufferConfig,
+
+    /**
+     * The render target to render into.
+     * The result will be blended with the texture data in the {@link backBuffer}.
+     */
+    renderTarget: ComputeRenderTargetConfig,
+
+    /**
+     * If this this true, colored transmittance will be used to blend the rendered sky and the texture data in the {@link backBuffer} when using the full-screen ray marching pass to render the sky.
+     *
+     * Defaults to true.
+     */
+    useColoredTransmittanceOnPerPixelRayMarch?: boolean,
+}
+
+export interface SkyRendererRasterConfig extends SkyRendererConfigBase {
+    /**
+     * The depth buffer to limit the ray marching distance when rendering the sky / atmosphere.
+     */
+    depthBuffer: DepthBufferConfig,
+
+    /**
+     * The format of the render target at location 0.
+     *
+     * Must support `RENDER_ATTACHMENT` usage.
+     * Should have at least 16 bit precision per channel.
+     */
+    renderTargetFormat: GPUTextureFormat,
+
+    /**
+     * Use dual-source blending for colored transmissions.
+     *
+     * Note that colored transmissions are only supported when using full-screen ray marching instead of the aerial perspective lookup table.
+     *
+     * Without the "dual-source-blending" feature enabled, colored transmissions can only be rendered using a compute pipeline or by writing luminance and transmittance to extra targets and blending them in an extra pass (see {@link transmissionFormat}, the blending step is then left to the user).
+     *
+     * Defaults to false.
+     */
+    useDualSourceBlending?: boolean,
+
+    /**
+     * If this is set and dual source blending is not enabled or not available, all render passes will be configured to use two render targets, where transmission will be written to the second render target using this format.
+     * In this case, no blend state will be configured for the render target at location 0. Instead, blending is left to the user.
+     *
+     * If {@link useDualSourceBlending} is true and the device support the `"dual-source-blending"` feature, this option is ignored.
+     *
+     * If {@link writeTransmissionOnlyOnPerPixelRayMarch} is true, this setting does not affect the sky rendering pass using the aerial perspective lookup table. It will instead be configured to expect a single render target at location 0 and a blend state will be configured for the pipeline.
+     */
+    transmissionFormat?: GPUTextureFormat,
+
+    /**
+     * If this is true, a {@link transmissionFormat} is set, and dual source blending is not enabled or not available, only configure the more expensive full-screen ray marching pass to use a second render target and write colored transmittance.
+     *
+     * Note that the faster pass using the aerial perspective lookup table does not support colored transmittance anyway and thus writing to a second render target is an extra cost without any benefit.
+     *
+     * Defaults to true.
+     */
+    writeTransmissionOnlyOnPerPixelRayMarch?: boolean,
 }
 
 /**
@@ -365,20 +358,79 @@ export interface AtmosphereLightsConfig {
 
     /**
      * If this is true, limb darkening is applied to the disk rendered for the first atmosphere light.
-     * 
+     *
      * Defaults to true.
      */
     applyLimbDarkeningOnSun?: boolean,
 
     /**
      * If this is true, limb darkening is applied to the disk rendered for the second atmosphere light.
-     * 
+     *
      * Defaults to false.
      */
     applyLimbDarkeningOnMoon?: boolean,
 }
 
-export interface SkyAtmosphereConfig {
+export interface CustomUniformsSourceConfig {
+    /**
+     * A list of bind group layouts specifying all user-controlled resources containing the individual parts of the uniform values required by a {@link SkyAtmosphereRenderer}.
+     *
+     * This should not contain more than `maxBindGroups - 1` bind group layouts, where `maxBindGroups` is the maximum number of bind group layouts per pipeline layout supported by the device.
+     */
+    bindGroupLayouts: GPUBindGroupLayout[],
+
+    /**
+     * A list of bind groups generated using the {@link bindGroupLayouts}, containing all user-controlled resources containing the individual parts of the uniform values required by a {@link SkyAtmosphereRenderer}.
+     */
+    bindGroups: GPUBindGroup[],
+
+    /**
+     * The shader code to inject into internal pipelines.
+     *
+     * This needs to provide at least the following interface:
+     *
+     *      fn get_inverse_projection() -> mat4x4<f32>
+     *
+     *      fn get_inverse_view() -> mat4x4<f32>
+     *
+     *      fn get_camera_world_position() -> vec3<f32>
+     *
+     *      fn get_frame_id() -> f32
+     *
+     *      fn get_screen_resolution() -> vec2<f32>
+     *
+     *      fn get_ray_march_min_spp() -> f32
+     *
+     *      fn get_ray_march_max_spp() -> f32
+     *
+     *      fn get_sun_illuminance() -> vec3<f32>
+     *
+     *      fn get_sun_direction() -> vec3<f32>
+     *
+     *      fn get_sun_disk_diameter() -> f32
+     *
+     *      fn get_sun_disk_luminance_scale() -> f32
+     *
+     *      fn get_moon_illuminance() -> vec3<f32>
+     *
+     *      fn get_moon_direction() -> vec3<f32>
+     *
+     *      fn get_moon_disk_diameter() -> f32
+     *
+     *      fn get_moon_disk_luminance_scale() -> f32
+     *
+     * For more details on the individual parameters, refer to the documentation on {@link Uniforms}.
+     *
+     * The WGSL code should also include the bind groups matching the given {@link bindGroupLayouts}.
+     * The bind groups must not use bind group index 0.
+     *
+     * If shadows are used (see {@link ShadowConfig}), the bind group layouts required to render shadows will be injected before the custom unifom buffer bind group layouts.
+     * I.e., the bind group indices should start with `1 + shadowConfig.bindGroupLayouts.length`.
+     */
+    wgslCode: string,
+}
+
+export interface SkyAtmosphereRendererConfig {
     /**
      * A name used to lable internal resources and pipelines.
      *
@@ -407,10 +459,7 @@ export interface SkyAtmosphereConfig {
      */
     atmosphere?: Atmosphere,
 
-    /**
-     * Config parameters for rendering the sky required by a {@link SkyAtmosphereRenderer} (or a {@link SkyAtmosphereComputeRenderer} / {@link SkyAtmosphereRasterRenderer}).
-     */
-    skyRenderer: SkyRendererPassConfig,
+    skyRenderer?: SkyRendererConfigBase,
 
     /**
      * Config for atmosphere lights (sun, moon, sun disk).
@@ -423,7 +472,28 @@ export interface SkyAtmosphereConfig {
     shadow?: ShadowConfig,
 
     /**
+     * Config for externally controlled buffers containing the parameters otherwise controlled by an internal buffer storing {@link Uniforms}.
+     *
+     * If this is set, no internal buffer for storing {@link Uniforms} will be created or updated.
+     */
+    customUniformsSource?: CustomUniformsSourceConfig,
+
+    /**
      * Config for internally used lookup tables.
      */
     lookUpTables?: SkyAtmosphereLutConfig,
+}
+
+export interface SkyAtmosphereComputeRendererConfig extends SkyAtmosphereRendererConfig {
+    /**
+     * Config for the sky rendering post process.
+     */
+    skyRenderer: SkyRendererComputeConfig,
+}
+
+export interface SkyAtmosphereRasterRendererConfig extends SkyAtmosphereRendererConfig {
+    /**
+     * Config for the sky rendering post process.
+     */
+    skyRenderer: SkyRendererRasterConfig,
 }

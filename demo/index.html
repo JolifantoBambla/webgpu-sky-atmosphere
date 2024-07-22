@@ -18,7 +18,7 @@
         import { makeDragonRenderer } from './stanford-dragon.js';
         import { makeUi } from './ui.js';
 
-        import { SkyAtmosphereRenderer } from '../dist/1.x/webgpu-sky-atmosphere.module.min.js';
+        import { SkyAtmosphereComputeRenderer, SkyAtmosphereRasterRenderer } from '../dist/1.x/webgpu-sky-atmosphere.module.min.js';
 
 
         async function main() {
@@ -138,18 +138,16 @@
                     `
                 },
             };
-            const skyAtmosphereRenderer = SkyAtmosphereRenderer.makeSkyAtmosphereRenderer(device, {
+            const skyAtmosphereRenderer = new SkyAtmosphereComputeRenderer(device, {
                 ...skyAtmosphereConfigBase,
                 skyRenderer: {
-                    passConfig: {
-                        backBuffer: {
-                            texture: backBuffer,
-                            view: backBufferView,
-                        },
-                        renderTarget: {
-                            texture: skyRenderTarget,
-                            view: skyRenderTarget.createView(),
-                        },
+                    backBuffer: {
+                        texture: backBuffer,
+                        view: backBufferView,
+                    },
+                    renderTarget: {
+                        texture: skyRenderTarget,
+                        view: skyRenderTarget.createView(),
                     },
                     depthBuffer: {
                         texture: depthBuffer,
@@ -158,15 +156,13 @@
                     },
                 },
             });
-            const skyAtmosphereRenderer2 = SkyAtmosphereRenderer.makeSkyAtmosphereRenderer(
+            const skyAtmosphereRenderer2 = new SkyAtmosphereRasterRenderer(
                 device,
                 {
                     ...skyAtmosphereConfigBase,
                     skyRenderer: {
-                        passConfig: {
-                            renderTargetFormat: skyRenderTarget.format,
-                            useDualSourceBlending: true,
-                        },
+                        renderTargetFormat: skyRenderTarget.format,
+                        useDualSourceBlending: true,
                         depthBuffer: {
                             texture: depthBuffer,
                             view: depthBufferView,

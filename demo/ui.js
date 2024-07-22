@@ -4,15 +4,15 @@ import { Pane } from 'https://cdn.jsdelivr.net/npm/tweakpane@4.0.3/dist/tweakpan
 export function makeUi(atmosphere, camera, scaleFromKilometers = 1.0) {
     const params = {
         debugViews: {
-            showTransmittanceLut: true,
+            showTransmittanceLut: false,
     
-            showMultiScatteringLut: true,
+            showMultiScatteringLut: false,
             multiScatteringLutFactor: 50,
             
-            showSkyViewLut: true,
+            showSkyViewLut: false,
             skyViewLutFactor: 50,
             
-            showAerialPerspectiveLut: true,
+            showAerialPerspectiveLut: false,
             aerialPerspectiveLutFactor: 50,
             aerialPerspectiveSlice: 0,
         },
@@ -80,21 +80,6 @@ export function makeUi(atmosphere, camera, scaleFromKilometers = 1.0) {
         title: 'WebGPU Sky / Atmosphere',
         expanded: true,
     });
-    const debugViewFolder = pane.addFolder({
-        title: 'Debug views',
-        expanded: false,
-    });
-    debugViewFolder.addBinding(params.debugViews, 'showTransmittanceLut', {label: 'Show transmittance LUT'});
-
-    debugViewFolder.addBinding(params.debugViews, 'showMultiScatteringLut', {label: 'Show multi. scat. LUT'});
-    debugViewFolder.addBinding(params.debugViews, 'multiScatteringLutFactor', {min: 1, max: 100, step: 1, label: 'Multi. scat. scale'});
-    
-    debugViewFolder.addBinding(params.debugViews, 'showSkyViewLut', {label: 'Show sky view LUT'});
-    debugViewFolder.addBinding(params.debugViews, 'skyViewLutFactor', {min: 1, max: 100, step: 1, label: 'Sky view scale'});
-    
-    debugViewFolder.addBinding(params.debugViews, 'showAerialPerspectiveLut', {label: 'Show aerial persp. LUT'});
-    debugViewFolder.addBinding(params.debugViews, 'aerialPerspectiveLutFactor', {min: 1, max: 100, step: 1, label: 'Aerial persp. scale'});
-    debugViewFolder.addBinding(params.debugViews, 'aerialPerspectiveSlice', {min: 0, max: 31, step: 1, label: 'Aerial persp. slice'});
 
     const renderSettingsFolder = pane.addFolder({
         title: 'Render settings',
@@ -183,6 +168,22 @@ export function makeUi(atmosphere, camera, scaleFromKilometers = 1.0) {
         .on('change', e => {
             params.atmosphere.absorption.extinction = [e.value.r, e.value.g, e.value.b].map(c => c / (100.0 * scaleFromKilometers));
         });
+
+    const debugViewFolder = pane.addFolder({
+        title: 'Debug views',
+        expanded: false,
+    });
+    debugViewFolder.addBinding(params.debugViews, 'showTransmittanceLut', {label: 'Show transmittance LUT'});
+
+    debugViewFolder.addBinding(params.debugViews, 'showMultiScatteringLut', {label: 'Show multi. scat. LUT'});
+    debugViewFolder.addBinding(params.debugViews, 'multiScatteringLutFactor', {min: 1, max: 100, step: 1, label: 'Multi. scat. scale'});
+    
+    debugViewFolder.addBinding(params.debugViews, 'showSkyViewLut', {label: 'Show sky view LUT'});
+    debugViewFolder.addBinding(params.debugViews, 'skyViewLutFactor', {min: 1, max: 100, step: 1, label: 'Sky view scale'});
+    
+    debugViewFolder.addBinding(params.debugViews, 'showAerialPerspectiveLut', {label: 'Show aerial persp. LUT'});
+    debugViewFolder.addBinding(params.debugViews, 'aerialPerspectiveLutFactor', {min: 1, max: 100, step: 1, label: 'Aerial persp. scale'});
+    debugViewFolder.addBinding(params.debugViews, 'aerialPerspectiveSlice', {min: 0, max: 31, step: 1, label: 'Aerial persp. slice'});
 
     return params;
 }

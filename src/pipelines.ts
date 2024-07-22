@@ -1,4 +1,4 @@
-import { SkyAtmosphereConfig, ShadowConfig } from './config.js';
+import { SkyAtmosphereRendererConfig, ShadowConfig, CustomUniformsSourceConfig } from './config.js';
 import { AERIAL_PERSPECTIVE_LUT_FORMAT, ATMOSPHERE_BUFFER_SIZE, UNIFORMS_BUFFER_SIZE, DEFAULT_AERIAL_PERSPECTIVE_LUT_SIZE, DEFAULT_MULTISCATTERING_LUT_SIZE, DEFAULT_SKY_VIEW_LUT_SIZE, MULTI_SCATTERING_LUT_FORMAT, SKY_VIEW_LUT_FORMAT, SkyAtmosphereResources, TRANSMITTANCE_LUT_FORMAT } from './resources.js';
 import { makeAerialPerspectiveLutShaderCode, makeMultiScatteringLutShaderCode, makeSkyViewLutShaderCode, makeTransmittanceLutShaderCode } from './shaders.js';
 import { ComputePass } from './util.js';
@@ -13,7 +13,7 @@ export class SkyAtmospherePipelines {
     readonly skyViewLutPipeline: SkyViewLutPipeline;
     readonly aerialPerspectiveLutPipeline: AerialPerspectiveLutPipeline;
 
-    constructor(device: GPUDevice, config: SkyAtmosphereConfig) {
+    constructor(device: GPUDevice, config: SkyAtmosphereRendererConfig) {
         this.transmittanceLutPipeline = new TransmittanceLutPipeline(
             device,
             config.lookUpTables?.transmittanceLut?.format ?? TRANSMITTANCE_LUT_FORMAT,
@@ -29,9 +29,10 @@ export class SkyAtmospherePipelines {
             config.lookUpTables?.skyViewLut?.format ?? SKY_VIEW_LUT_FORMAT,
             config.lookUpTables?.skyViewLut?.size ?? DEFAULT_SKY_VIEW_LUT_SIZE,
             config.lookUpTables?.multiScatteringLut?.size ?? [DEFAULT_MULTISCATTERING_LUT_SIZE, DEFAULT_MULTISCATTERING_LUT_SIZE],
-            config.skyRenderer.distanceToMaxSampleCount ?? (100.0 * (config.distanceScaleFactor ?? 1.0)),
+            config.skyRenderer?.distanceToMaxSampleCount ?? (100.0 * (config.distanceScaleFactor ?? 1.0)),
             config.lights?.useMoon ?? false,
             (config.lookUpTables?.skyViewLut?.affectedByShadow ?? true) ? config.shadow : undefined,
+            config.customUniformsSource,
         );
         this.aerialPerspectiveLutPipeline = new AerialPerspectiveLutPipeline(
             device,
@@ -41,6 +42,7 @@ export class SkyAtmospherePipelines {
             config.lookUpTables?.multiScatteringLut?.size ?? [DEFAULT_MULTISCATTERING_LUT_SIZE, DEFAULT_MULTISCATTERING_LUT_SIZE],
             config.lights?.useMoon ?? false,
             config.shadow,
+            config.customUniformsSource,
         );
     }
 }
@@ -245,14 +247,14 @@ export class SkyViewLutPipeline {
     readonly skyViewLutSize: [number, number];
     readonly multiscatteringLutSize: [number, number];
 
-    constructor(device: GPUDevice, skyViewLutFormat: GPUTextureFormat, skyViewLutSize: [number, number], multiscatteringLutSize: [number, number], distanceToMaxSampleCount: number, useMoon: boolean, shadowConfig?: ShadowConfig) {
+    constructor(device: GPUDevice, skyViewLutFormat: GPUTextureFormat, skyViewLutSize: [number, number], multiscatteringLutSize: [number, number], distanceToMaxSampleCount: number, useMoon: boolean, shadowConfig?: ShadowConfig, customUniformsConfig?: CustomUniformsSourceConfig) {
         this.device = device;
         this.skyViewLutFormat = skyViewLutFormat;
         this.skyViewLutSize = skyViewLutSize;
         this.multiscatteringLutSize = multiscatteringLutSize;
         this.bindGroupLayout = device.createBindGroupLayout({
             label: 'sky view LUT pass',
-            entries: [
+            entries: ([
                 {
                     binding: 0,
                     visibility: GPUShaderStage.COMPUTE,
@@ -262,7 +264,7 @@ export class SkyViewLutPipeline {
                         minBindingSize: ATMOSPHERE_BUFFER_SIZE,
                     },
                 },
-                {
+                customUniformsConfig ? undefined : {
                     binding: 1,
                     visibility: GPUShaderStage.COMPUTE,
                     buffer: {
@@ -305,17 +307,21 @@ export class SkyViewLutPipeline {
                         viewDimension: '2d',
                     },
                 },
-            ],
+            ].filter(e => e !== undefined) as GPUBindGroupLayoutEntry[])
+            .map((e, i) => {
+                e.binding = i;
+                return e;
+            }) as GPUBindGroupLayoutEntry[],
         });
         this.pipeline = device.createComputePipeline({
             label: 'sky view LUT pass',
             layout: device.createPipelineLayout({
                 label: 'sky view LUT pass',
-                bindGroupLayouts: [this.bindGroupLayout, ...(shadowConfig?.bindGroupLayouts ?? [])],
+                bindGroupLayouts: [this.bindGroupLayout, ...(shadowConfig?.bindGroupLayouts ?? []), ...(customUniformsConfig?.bindGroupLayouts ?? [])],
             }),
             compute: {
                 module: device.createShaderModule({
-                    code: `${shadowConfig?.wgslCode || 'fn get_shadow(p: vec3<f32>) -> f32 { return 1.0; }'}\n${makeSkyViewLutShaderCode(skyViewLutFormat)}`,
+                    code: `${shadowConfig?.wgslCode || 'fn get_shadow(p: vec3<f32>) -> f32 { return 1.0; }'}\n${makeSkyViewLutShaderCode(skyViewLutFormat, customUniformsConfig?.wgslCode)}`,
                 }),
                 entryPoint: 'render_sky_view_lut',
                 constants: {
@@ -330,14 +336,14 @@ export class SkyViewLutPipeline {
         });
     }
 
-    public makeComputePass(resources: SkyAtmosphereResources, shadowBindGroups?: GPUBindGroup[]): ComputePass {
+    public makeComputePass(resources: SkyAtmosphereResources, shadowBindGroups?: GPUBindGroup[], customUniformsBindGroups?: GPUBindGroup[]): ComputePass {
         if (this.device !== resources.device) {
             throw new Error(`[SkyViewLutPipeline::makeComputePass]: device mismatch`);
         }
         if (resources.atmosphereBuffer.size < ATMOSPHERE_BUFFER_SIZE) {
-            throw new Error(`[SkyViewLutPipeline::makeComputePass]: buffer too small for atmosphere parameters (${resources.uniformsBuffer.size} < ${UNIFORMS_BUFFER_SIZE})`);
+            throw new Error(`[SkyViewLutPipeline::makeComputePass]: buffer too small for atmosphere parameters (${resources.atmosphereBuffer.size} < ${ATMOSPHERE_BUFFER_SIZE})`);
         }
-        if (resources.uniformsBuffer.size < UNIFORMS_BUFFER_SIZE) {
+        if (resources.uniformsBuffer && resources.uniformsBuffer.size < UNIFORMS_BUFFER_SIZE) {
             throw new Error(`[SkyViewLutPipeline::makeComputePass]: buffer too small for config (${resources.atmosphereBuffer.size} < ${ATMOSPHERE_BUFFER_SIZE})`);
         }
         if (resources.multiScatteringLut.texture.width !== this.multiscatteringLutSize[0] || resources.multiScatteringLut.texture.height !== this.multiscatteringLutSize[1]) {
@@ -352,14 +358,14 @@ export class SkyViewLutPipeline {
         const bindGroup = resources.device.createBindGroup({
             label: `sky view LUT pass [${resources.label}]`,
             layout: this.bindGroupLayout,
-            entries: [
+            entries: ([
                 {
                     binding: 0,
                     resource: {
                         buffer: resources.atmosphereBuffer,
                     },
                 },
-                {
+                customUniformsBindGroups ? undefined : {
                     binding: 1,
                     resource: {
                         buffer: resources.uniformsBuffer,
@@ -381,11 +387,15 @@ export class SkyViewLutPipeline {
                     binding: 5,
                     resource: resources.skyViewLut.texture.createView(),
                 },
-            ],
+            ].filter(e => e !== undefined) as GPUBindGroupEntry[])
+            .map((e, i) => {
+                e.binding = i;
+                return e;
+            }) as GPUBindGroupEntry[],
         });
         return new ComputePass(
             this.pipeline,
-            [bindGroup, ...(shadowBindGroups ?? [])],
+            [bindGroup, ...(shadowBindGroups ?? []), ...(customUniformsBindGroups ?? [])],
             [Math.ceil(resources.skyViewLut.texture.width / 16.0), Math.ceil(resources.skyViewLut.texture.height / 16.0), 1],
         );
     }
@@ -400,7 +410,7 @@ export class AerialPerspectiveLutPipeline {
     readonly aerialPerspectiveDistancePerSlice: number;
     readonly multiscatteringLutSize: [number, number];
 
-    constructor(device: GPUDevice, aerialPerspectiveLutFormat: GPUTextureFormat, aerialPerspectiveSliceCount: number, aerialPerspectiveDistancePerSlice: number, multiscatteringLutSize: [number, number], useMoon: boolean, shadowConfig?: ShadowConfig) {
+    constructor(device: GPUDevice, aerialPerspectiveLutFormat: GPUTextureFormat, aerialPerspectiveSliceCount: number, aerialPerspectiveDistancePerSlice: number, multiscatteringLutSize: [number, number], useMoon: boolean, shadowConfig?: ShadowConfig, customUniformsConfig?: CustomUniformsSourceConfig) {
         this.device = device;
         this.aerialPerspectiveLutFormat = aerialPerspectiveLutFormat;
         this.aerialPerspectiveSliceCount = aerialPerspectiveSliceCount;
@@ -408,7 +418,7 @@ export class AerialPerspectiveLutPipeline {
         this.multiscatteringLutSize = multiscatteringLutSize;
         this.bindGroupLayout = device.createBindGroupLayout({
             label: 'aerial perspective LUT pass',
-            entries: [
+            entries: ([
                 {
                     binding: 0,
                     visibility: GPUShaderStage.COMPUTE,
@@ -418,7 +428,7 @@ export class AerialPerspectiveLutPipeline {
                         minBindingSize: ATMOSPHERE_BUFFER_SIZE,
                     },
                 },
-                {
+                customUniformsConfig ? undefined : {
                     binding: 1,
                     visibility: GPUShaderStage.COMPUTE,
                     buffer: {
@@ -461,17 +471,21 @@ export class AerialPerspectiveLutPipeline {
                         viewDimension: '3d',
                     },
                 },
-            ],
+            ].filter(e => e !== undefined) as GPUBindGroupLayoutEntry[])
+            .map((e, i) => {
+                e.binding = i;
+                return e;
+            }) as GPUBindGroupLayoutEntry[],
         });
         this.pipeline = device.createComputePipeline({
             label: 'aerial perspective LUT pass',
             layout: device.createPipelineLayout({
                 label: 'aerial perspective LUT pass',
-                bindGroupLayouts: [this.bindGroupLayout, ...(shadowConfig?.bindGroupLayouts ?? [])],
+                bindGroupLayouts: [this.bindGroupLayout, ...(shadowConfig?.bindGroupLayouts ?? []), ...(customUniformsConfig?.bindGroupLayouts ?? [])],
             }),
             compute: {
                 module: device.createShaderModule({
-                    code: `${shadowConfig?.wgslCode || 'fn get_shadow(p: vec3<f32>) -> f32 { return 1.0; }'}\n${makeAerialPerspectiveLutShaderCode(aerialPerspectiveLutFormat)}`,
+                    code: `${shadowConfig?.wgslCode || 'fn get_shadow(p: vec3<f32>) -> f32 { return 1.0; }'}\n${makeAerialPerspectiveLutShaderCode(aerialPerspectiveLutFormat, customUniformsConfig?.wgslCode)}`,
                 }),
                 entryPoint: 'render_aerial_perspective_lut',
                 constants: {
@@ -485,14 +499,14 @@ export class AerialPerspectiveLutPipeline {
         });
     }
 
-    public makeComputePass(resources: SkyAtmosphereResources, shadowBindGroups?: GPUBindGroup[]): ComputePass {
+    public makeComputePass(resources: SkyAtmosphereResources, shadowBindGroups?: GPUBindGroup[], customUniformsBindGroups?: GPUBindGroup[]): ComputePass {
         if (this.device !== resources.device) {
             throw new Error(`[AerialPerspectiveLutPipeline::makeComputePass]: device mismatch`);
         }
         if (resources.atmosphereBuffer.size < ATMOSPHERE_BUFFER_SIZE) {
-            throw new Error(`[AerialPerspectiveLutPipeline::makeComputePass]: buffer too small for atmosphere parameters (${resources.uniformsBuffer.size} < ${UNIFORMS_BUFFER_SIZE})`);
+            throw new Error(`[AerialPerspectiveLutPipeline::makeComputePass]: buffer too small for atmosphere parameters (${resources.atmosphereBuffer.size} < ${ATMOSPHERE_BUFFER_SIZE})`);
         }
-        if (resources.uniformsBuffer.size < UNIFORMS_BUFFER_SIZE) {
+        if (resources.uniformsBuffer && resources.uniformsBuffer.size < UNIFORMS_BUFFER_SIZE) {
             throw new Error(`[AerialPerspectiveLutPipeline::makeComputePass]: buffer too small for config (${resources.atmosphereBuffer.size} < ${ATMOSPHERE_BUFFER_SIZE})`);
         }
         if (resources.multiScatteringLut.texture.width !== this.multiscatteringLutSize[0] || resources.multiScatteringLut.texture.height !== this.multiscatteringLutSize[1]) {
@@ -507,14 +521,14 @@ export class AerialPerspectiveLutPipeline {
         const bindGroup = resources.device.createBindGroup({
             label: `aerial perspective LUT pass [${resources.label}]`,
             layout: this.bindGroupLayout,
-            entries: [
+            entries: ([
                 {
                     binding: 0,
                     resource: {
                         buffer: resources.atmosphereBuffer,
                     },
                 },
-                {
+                customUniformsBindGroups ? undefined : {
                     binding: 1,
                     resource: {
                         buffer: resources.uniformsBuffer,
@@ -536,11 +550,15 @@ export class AerialPerspectiveLutPipeline {
                     binding: 5,
                     resource: resources.aerialPerspectiveLut.texture.createView(),
                 },
-            ],
+            ].filter(e => e !== undefined) as GPUBindGroupEntry[])
+            .map((e, i) => {
+                e.binding = i;
+                return e;
+            }) as GPUBindGroupEntry[],
         });
         return new ComputePass(
             this.pipeline,
-            [bindGroup, ...(shadowBindGroups ?? [])],
+            [bindGroup, ...(shadowBindGroups ?? []), ...(customUniformsBindGroups ?? [])],
             [
                 Math.ceil(resources.aerialPerspectiveLut.texture.width / 16.0),
                 Math.ceil(resources.aerialPerspectiveLut.texture.height / 16.0),

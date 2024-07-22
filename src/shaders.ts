@@ -1,7 +1,7 @@
 import aerialPerspectiveWgsl from './shaders/common/aerial_perspective.wgsl';
 import blendWgsl from './shaders/common/blend.wgsl';
-import configWgsl from './shaders/common/config.wgsl';
 import constantsWgsl from './shaders/common/constants.wgsl';
+import customUniformsWgsl from './shaders/common/custom_uniforms.wgsl';
 import coordinateSystemWgsl from './shaders/common/coordinate_system.wgsl';
 import fullScreenVertexShaderWgsl from './shaders/common/vertex_full_screen.wgsl';
 import intersectionWgsl from './shaders/common/intersection.wgsl';
@@ -10,6 +10,7 @@ import multipleScatteringWgsl from './shaders/common/multiple_scattering.wgsl';
 import phaseWgsl from './shaders/common/phase.wgsl';
 import skyViewWgsl from './shaders/common/sky_view.wgsl';
 import sunDiskWgsl from './shaders/common/sun_disk.wgsl';
+import uniformsWgsl from './shaders/common/uniforms.wgsl';
 import uvWgsl from './shaders/common/uv.wgsl';
 
 import renderTransmittanceLutWgsl from './shaders/render_transmittance_lut.wgsl';
@@ -28,18 +29,54 @@ export function makeMultiScatteringLutShaderCode(multiScatteringLutFormat: GPUTe
     return `${constantsWgsl}\n${intersectionWgsl}\n${mediumWgsl}\n${phaseWgsl}\n${uvWgsl}\n${renderMultiScatteringLutWgsl}`.replace('rgba16float', multiScatteringLutFormat);
 }
 
-export function makeSkyViewLutShaderCode(skyViewLutFormat: GPUTextureFormat = 'rgba16float') {
-    return `${constantsWgsl}\n${intersectionWgsl}\n${mediumWgsl}\n${phaseWgsl}\n${uvWgsl}\n${configWgsl}\n${coordinateSystemWgsl}\n${multipleScatteringWgsl}\n${renderSkyViewLutWgsl}`.replace('rgba16float', skyViewLutFormat);
+export function makeSkyViewLutShaderCode(skyViewLutFormat: GPUTextureFormat = 'rgba16float', customUniforms?: string) {
+    const base = `${constantsWgsl}\n${intersectionWgsl}\n${mediumWgsl}\n${phaseWgsl}\n${uvWgsl}\n${uniformsWgsl}\n${customUniforms ? `${customUniforms}\n${customUniformsWgsl}\n` : ''}${coordinateSystemWgsl}\n${multipleScatteringWgsl}\n`;
+    let shader = renderSkyViewLutWgsl.replace('rgba16float', skyViewLutFormat);
+    if (customUniforms) {
+        shader = shader.replace('let config = config_buffer', 'let config = get_uniforms()');
+        shader = shader.replace('@group(0) @binding(1) var<uniform> config_buffer: Uniforms;', '');
+        for (let i = 2; i < 6; ++i) {
+            shader = shader.replace(`group(0) @binding(${i})`, `group(0) @binding(${i - 1})`);
+        }
+    }
+    return `${base}\n${shader}`;
 }
 
-export function makeAerialPerspectiveLutShaderCode(aerialPerspectiveLutFormat: GPUTextureFormat = 'rgba16float') {
-    return `${constantsWgsl}\n${intersectionWgsl}\n${mediumWgsl}\n${phaseWgsl}\n${uvWgsl}\n${configWgsl}\n${coordinateSystemWgsl}\n${multipleScatteringWgsl}\n${aerialPerspectiveWgsl}\n${renderAerialPerspectiveWgsl}`.replace('rgba16float', aerialPerspectiveLutFormat);
+export function makeAerialPerspectiveLutShaderCode(aerialPerspectiveLutFormat: GPUTextureFormat = 'rgba16float', customUniforms?: string) {
+    const base = `${constantsWgsl}\n${intersectionWgsl}\n${mediumWgsl}\n${phaseWgsl}\n${uvWgsl}\n${uniformsWgsl}\n${customUniforms ? `${customUniforms}\n${customUniformsWgsl}\n` : ''}${coordinateSystemWgsl}\n${multipleScatteringWgsl}\n${aerialPerspectiveWgsl}\n`;
+    let shader = renderAerialPerspectiveWgsl.replace('rgba16float', aerialPerspectiveLutFormat);
+    if (customUniforms) {
+        shader = shader.replace('let config = config_buffer', 'let config = get_uniforms()');
+        shader = shader.replace('@group(0) @binding(1) var<uniform> config_buffer: Uniforms;', '');
+        for (let i = 2; i < 6; ++i) {
+            shader = shader.replace(`group(0) @binding(${i})`, `group(0) @binding(${i - 1})`);
+        }
+    }
+    return `${base}\n${shader}`;
 }
 
-export function makeRenderSkyWithLutsShaderCode(renderTargetFormat: GPUTextureFormat = 'rgba16float') {
-    return `${constantsWgsl}\n${intersectionWgsl}\n${mediumWgsl}\n${phaseWgsl}\n${uvWgsl}\n${configWgsl}\n${coordinateSystemWgsl}\n${aerialPerspectiveWgsl}\n${skyViewWgsl}\n${blendWgsl}\n${sunDiskWgsl}\n${fullScreenVertexShaderWgsl}\n${renderSkyWithLutsWgsl}`.replace('rgba16float', renderTargetFormat);
+export function makeRenderSkyWithLutsShaderCode(renderTargetFormat: GPUTextureFormat = 'rgba16float', customUniforms?: string) {
+    const base = `${constantsWgsl}\n${intersectionWgsl}\n${mediumWgsl}\n${phaseWgsl}\n${uvWgsl}\n${uniformsWgsl}\n${customUniforms ? `${customUniforms}\n${customUniformsWgsl}\n` : ''}${coordinateSystemWgsl}\n${aerialPerspectiveWgsl}\n${skyViewWgsl}\n${blendWgsl}\n${sunDiskWgsl}\n${fullScreenVertexShaderWgsl}`;
+    let shader = renderSkyWithLutsWgsl.replace('rgba16float', renderTargetFormat);
+    if (customUniforms) {
+        shader = shader.replace('let config = config_buffer', 'let config = get_uniforms()');
+        shader = shader.replace('@group(0) @binding(1) var<uniform> config_buffer: Uniforms;', '');
+        for (let i = 2; i < 9; ++i) {
+            shader = shader.replace(`group(0) @binding(${i})`, `group(0) @binding(${i - 1})`);
+        }
+    }
+    return `${base}\n${shader}`;
 }
 
-export function makeRenderSkyRaymarchingShaderCode(renderTargetFormat: GPUTextureFormat = 'rgba16float') {
-    return `${constantsWgsl}\n${intersectionWgsl}\n${mediumWgsl}\n${phaseWgsl}\n${uvWgsl}\n${configWgsl}\n${coordinateSystemWgsl}\n${multipleScatteringWgsl}\n${blendWgsl}\n${sunDiskWgsl}\n${fullScreenVertexShaderWgsl}\n${renderSkyRaymarchingWgsl}`.replace('rgba16float', renderTargetFormat);
+export function makeRenderSkyRaymarchingShaderCode(renderTargetFormat: GPUTextureFormat = 'rgba16float', customUniforms?: string) {
+    const base = `${constantsWgsl}\n${intersectionWgsl}\n${mediumWgsl}\n${phaseWgsl}\n${uvWgsl}\n${uniformsWgsl}\n${customUniforms ? `${customUniforms}\n${customUniformsWgsl}\n` : ''}${coordinateSystemWgsl}\n${multipleScatteringWgsl}\n${blendWgsl}\n${sunDiskWgsl}\n${fullScreenVertexShaderWgsl}`;
+    let shader = renderSkyRaymarchingWgsl.replace('rgba16float', renderTargetFormat);
+    if (customUniforms) {
+        shader = shader.replace('let config = config_buffer', 'let config = get_uniforms()');
+        shader = shader.replace('@group(0) @binding(1) var<uniform> config_buffer: Uniforms;', '');
+        for (let i = 2; i < 9; ++i) {
+            shader = shader.replace(`group(0) @binding(${i})`, `group(0) @binding(${i - 1})`);
+        }
+    }
+    return `${base}\n${shader}`;
 }
