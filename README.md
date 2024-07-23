@@ -124,7 +124,7 @@ The sky rendering post process depends on a couple of internally managed lookup 
 If you only need the lookup tables and want to roll your own sky renderer, use a `SkyAtmosphereRenderer`:
 
 ```js
-import { SkyAtmisphereRenderer } from 'webgpu-sky-atmosphere';
+import { SkyAtmosphereRenderer } from 'webgpu-sky-atmosphere';
 
 // during setup
 const skyRenderer = new SkyAtmosphereRenderer(device, {
@@ -146,7 +146,7 @@ The above renderers default to rendering the clear sky / atmosphere using low-re
 While the former method is faster, full-resolution ray marching produces smoother volumetric shadows and allows for colored transmittance.
 It also produces a much smoother transition when moving from the top layers of the atmosphere to outer space.
 
-A typical scenario would be to switch to full-screen ray marching if the camera is above a certain altitude threshold by passing the corresponding flag to `renderSkyAtmosphere` / `renderSky`:
+A typical scenario would be to switch to full-resolution ray marching if the camera is above a certain altitude threshold by passing the corresponding flag to `renderSkyAtmosphere` / `renderSky`:
 
 ```js
 const useFullResolutionRayMarch = /* true if camera is above altitude threshold */;
@@ -169,7 +169,7 @@ const config = {
 
 ### Atmosphere model
 
-The atmosphere of a telluric planet, i.e., planets with a solid planetery surface, is modelled by three components:
+The atmosphere of a telluric planet, i.e., a planet with a solid planetery surface, is modelled by three components:
 
  * Rayleigh theory models the wavelength dependent scattering of light interacting with tiny air molecules. In Earth's atmosphere, it is ressponsible for the blue color of the sky.
  * Mie theory models how light is scattered around and absorbed by larger aerosols like dust or pollution. It is almost independent of wavelength and most of the incoming light is scattered in the forward direction. In Earth's atmosphere, it is responsible for the white glare around the sun.
