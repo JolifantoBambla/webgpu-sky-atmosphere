@@ -1,13 +1,15 @@
 # WebGPU Sky / Atmosphere
 A WebGPU implementation of Hillaire's atmosphere model ([A Scalable and Production Ready
 Sky and Atmosphere Rendering Technique](https://sebh.github.io/publications/egsr2020.pdf)).
-Renders the clear sky / atmosphere as a post process.
+Renders the clear sky / atmosphere for both ground and space views as a post process.
+
 
 ## Docs
 
 Find the docs [here](https://jolifantobambla.github.io/webgpu-sky-atmosphere/).
 
 Try it out [here](https://jolifantobambla.github.io/webgpu-sky-atmosphere/demo/).
+
 
 ## Installation
 
@@ -52,16 +54,31 @@ const skyRenderer = new SkyAtmosphereComputeRenderer(device, {
       // ...using the depth buffer to limit ray marching
       texture: depthBuffer,
     },
-  }
+  },
 });
 
 // during render loop
 const skyUniforms = {
-  // set camera paramters, etc.
+  camera: {
+    position: [ /* world space position */ ],
+    inverseView: [ /* inverse view matrix */ ],
+    inverseProjection: [ /*inverse projection matrix */ ],
+  },
+  screenResolution: [ /* width, height */ ],
+  sun: {
+    direction: [ /* normalized direction to the sun */ ],
+  },
 };
 const skyPass = commandEncoder.beginComputePass();
 skyRenderer.renderSkyAtmosphere(skyPass, skyUniforms);
 skyPass.end();
+
+// and in case of a resolution change: 
+skyRenderer.onResize({
+  depthBuffer,
+  backBuffer,
+  renderTarget,
+});
 ```
 
 Or, if you prefer render passes / bundles, use a `SkyAtmosphereRasterRenderer`:
@@ -78,8 +95,8 @@ const skyRenderer = new SkyAtmosphereRasterRenderer(device, {
     // the depth buffer is used to limit the ray marching distance
     depthBuffer: {
       texture: depthBuffer,
-    }
-  }
+    },
+  },
 });
 
 // during render loop
@@ -98,9 +115,13 @@ const skyPass = commandEncoder.beginRenderPass({
 });
 skyRenderer.renderSky(skyPass);
 skyPass.end();
+
+// and in case of a resolution change: 
+skyRenderer.onResize(depthBuffer);
 ```
 
-Or, if you only need the lookup tables and want to roll your own sky renderer, use a `SkyAtmosphereRenderer`:
+The sky rendering post process depends on a couple of internally managed lookup tables.
+If you only need the lookup tables and want to roll your own sky renderer, use a `SkyAtmosphereRenderer`:
 
 ```js
 import { SkyAtmisphereRenderer } from 'webgpu-sky-atmosphere';
@@ -122,7 +143,7 @@ skyPass.end();
 ### Full-resolution ray marching
 
 The above renderers default to rendering the clear sky / atmosphere using low-resolution lookup tables. However, it can also be rendered by doing a full-resolution ray marching pass.
-While the former method is faster, full-resolution ray marching produces smoother volumetric shadows.
+While the former method is faster, full-resolution ray marching produces smoother volumetric shadows and allows for colored transmittance.
 
 To use full-resolution ray marching instead of the faster lookup table-based approach, set the default behavior for `renderSkyAtmosphere` and `renderSky` via the config:
 
@@ -130,8 +151,9 @@ To use full-resolution ray marching instead of the faster lookup table-based app
 const config = {
   skyRenderer: {
     defaultToPerPixelRayMarch: true,
-  }
-} 
+  },
+  ...
+};
 ```
 
 Or pass the corresponding flag to `renderSkyAtmosphere` / `renderSky` directly:
@@ -144,40 +166,92 @@ skyRenderer.renderSkyAtmosphere(computePass, config, null, useFullResolutionRayM
 skyRenderer.renderSky(renderPass, useFullResolutionRayMarch);
 ```
 
-### Lookup tables
+### Atmosphere model
 
-Both sky rendering methods depend on a transmittance and a multiple scattering lookup table that are constant for a given atmosphere.
-By default, these lookup tables are rendered at the time the renderer is created.
-To re-render these lookup tables, e.g., if the atmosphere parameters change, call
+The atmosphere of a telluric planet, i.e., planets with a solid planetery surface, is modelled by three components:
 
-```js
-skyRenderer.renderConstantLuts(
-  computePassEncoder,
-  // this is optional
-  // if this is undefined, the internal atmosphere parameters will not be updated
-  atmosphere,
-);
-```
+ * Rayleigh theory models the wavelength dependent scattering of light interacting with tiny air molecules. In Earth's atmosphere, it is ressponsible for the blue color of the sky.
+ * Mie theory models how light is scattered around and absorbed by larger aerosols like dust or pollution. It is almost independent of wavelength and most of the incoming light is scattered in the forward direction. In Earth's atmosphere, it is responsible for the white glare around the sun.
+ * Ozone: On Earth, light is also absorbed by the ozone in the atmosphere contributing to the sky's blue color when the sun is at the horizon.
 
-When not doing a full-resolution ray marching pass, an additional low resolution lookup table for the distant sky as well as an aerial perspective lookup table (as a volume around the camera) need to be rendered. These lookup tables are view-dependent and need to be re-rendered each frame they are used:
+By default, a `SkyAtmosphereRenderer` will use an Earth-like atmosphere with the origin on the planet's top pole, scaled to 1 = 1 km and assuming the y axis is pointing up.
+
+To adjust the scale of the atmosphere, e.g., 1 = 1m, set
 
 ```js
-skyRenderer.renderDynamicLuts(
-  computePassEncoder,
-  // passing the uniforms is optional
-  // if this is undefined, the internal uniform buffer will not be updated
-  uniforms,
-);
+const config = {
+  distanceScaleFactor: 1000.0,
+  ...
+};
 ```
 
-Alternatively, each lookup table can be rendered individually.
-See the documentation for more details.
+Note that the `config.distanceScaleFactor` is also used to set compile-time constants in the renderer's shaders. I.e., to render an atmosphere at a different scale, a new renderer instance must be created.
+
+To initialize an Earth-like atmosphere to use a different origin, use 
+
+```js
+const distanceScale = 1.0; // 1 = 1km
+
+// using a specific center
+const center = [ /* whereever the planet's center is */ ];
+const config = {
+  atmosphere: makeEarthAtmosphere(distanceScale, center),
+  ...
+};
+
+// using the default center (origin is on the top pole) but with the z axis pointing up
+const yUp = false;
+const config = {
+  atmosphere: makeEarthAtmosphere(distanceScale, null, yUp),
+  ...
+};
+```
+
+To create a custom atmosphere, adjust the parameters to your liking (read the [docs](https://jolifantobambla.github.io/webgpu-sky-atmosphere/interfaces/Atmosphere) for more information on the indivdual parameters of an `Atmosphere`):
+
+```js
+const config = {
+  atmosphere: {
+    // do what your heart desires
+  },
+  ...
+};
+```
+
+Except for the distance scale used for an `Atmosphere`, all parameters can be updated at runtime:
+
+```js
+// passing an atmosphere to renderSkyAtmosphere or renderSkyAtmosphereLuts will automatically update the atmosphere and corresponding lookup tables
+skyRenderer.renderSkyAtmosphere(passEncoder, uniforms, newAtmosphere);
+
+// alternatively, update the atmosphere parameters first and re-render the corresponding lookup tables later
+skyRenderer.updateAtmosphere(newAtmosphere);
+// ... later
+skyRenderer.renderConstantLuts(passEncoder);
+```
 
 ### Light sources
 
 Theoretically, an arbitrary number of light sources could influence the atmosphere. However, for performance reasons, only up to two directional light sources are considered.
 
+At runtime, light source parameters are set through `Uniforms` passed to the renderer:
+
+```js
+const uniforms = {
+  sun: {
+    direction: [ /* normalized direction to the light source */ ],
+    illuminance: [ /* illuminance at the top of the atmosphere */ ],
+  },
+  moon: {
+    // has same structure as the sun  
+  },
+  ...
+};
+skyRenderer.renderSkyAtmosphere(passEncoder, uniforms);
+```
+
 By default, only one light source is used. To also use the second one, use the `lights` property of the config:
+
 ```js
 const config = {
     ...
@@ -191,6 +265,19 @@ const config = {
 #### Sun disk rendering
 
 A simple implementation for rendering a sun and a moon disk is provided by the `SkyAtmosphereRenderer`.
+
+Use the `Uniforms` to adjust the sun disk's appearance:
+
+```js
+const uniforms = {
+  sun: {
+    diskAngularDiameter: 0.0095, // angular diameter in radians
+    diskLuminanceScale: 20.0, // make the disk appear brighter
+  },
+  ...
+};
+```
+
 The provided implementation can be disabled using the `lights` property of the config:
 
 ```js
@@ -198,6 +285,7 @@ const config = {
     ...
     lights: {
         renderSunDisk: false,
+        renderMoonDisk: false,
     },
     ...
 }
@@ -258,7 +346,7 @@ const config = {
 
 ### Custom uniform buffers
 
-It is likely that some or even all uniforms used by a `SkyAtmosphereRenderer` are already available on the GPU in some other buffers in your engine.
+It is likely that some or even all uniforms used by a `SkyAtmosphereRenderer` are already available on the GPU in some other buffer(s) in your engine.
 To replace the `SkyAtmosphereRenderer`'s internal uniform buffer by one or more user-controlled uniform buffers, configure the renderer to inject external bind groups and WGSL code, similar to how shadows were integrated into the renderer:
 
 ```js
@@ -288,6 +376,75 @@ const config = {
 }
 ```
 
+### Lookup tables
+
+Both sky rendering methods depend on a couple of cheap-to-compute lookup tables:
+
+ * Transmittance LUT: stores the colored transmittance towards the top of the atmosphere parameterized by the sample height and direction
+ * Multiple Scattering LUT: stores the contribution of multiple scattering parameterized by the sample height and sun direction
+ * Sky View LUT: stores the view of the distant sky for the current camera position parameterized by latitude and longitude
+ * Aerial Perspective LUT: stores the aerial perspective for the current camera frustum as a volume texture (rgb-colored luminance reaching the camera from the froxel's center and grayscale transmittance from the camera to the froxel's center)
+
+To change the format or size of any of the lookup tables, use the `lookUpTables` property of the config, e.g.:
+
+```js
+const config = {
+  lookUpTables: {
+    transmittanceLut: {
+      format: 'rgba32float', // note that the use of 'rgba32float' requires the device-feature 'float32-filterable' to be enabled
+    },
+    aerialPerspectiveLut: {
+      size: [64, 64, 32],
+    },
+  },
+  ...
+};
+```
+
+For more information on the individual options, please refer to the [documentation](https://jolifantobambla.github.io/webgpu-sky-atmosphere/interfaces/SkyAtmosphereLutConfig).
+
+The transmittance and the multiple scattering lookup table are constant for a given atmosphere. This is why they are rendered during the `SkyAtmosphereRenderer`'s constructor by default and re-rendered by `renderSkyAtmosphere` / `renderSkyAtmosphereLuts` only if a the optional `atmopshere` parameter is set.
+To re-render the two lookup tables outside of these scenarios, call:
+
+```js
+skyRenderer.renderConstantLuts(
+  computePassEncoder,
+  // this is optional
+  // if this is undefined, the internal atmosphere parameters will not be updated but the lookup tables will still be rendered
+  atmosphere,
+);
+```
+
+While the constant lookup tables are used by both sky rendering methods, the sky view and aerial perspective lookup tables are not used by the full-resolution ray marching method.
+Since they are view dependent, they are re-rendered whenever new `Uniforms` are passed to `renderSkyAtmosphere` / `renderSkyAtmosphereLuts`.
+To only update these two lookup tables, call:
+
+```js
+skyRenderer.renderDynamicLuts(
+  computePassEncoder,
+  // passing the uniforms is optional
+  // if this is undefined, the internal uniform buffer will not be updated
+  uniforms,
+);
+```
+
+Alternatively, each lookup table can be rendered individually.
+See the [documentation](https://jolifantobambla.github.io/webgpu-sky-atmosphere/classes/SkyAtmosphereRenderer) for more details.
+
+
+## Integrating this library into a renderer
+
+This library makes a couple of assumptions about the render engine that uses it.
+For a `SkyAtmosphereRenderer` to produce nice results, the render engine should...
+
+ * ...use some kind of tone-mapping operator
+ * ...use either dithering or temporal anti-aliasing to get rid of banding artefacts introduced by the use of compressed low-resolution lookup tables
+ * ...use a bloom filter to give the sun disk a nicer look
+ * ...use temporal anti-aliasing to get rid of the noise introduced by randomizing ray offsets for full-resolution ray marching
+
+The [demo](https://jolifantobambla.github.io/webgpu-sky-atmosphere/demo/) uses a hard-coded tonemapping operator and gradient noise-based dithering to address some of these issues.
+
+
 ## Contributions
 
 Contributions are very welcome. If you find a bug or think some important functionality is missing, please file an issue [here](https://github.com/JolifantoBambla/webgpu-sky-atmosphere/issues). If want to help out yourself, feel free to submit a pull request [here](https://github.com/JolifantoBambla/webgpu-sky-atmosphere/pulls).
@@ -295,6 +452,6 @@ Contributions are very welcome. If you find a bug or think some important functi
 
 ## Acknowledgements
 
-This library is originally a WebGPU port of Hillaire's [demo implementation](https://github.com/sebh/UnrealEngineSkyAtmosphere) for his paper [A Scalable and Production Ready
+This library is originally a WebGPU port of Sébastien Hillaire's [demo implementation](https://github.com/sebh/UnrealEngineSkyAtmosphere) for his paper [A Scalable and Production Ready
 Sky and Atmosphere Rendering Technique](https://sebh.github.io/publications/egsr2020.pdf).
 The original demo was released under the MIT licence by Epic Games, Inc.

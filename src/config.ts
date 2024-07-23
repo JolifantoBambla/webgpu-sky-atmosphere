@@ -204,7 +204,6 @@ export interface ComputeRenderTargetConfig {
  * External resources and settings required by a {@link SkyAtmosphereRenderer}.
  */
 export interface SkyRendererConfigBase {
-
     /**
      * If this is true, {@link SkyAtmosphereRasterRenderer.renderSky} / {@link SkyAtmosphereComputeRenderer.renderSkyAtmosphere} will default to full-screen ray marching to render the atmosphere.
      *
@@ -459,6 +458,9 @@ export interface SkyAtmosphereRendererConfig {
      */
     atmosphere?: Atmosphere,
 
+    /**
+     * Config for the sky rendering post process.
+     */
     skyRenderer?: SkyRendererConfigBase,
 
     /**
