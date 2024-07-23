@@ -144,8 +144,19 @@ skyPass.end();
 
 The above renderers default to rendering the clear sky / atmosphere using low-resolution lookup tables. However, it can also be rendered by doing a full-resolution ray marching pass.
 While the former method is faster, full-resolution ray marching produces smoother volumetric shadows and allows for colored transmittance.
+It also produces a much smoother transition when moving from the top layers of the atmosphere to outer space.
 
-To use full-resolution ray marching instead of the faster lookup table-based approach, set the default behavior for `renderSkyAtmosphere` and `renderSky` via the config:
+A typical scenario would be to switch to full-screen ray marching if the camera is above a certain altitude threshold by passing the corresponding flag to `renderSkyAtmosphere` / `renderSky`:
+
+```js
+const useFullResolutionRayMarch = /* true if camera is above altitude threshold */;
+
+skyRenderer.renderSkyAtmosphere(computePass, config, null, useFullResolutionRayMarch);
+
+skyRenderer.renderSky(renderPass, useFullResolutionRayMarch);
+```
+
+To use full-resolution ray marching instead of the faster lookup table-based approach by default, change the default behavior via the config:
 
 ```js
 const config = {
@@ -154,16 +165,6 @@ const config = {
   },
   ...
 };
-```
-
-Or pass the corresponding flag to `renderSkyAtmosphere` / `renderSky` directly:
-
-```js
-const useFullResolutionRayMarch = true;
-
-skyRenderer.renderSkyAtmosphere(computePass, config, null, useFullResolutionRayMarch);
-
-skyRenderer.renderSky(renderPass, useFullResolutionRayMarch);
 ```
 
 ### Atmosphere model

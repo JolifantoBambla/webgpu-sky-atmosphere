@@ -7,7 +7,8 @@
 </head>
 <body>
     <div class="container">
-        <canvas id="canvas"></canvas>
+        <canvas id="canvas" style="width: 99%; height: 99%; position: absolute"></canvas>
+        <div id="ui" style="position: absolute; right: 0; z-index: 1;"></div>
     </div>
 
     <script src="https://wgpu-matrix.org/dist/3.x/wgpu-matrix.min.js"></script>
@@ -22,7 +23,10 @@
 
 
         async function main() {
-            const resolution = [1920, 1080];
+            const canvas = document.querySelector('canvas');
+            const resolution = [canvas.clientWidth, canvas.clientHeight];
+            canvas.width = resolution[0];
+            canvas.height = resolution[1];
 
             const adapter = await navigator.gpu.requestAdapter();
             const device = await adapter.requestDevice({requiredFeatures: adapter.features.has('dual-source-blending') ? ['dual-source-blending'] : []});
@@ -77,9 +81,8 @@
                 }
             }
 
-            const canvas = document.querySelector('canvas');
-            canvas.width = resolution[0];
-            canvas.height = resolution[1];
+            //canvas.width = resolution[0];
+            //canvas.height = resolution[1];
 
             const context = canvas.getContext('webgpu');
             const presentationFormat = navigator.gpu.getPreferredCanvasFormat();
@@ -206,7 +209,7 @@
                     },
                 },
             });
-            const skyAtmosphereRenderer2 = new SkyAtmosphereRasterRenderer(
+            const skyAtmosphereRasterRenderer = new SkyAtmosphereRasterRenderer(
                 device,
                 {
                     ...skyAtmosphereConfigBase,
@@ -221,6 +224,48 @@
                     },
                 },
                 skyAtmosphereRenderer.skyAtmospherePipelines,
+                skyAtmosphereRenderer.resources,  
+            );
+
+            skyAtmosphereConfigBase.distanceScaleFactor = 1000.0;
+            const skyAtmosphereRendererMeters = new SkyAtmosphereComputeRenderer(
+                device,
+                {
+                    ...skyAtmosphereConfigBase,
+                    skyRenderer: {
+                        backBuffer: {
+                            texture: backBuffer,
+                            view: backBufferView,
+                        },
+                        renderTarget: {
+                            texture: skyRenderTarget,
+                            view: skyRenderTarget.createView(),
+                        },
+                        depthBuffer: {
+                            texture: depthBuffer,
+                            view: depthBufferView,
+                            reverseZ: true,
+                        },
+                    },
+                },
+                null,
+                skyAtmosphereRenderer.resources,
+            );
+            const skyAtmosphereRasterRendererMeters = new SkyAtmosphereRasterRenderer(
+                device,
+                {
+                    ...skyAtmosphereConfigBase,
+                    skyRenderer: {
+                        renderTargetFormat: skyRenderTarget.format,
+                        useDualSourceBlending,
+                        depthBuffer: {
+                            texture: depthBuffer,
+                            view: depthBufferView,
+                            reverseZ: true,
+                        },
+                    },
+                },
+                skyAtmosphereRendererMeters.skyAtmospherePipelines,
                 skyAtmosphereRenderer.resources,  
             );
 
@@ -389,7 +434,7 @@
 
             const sunProjection = mat4n.ortho(-80, 80, -80, 80, -200, 300);
 
-            const params = makeUi(skyAtmosphereRenderer.resources.atmosphere, cameraController, distanceScaleFactor);
+            const params = makeUi(skyAtmosphereRenderer.resources.atmosphere, cameraController);
 
             let lastTime = new Date();
             let frameId = 0;
@@ -508,9 +553,9 @@
 
                 const computePass = encoder.beginComputePass();
                 if (params.renderSettings.compute) {
-                    skyAtmosphereRenderer.renderSkyAtmosphere(computePass, config, params.atmosphere, params.renderSettings.rayMarch);
+                    (params.renderSettings.inMeters ? skyAtmosphereRendererMeters : skyAtmosphereRenderer).renderSkyAtmosphere(computePass, config, params.atmosphere, params.renderSettings.rayMarch);
                 } else {
-                    skyAtmosphereRenderer2.renderSkyAtmosphereLuts(computePass, config, params.atmosphere, params.renderSettings.rayMarch);
+                    (params.renderSettings.inMeters ? skyAtmosphereRasterRendererMeters : skyAtmosphereRasterRenderer).renderSkyAtmosphereLuts(computePass, config, params.atmosphere, params.renderSettings.rayMarch);
                 }
                 computePass.end();
 
@@ -522,7 +567,7 @@
                             storeOp: 'store',
                         }],
                     });
-                    skyAtmosphereRenderer2.renderSky(renderPass, params.renderSettings.rayMarch);
+                    (params.renderSettings.inMeters ? skyAtmosphereRasterRendererMeters : skyAtmosphereRasterRenderer).renderSky(renderPass, params.renderSettings.rayMarch);
                     renderPass.end();
                 }
 

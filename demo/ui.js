@@ -1,7 +1,7 @@
 import { makeEarthAtmosphere } from '../dist/1.x/webgpu-sky-atmosphere.module.min.js';
 import { Pane } from 'https://cdn.jsdelivr.net/npm/tweakpane@4.0.3/dist/tweakpane.min.js';
 
-export function makeUi(atmosphere, camera, scaleFromKilometers = 1.0) {
+export function makeUi(atmosphere, camera) {
     const params = {
         debugViews: {
             showTransmittanceLut: false,
@@ -29,6 +29,7 @@ export function makeUi(atmosphere, camera, scaleFromKilometers = 1.0) {
             rayMarch: false,
             compute: true,
             viewHeight: 1.0,
+            inMeters: false,
         },
         atmosphereHelper: {
             bottomRadius: 6360.0,
@@ -73,12 +74,26 @@ export function makeUi(atmosphere, camera, scaleFromKilometers = 1.0) {
             },
         },
     };
+    params.scaleFromKilometers = _ => params.renderSettings.inMeters ? 1000.0 : 1.0;
 
-    params.atmosphere = atmosphere || makeEarthAtmosphere(scaleFromKilometers);
+    params.atmosphere = atmosphere || makeEarthAtmosphere(params.scaleFromKilometers());
 
     const pane = new Pane({
         title: 'WebGPU Sky / Atmosphere',
         expanded: true,
+        container: document.getElementById('ui'),
+    });
+    pane.addBinding({
+        info: `WASD: move horizontally
+Arrow Up / Down: move vertically
+Space (hold): move faster
+Mouse (click on canvas): look around
+Escape: exit pointer lock on canvas`,
+    }, 'info', {
+        label: null,
+        readonly: true,
+        multiline: true,
+        rows: 5,
     });
 
     const renderSettingsFolder = pane.addFolder({
@@ -103,9 +118,42 @@ export function makeUi(atmosphere, camera, scaleFromKilometers = 1.0) {
     
     renderSettingsFolder.addBinding(params.renderSettings, 'rayMarch', {label: 'Force ray marching'});
     renderSettingsFolder.addBinding(params.renderSettings, 'compute', {label: 'Use compute'});
-    renderSettingsFolder.addBinding(params.renderSettings, 'viewHeight', {min: 1, max: 110000.0, label: 'View height (% of atmosphere height)'})
+    renderSettingsFolder.addBinding(params.renderSettings, 'inMeters', {label: '1 = 1m'})
         .on('change', e => {
-            camera.height = (e.value / 100.0) * params.atmosphere.height;
+            const scale = e.value ? 1000.0 : 1 / 1000.0;
+
+            camera.height = Math.max(camera.position[1], e.value ? 25 : 1);
+            camera.maxSpeed = e.value ? 1.0 : 0.1;
+
+            params.atmosphere = {
+                center: params.atmosphere.center.map(c => c * scale),
+                bottomRadius: params.atmosphere.bottomRadius * scale,
+                height: params.atmosphere.height * scale,
+                rayleigh: {
+                    densityExpScale: params.atmosphere.rayleigh.densityExpScale / scale,
+                    scattering: params.atmosphere.rayleigh.scattering.map(c => c / scale),
+                },
+                mie: {
+                    densityExpScale: params.atmosphere.mie.densityExpScale / scale,
+                    scattering: params.atmosphere.mie.scattering.map(c => c / scale),
+                    extinction: params.atmosphere.mie.extinction.map(c => c / scale),
+                    phaseG: params.atmosphere.mie.phaseG * scale,
+                },
+                absorption: {
+                    layer0: {
+                        height: params.atmosphere.absorption.layer0.height * scale,
+                        constantTerm: params.atmosphere.absorption.layer0.constantTerm,
+                        linearTerm: params.atmosphere.absorption.layer0.linearTerm / scale,
+                    },
+                    layer1: {
+                        constantTerm: params.atmosphere.absorption.layer1.constantTerm,
+                        linearTerm: params.atmosphere.absorption.layer1.linearTerm / scale,
+                    },
+                    extinction: params.atmosphere.absorption.extinction.map(c => c / scale),
+                },
+                groundAlbedo: params.atmosphere.groundAlbedo,
+                multipleScatteringFactor: params.atmosphere.multipleScatteringFactor,
+            };
         });
 
     const atmosphereFolder = pane.addFolder({
@@ -114,11 +162,11 @@ export function makeUi(atmosphere, camera, scaleFromKilometers = 1.0) {
     });
     atmosphereFolder.addBinding(params.atmosphereHelper, 'bottomRadius', {min: 100.0, max: 10000.0, step: 10.0, label: 'ground radius (in km)'})
         .on('change', e => {
-            params.atmosphere.bottomRadius = e.value * scaleFromKilometers;
+            params.atmosphere.bottomRadius = e.value * params.scaleFromKilometers();
         });
     atmosphereFolder.addBinding(params.atmosphereHelper, 'height', {min: 10.0, max: 500.0, step: 1.0, label: 'height (in km)'})
         .on('change', e => {
-            params.atmosphere.height = e.value * scaleFromKilometers;
+            params.atmosphere.height = e.value * params.scaleFromKilometers();
         });
     atmosphereFolder.addBinding(params.atmosphere, 'multipleScatteringFactor', {min: 0.0, max: 1.0, step: 0.1, label: 'Multi-scattering factor'});
     atmosphereFolder.addBinding(params.atmosphereHelper, 'groundAlbedo', {color: {type: 'float'}, label: 'Ground albedo'})
@@ -132,11 +180,11 @@ export function makeUi(atmosphere, camera, scaleFromKilometers = 1.0) {
     });
     rayleighFolder.addBinding(params.atmosphereHelper.rayleigh, 'scaleHeight', {min: 0.0, max: 10.0, step: 0.1, label: 'scale height (in km)'})
         .on('change', e => {
-            params.atmosphere.rayleigh.densityExpScale = -1.0 / (e.value * scaleFromKilometers);
+            params.atmosphere.rayleigh.densityExpScale = -1.0 / (e.value * params.scaleFromKilometers());
         });
     rayleighFolder.addBinding(params.atmosphereHelper.rayleigh, 'scattering', {color: {type: 'float'}, label: 'scattering (per 100 m)'})
         .on('change', e => {
-            params.atmosphere.rayleigh.scattering = [e.value.r, e.value.g, e.value.b].map(c => c / (10.0 * scaleFromKilometers));
+            params.atmosphere.rayleigh.scattering = [e.value.r, e.value.g, e.value.b].map(c => c / (10.0 * params.scaleFromKilometers()));
         });
 
     const mieFolder = atmosphereFolder.addFolder({
@@ -145,19 +193,19 @@ export function makeUi(atmosphere, camera, scaleFromKilometers = 1.0) {
     });
     mieFolder.addBinding(params.atmosphereHelper.mie, 'scaleHeight', {min: 0.0, max: 10.0, step: 0.1, label: 'scale height (in km)'})
         .on('change', e => {
-            params.atmosphere.mie.densityExpScale = -1.0 / (e.value * scaleFromKilometers);
+            params.atmosphere.mie.densityExpScale = -1.0 / (e.value * params.scaleFromKilometers());
         });
     mieFolder.addBinding(params.atmosphereHelper.mie, 'scattering', {color: {type: 'float'}, label: 'scattering (per 10 m)'})
         .on('change', e => {
-            params.atmosphere.mie.scattering = [e.value.r, e.value.g, e.value.b].map(c => c / (100.0 * scaleFromKilometers));
+            params.atmosphere.mie.scattering = [e.value.r, e.value.g, e.value.b].map(c => c / (100.0 * params.scaleFromKilometers()));
         });
     mieFolder.addBinding(params.atmosphereHelper.mie, 'extinction', {color: {type: 'float'}, label: 'extinction (per 10 m)'})
         .on('change', e => {
-            params.atmosphere.mie.extinction = [e.value.r, e.value.g, e.value.b].map(c => c / (100.0 * scaleFromKilometers));
+            params.atmosphere.mie.extinction = [e.value.r, e.value.g, e.value.b].map(c => c / (100.0 * params.scaleFromKilometers()));
         });            
     mieFolder.addBinding(params.atmosphereHelper.mie, 'phaseG', {min: 0.0, max: 1.0, step: 0.1, label: 'phase g'})
         .on('change', e => {
-            params.atmosphere.mie.phaseG = e.value * scaleFromKilometers;
+            params.atmosphere.mie.phaseG = e.value * params.scaleFromKilometers();
         });
 
     const absorptionFolder = atmosphereFolder.addFolder({
@@ -166,7 +214,7 @@ export function makeUi(atmosphere, camera, scaleFromKilometers = 1.0) {
     });
     absorptionFolder.addBinding(params.atmosphereHelper.absorption, 'extinction', {color: {type: 'float'}, label: 'extinction (per 10 m)'})
         .on('change', e => {
-            params.atmosphere.absorption.extinction = [e.value.r, e.value.g, e.value.b].map(c => c / (100.0 * scaleFromKilometers));
+            params.atmosphere.absorption.extinction = [e.value.r, e.value.g, e.value.b].map(c => c / (100.0 * params.scaleFromKilometers()));
         });
 
     const debugViewFolder = pane.addFolder({

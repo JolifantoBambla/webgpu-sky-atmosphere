@@ -53,11 +53,15 @@ export class FPSCameraController {
         const keyLeft = 'KeyA';
         const keyRight = 'KeyD';
         const keyFast = 'Space';
+        const keyUp = 'ArrowUp';
+        const keyDown = 'ArrowDown';
+
 
         const cos = Math.cos(this.#yaw);
         const sin = Math.sin(this.#yaw);
         const forward = [-sin, 0, -cos];
         const right = [cos, 0, -sin];
+        const up = [0, 1, 0];
 
         const acc = vec3n.create(0, 0, 0);
         if (this.#keys[keyFront]) {
@@ -72,9 +76,15 @@ export class FPSCameraController {
         if (this.#keys[keyLeft]) {
             vec3n.sub(acc, right, acc);
         }
+        if (this.#keys[keyUp]) {
+            vec3n.add(acc, up, acc);
+        }
+        if (this.#keys[keyDown]) {
+            vec3n.sub(acc, up, acc);
+        }
         vec3n.addScaled(this.#velocity, acc, dt * this.#acceleration, this.#velocity);
 
-        if (![keyFront, keyBack, keyLeft, keyRight].some(code => this.#keys[code])) {
+        if (![keyFront, keyBack, keyLeft, keyRight, keyUp, keyDown].some(code => this.#keys[code])) {
             vec3n.scale(this.#velocity, Math.exp(dt * Math.log(1 - this.#decay)), this.#velocity);
         }
         const speed = vec3n.length(this.#velocity);
@@ -92,6 +102,10 @@ export class FPSCameraController {
 
     set height(h) {
         this.#position[1] = h;
+    }
+
+    set maxSpeed(s) {
+        this.#maxSpeed = s;
     }
 
     get position() {
