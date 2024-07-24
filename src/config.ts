@@ -242,7 +242,7 @@ export interface SkyRendererConfigBase {
 
 export interface FullResolutionRayMarchConfig {
     /**
-     * If this is false, the sky view lookup table for pixels with an invalid depth value.
+     * If this is false, the sky view lookup table is used for pixels with an invalid depth value.
      *
      * While this is cheaper than a full-resolution ray march, volumetric shadows will not be rendered for distant sky pixels.
      *

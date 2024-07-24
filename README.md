@@ -166,6 +166,22 @@ const config = {
 };
 ```
 
+In addition to the two sky rendering methods, it is also possible to use a lookup table for the distant sky while doing a per-pixel ray march for each pixel with a valid depth buffer value.
+While this is cheaper than doing a full-resolution ray march, volumetric shadows will not be rendered for distant sky pixels.
+To enable this hybrid mode, set up the config like this:
+
+```js
+const config = {
+  skyRenderer: {
+    rayMarch: {
+      rayMarchDistantSky: false,
+    },
+    ...
+  },
+  ...
+};
+```
+
 ### Atmosphere model
 
 The atmosphere of a telluric planet, i.e., a planet with a solid planetery surface, is modelled by three components:
