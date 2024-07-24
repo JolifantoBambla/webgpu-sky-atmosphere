@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2024 Lukas Herzberger
+ * Copyright (c) 2020 Epic Games, Inc.
+ * SPDX-License-Identifier: MIT
+ */
+
 override USE_MOON: bool = false;
 
 override WORKGROUP_SIZE_X: u32 = 16;
@@ -19,7 +25,7 @@ struct SingleScatteringResult {
 	transmittance: vec3<f32>,			// Transmittance in [0,1] (unitless)
 }
 
-fn integrate_scattered_luminance(world_pos: vec3<f32>, world_dir: vec3<f32>, atmosphere: Atmosphere, config: Uniforms, sample_count: f32, t_max_bound: f32) -> SingleScatteringResult {
+fn integrate_scattered_luminance(uv: vec2<f32>, world_pos: vec3<f32>, world_dir: vec3<f32>, atmosphere: Atmosphere, config: Uniforms, sample_count: f32, t_max_bound: f32) -> SingleScatteringResult {
 	var result = SingleScatteringResult();
 
 	let planet_center = vec3<f32>();
@@ -29,7 +35,7 @@ fn integrate_scattered_luminance(world_pos: vec3<f32>, world_dir: vec3<f32>, atm
     }
 	t_max = min(t_max, t_max_bound);
 
-    let sample_segment_t = 0.3;
+    let sample_segment_t = get_sample_segment_t(uv, config);
     let dt = t_max / sample_count;
 
     let sun_direction = normalize(config.sun.direction);
@@ -150,7 +156,7 @@ fn render_aerial_perspective_lut(@builtin(global_invocation_id) global_id: vec3<
 	}
 
 	let sample_count = max(1.0, f32(global_id.z + 1) * 2.0);
-	let ss = integrate_scattered_luminance(world_pos, world_dir, atmosphere, config, sample_count, t_max);
+	let ss = integrate_scattered_luminance(uv, world_pos, world_dir, atmosphere, config, sample_count, t_max);
 
 	let transmittance = dot(ss.transmittance, vec3(1.0 / 3.0));
 	textureStore(aerial_perspective_lut, global_id, vec4(ss.luminance, 1.0 - transmittance));

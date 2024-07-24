@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2024 Lukas Herzberger
+ * Copyright (c) 2020 Epic Games, Inc.
+ * SPDX-License-Identifier: MIT
+ */
+
 // If there are no positive real solutions, returns -1.0
 fn solve_quadratic_for_positive_reals(a: f32, b: f32, c: f32) -> f32 {
     let delta = b * b - 4.0 * a * c;

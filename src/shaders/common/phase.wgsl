@@ -1,5 +1,9 @@
-// requires constants.wgsl
-
+/*
+ * Copyright (c) 2024 Lukas Herzberger
+ * Copyright (c) 2020 Epic Games, Inc.
+ * SPDX-License-Identifier: MIT
+ */
+ 
 const isotropic_phase: f32 = 1.0 / sphere_solid_angle;
 
 fn cornette_shanks_phase(g: f32, cos_theta: f32) -> f32 {

@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2024 Lukas Herzberger
+ * SPDX-License-Identifier: MIT
+ */
+
 override IS_REVERSE_Z: bool = true;
 
 fn depth_max() -> f32 {

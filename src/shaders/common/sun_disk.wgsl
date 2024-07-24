@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2024 Lukas Herzberger
+ * SPDX-License-Identifier: MIT
+ */
+
 override RENDER_SUN_DISK: bool = true;
 override RENDER_MOON_DISK: bool = true;
 override LIMB_DARKENING_ON_SUN: bool = true;

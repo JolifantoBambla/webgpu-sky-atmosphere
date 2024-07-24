@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2024 Lukas Herzberger
+ * Copyright (c) 2020 Epic Games, Inc.
+ * SPDX-License-Identifier: MIT
+ */
+
 struct Atmosphere {
 	// Rayleigh scattering coefficients
 	rayleigh_scattering: vec3<f32>,

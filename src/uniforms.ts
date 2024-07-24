@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2024 Lukas Herzberger
+ * SPDX-License-Identifier: MIT
+ */
+
 export interface Camera {
     /**
      * World position of the current camera view
@@ -35,7 +40,7 @@ export interface AtmosphereLight {
 
     /**
      * Light disk's luminance scale.
-     * 
+     *
      * The light disk's luminance is computed from the given {@link illuminance} and the disk's {@link diskAngularDiameter}.
      * This scale is applied to the computed luminance value to give users more control over the sun disk's appearance.
      *
@@ -75,14 +80,14 @@ export interface Uniforms {
 
     /**
      * Minimum number of ray marching samples per pixel when rendering the sky view lookup table or rendering the sky using per-pixel ray marching.
-     * 
+     *
      * Defaults to 14.
      */
     rayMarchMinSPP?: number,
 
     /**
      * Maximum number of ray marching samples per pixel when rendering the sky view lookup table or rendering the sky using per-pixel ray marching.
-     * 
+     *
      * Defaults to 30.
      */
     rayMarchMaxSPP?: number,
@@ -94,9 +99,9 @@ export interface Uniforms {
 
     /**
      * The current frame id.
-     * 
-     * This is only used if {@link SkyRendererConfigBase.randomizeRayOffsets} is true.
-     * 
+     *
+     * This is only used if {@link FullResolutionRayMarchConfig.randomizeRayOffsets} or {@link AerialPerspectiveLutConfig.randomizeRayOffsets} is true.
+     *
      * Defaults to 0.
      */
     frameId?: number,

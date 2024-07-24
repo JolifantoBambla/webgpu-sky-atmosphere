@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2024 Lukas Herzberger
+ * SPDX-License-Identifier: MIT
+ */
+
 fn get_uniforms() -> Uniforms {
     Uniforms uniforms;
     uniforms.inverse_projection = get_inverse_projection();

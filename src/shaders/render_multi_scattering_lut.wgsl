@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2024 Lukas Herzberger
+ * Copyright (c) 2020 Epic Games, Inc.
+ * SPDX-License-Identifier: MIT
+ */
+ 
 override SAMPLE_COUNT: u32 = 20;
 
 @group(0) @binding(0) var<uniform> atmosphere_buffer: Atmosphere;

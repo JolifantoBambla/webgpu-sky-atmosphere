@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2024 Lukas Herzberger
+ * SPDX-License-Identifier: MIT
+ */
+
 import { Atmosphere } from './atmosphere.js';
 
 export interface TransmittanceLutConfig {
@@ -111,7 +116,21 @@ export interface AerialPerspectiveLutConfig {
      *
      * Defaults to 4 * {@link SkyAtmosphereRendererConfig.distanceScaleFactor}.
      */
-    distancePerSlice?: number
+    distancePerSlice?: number,
+
+    /**
+     * If this is true and {@link SkyAtmosphereRendererConfig.shadow} is defined, user-controlled shadow mapping will be evaluated for every sample when rendering the aerial perspective lookup table.
+     *
+     * Defaults to true.
+     */
+    affectedByShadow?: boolean,
+
+    /**
+     * Might results in smoother volumetric shadows but introduces visible noise.
+     *
+     * Defaults to false.
+     */
+    randomizeRayOffsets?: boolean,
 }
 
 /**
@@ -219,6 +238,17 @@ export interface SkyRendererConfigBase {
      * Defaults to 100 * {@link SkyAtmosphereRendererConfig.distanceScaleFactor}.
      */
     distanceToMaxSampleCount?: number,
+}
+
+export interface FullResolutionRayMarchConfig {
+    /**
+     * If this is false, the sky view lookup table for pixels with an invalid depth value.
+     *
+     * While this is cheaper than a full-resolution ray march, volumetric shadows will not be rendered for distant sky pixels.
+     *
+     * Defaults to false.
+     */
+    rayMarchDistantSky?: boolean,
 
     /**
      * Results in less sampling artefacts (e.g., smoother volumetric shadows) but introduces visible noise.
@@ -227,6 +257,16 @@ export interface SkyRendererConfigBase {
      * Defaults to true.
      */
     randomizeRayOffsets?: boolean,
+
+    /**
+     * If this this true, colored transmittance will be used to blend the rendered sky and the texture data in the back buffer when using the full-screen ray marching pass to render the sky.
+     *
+     * For a {@link SkyAtmosphereRasterRenderer}, this requires the "dual-source-blending" feature to be enabled. Otherwise, this flag has no effect.
+     * Without the "dual-source-blending" feature enabled, colored transmissions can only be rendered using a {@link SkyAtmosphereComputeRenderer} or by writing luminance and transmittance to extra targets and blending them in an extra pass (see {@link SkyRendererRasterConfig.transmissionFormat}, the blending step is then left to the user).
+     *
+     * Defaults to true.
+     */
+    useColoredTransmittance?: boolean,
 }
 
 export interface SkyRendererComputeConfig extends SkyRendererConfigBase {
@@ -247,11 +287,9 @@ export interface SkyRendererComputeConfig extends SkyRendererConfigBase {
     renderTarget: ComputeRenderTargetConfig,
 
     /**
-     * If this this true, colored transmittance will be used to blend the rendered sky and the texture data in the {@link backBuffer} when using the full-screen ray marching pass to render the sky.
-     *
-     * Defaults to true.
+     * Settings for the full-resolution ray marching pass.
      */
-    useColoredTransmittanceOnPerPixelRayMarch?: boolean,
+    rayMarch?: FullResolutionRayMarchConfig,
 }
 
 export interface SkyRendererRasterConfig extends SkyRendererConfigBase {
@@ -269,21 +307,15 @@ export interface SkyRendererRasterConfig extends SkyRendererConfigBase {
     renderTargetFormat: GPUTextureFormat,
 
     /**
-     * Use dual-source blending for colored transmissions.
-     *
-     * Note that colored transmissions are only supported when using full-screen ray marching instead of the aerial perspective lookup table.
-     *
-     * Without the "dual-source-blending" feature enabled, colored transmissions can only be rendered using a compute pipeline or by writing luminance and transmittance to extra targets and blending them in an extra pass (see {@link transmissionFormat}, the blending step is then left to the user).
-     *
-     * Defaults to false.
+     * Settings for the full-resolution ray marching pass.
      */
-    useDualSourceBlending?: boolean,
+    rayMarch?: FullResolutionRayMarchConfig,
 
     /**
      * If this is set and dual source blending is not enabled or not available, all render passes will be configured to use two render targets, where transmission will be written to the second render target using this format.
      * In this case, no blend state will be configured for the render target at location 0. Instead, blending is left to the user.
      *
-     * If {@link useDualSourceBlending} is true and the device support the `"dual-source-blending"` feature, this option is ignored.
+     * If `rayMarch.useColoredTransmittance` is true and the device support the `"dual-source-blending"` feature, this option is ignored.
      *
      * If {@link writeTransmissionOnlyOnPerPixelRayMarch} is true, this setting does not affect the sky rendering pass using the aerial perspective lookup table. It will instead be configured to expect a single render target at location 0 and a blend state will be configured for the pipeline.
      */

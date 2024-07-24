@@ -16,9 +16,27 @@ override WORKGROUP_SIZE_Y: u32 = 16;
 @group(0) @binding(2) var lut_sampler: sampler;
 @group(0) @binding(3) var transmittance_lut: texture_2d<f32>;
 @group(0) @binding(4) var multi_scattering_lut: texture_2d<f32>;
-@group(0) @binding(5) var depth_buffer: texture_2d<f32>;
-@group(0) @binding(6) var backbuffer: texture_2d<f32>;
-@group(0) @binding(7) var render_target: texture_storage_2d<rgba16float, write>;
+@group(0) @binding(5) var sky_view_lut: texture_2d<f32>;
+@group(0) @binding(6) var depth_buffer: texture_2d<f32>;
+@group(0) @binding(7) var backbuffer: texture_2d<f32>;
+@group(0) @binding(8) var render_target: texture_storage_2d<rgba16float, write>;
+
+fn use_sky_view_lut(view_height: f32, world_pos: vec3<f32>, world_dir: vec3<f32>, sun_dir: vec3<f32>, atmosphere: Atmosphere, config: Uniforms) -> vec4<f32> {
+    let zenith = normalize(world_pos);
+    let cos_view_zenith = dot(world_dir, zenith);
+
+    let side = normalize(cross(zenith, world_dir));	// assumes non parallel vectors
+    let forward = normalize(cross(side, zenith));	// aligns toward the sun light but perpendicular to up vector
+    let cos_light_view = normalize(vec2(dot(sun_dir, forward), dot(sun_dir, side))).x;
+
+    let intersects_ground = ray_intersects_sphere(world_pos, world_dir, vec3(), atmosphere.bottom_radius);
+
+    let uv = sky_view_lut_params_to_uv(atmosphere, intersects_ground, cos_view_zenith, cos_light_view, view_height);
+
+    let sky_view = textureSampleLevel(sky_view_lut, lut_sampler, uv, 0);
+
+    return vec4(sky_view.rgb + get_sun_luminance(world_pos, world_dir, atmosphere, config), sky_view.a);
+}
 
 fn get_sample_shadow(atmosphere: Atmosphere, sample_position: vec3<f32>, light_index: u32) -> f32 {
 	return get_shadow(sample_position + atmosphere.planet_center, light_index);
@@ -135,30 +153,28 @@ fn render_sky(pix: vec2<u32>) -> RenderSkyResult {
 	let atmosphere = atmosphere_buffer;
     let config = config_buffer;
 
-	let uv = (vec2<f32>(pix) + 0.5) / vec2<f32>(config.screen_resolution);
+    let uv = (vec2<f32>(pix) + 0.5) / vec2<f32>(config.screen_resolution);
 
     let world_dir = uv_to_world_dir(uv, config.inverse_projection, config.inverse_view);
     var world_pos = config.camera_world_position - atmosphere.planet_center;
     let sun_dir = normalize(config.sun.direction);
 
 	let view_height = length(world_pos);
-	
-    var luminance = vec3<f32>();
-	
+
     let depth = textureLoad(depth_buffer, pix, 0).r;
     if !is_valid_depth(depth) {
-        luminance += get_sun_luminance(world_pos, world_dir, atmosphere, config);
+        let sky_view = use_sky_view_lut(view_height, world_pos, world_dir, sun_dir, atmosphere, config);
+        return RenderSkyResult(vec4<f32>(sky_view.rgb, 1.0), vec4<f32>(vec3<f32>(sky_view.a), 1.0));
     }
-
+    
     if !move_to_atmosphere_top(&world_pos, world_dir, atmosphere.top_radius) {
-        luminance = get_sun_luminance(world_pos, world_dir, atmosphere, config);
-        return RenderSkyResult(max(vec4(luminance, 1.0), vec4()), max(vec4(0.0, 0.0, 0.0, 1.0), vec4()));
+        let black = vec4(vec3(), 1.0);
+        return RenderSkyResult(black, black);
     }
     
     let ss = integrate_scattered_luminance(uv, world_pos, world_dir, atmosphere, depth, config);
-    luminance += ss.luminance;
 
-    return RenderSkyResult(max(vec4(luminance, 1.0), vec4()), max(vec4(ss.transmittance, 1.0), vec4()));
+    return RenderSkyResult(max(vec4(ss.luminance, 1.0), vec4()), max(vec4(ss.transmittance, 1.0), vec4()));
 }
 
 struct RenderSkyFragment {

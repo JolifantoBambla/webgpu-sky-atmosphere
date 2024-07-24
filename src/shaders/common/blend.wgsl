@@ -1,8 +1,13 @@
+/*
+ * Copyright (c) 2024 Lukas Herzberger
+ * SPDX-License-Identifier: MIT
+ */
+
 fn blend(pix: vec2<u32>, src: vec4<f32>) {
     let dst = textureLoad(backbuffer, pix, 0);
     // blend op:        src*1 + dst * (1.0 - srcA)
     // alpha blend op:  src  * 0 + dst * 1
-    let rgb = src.rgb + dst.rgb * (1.0 - clamp(src.a, 0.0, 1.0));
+    let rgb = src.rgb + dst.rgb * (1.0 - saturate(src.a));
     let a = dst.a;
     textureStore(render_target, pix, vec4<f32>(rgb, a));
 }

@@ -237,7 +237,9 @@
                     view: depthBufferView,
                     reverseZ: true,
                 },
-                useColoredTransmittanceOnPerPixelRayMarch: true,
+                rayMarch: {
+                    useColoredTransmittance: true,
+                },
             };
             const renderPassConfigBase = {
                 renderTargetFormat: skyRenderTarget.format,
@@ -245,6 +247,9 @@
                     texture: depthBuffer,
                     view: depthBufferView,
                     reverseZ: true,
+                },
+                rayMarch: {
+                    useColoredTransmittance: useDualSourceBlending,
                 },
             };
 
@@ -258,7 +263,6 @@
                     ...skyAtmosphereConfigBase,
                     skyRenderer: {
                         ...renderPassConfigBase,
-                        useDualSourceBlending,
                     },
                 },
                 skyAtmosphereRenderer.skyAtmospherePipelines,
@@ -270,7 +274,9 @@
                     ...skyAtmosphereConfigBase,
                     skyRenderer: {
                         ...computePassConfigBase,
-                        useColoredTransmittanceOnPerPixelRayMarch: false,
+                        rayMarch: {
+                            useColoredTransmittance: false,
+                        },
                     },
                 },
                 skyAtmosphereRenderer.skyAtmospherePipelines,
@@ -282,7 +288,9 @@
                     ...skyAtmosphereConfigBase,
                     skyRenderer: {
                         ...renderPassConfigBase,
-                        useDualSourceBlending: false,
+                        rayMarch: {
+                            useColoredTransmittance: false,
+                        },
                     },
                 },
                 skyAtmosphereRenderer.skyAtmospherePipelines,
@@ -305,7 +313,6 @@
                     ...skyAtmosphereConfigBase,
                     skyRenderer: {
                         ...renderPassConfigBase,
-                        useDualSourceBlending,
                     },
                 },
                 skyAtmosphereRendererMeters.skyAtmospherePipelines,
@@ -317,7 +324,9 @@
                     ...skyAtmosphereConfigBase,
                     skyRenderer: {
                         ...computePassConfigBase,
-                        useColoredTransmittanceOnPerPixelRayMarch: false,
+                        rayMarch: {
+                            useColoredTransmittance: false,
+                        },
                     },
                 },
                 skyAtmosphereRendererMeters.skyAtmospherePipelines,
@@ -329,7 +338,9 @@
                     ...skyAtmosphereConfigBase,
                     skyRenderer: {
                         ...renderPassConfigBase,
-                        useDualSourceBlending: false,
+                        rayMarch: {
+                            useColoredTransmittance: false,
+                        },
                     },
                 },
                 skyAtmosphereRendererMeters.skyAtmospherePipelines,

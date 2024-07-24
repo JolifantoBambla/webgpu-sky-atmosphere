@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2024 Lukas Herzberger
+ * Copyright (c) 2020 Epic Games, Inc.
+ * SPDX-License-Identifier: MIT
+ */
+
 fn from_sub_uvs_to_unit(u: f32, resolution: f32) -> f32 {
     return (u - 0.5 / resolution) * (resolution / (resolution - 1.0));
 }

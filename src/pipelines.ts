@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2024 Lukas Herzberger
+ * SPDX-License-Identifier: MIT
+ */
+
 import { SkyAtmosphereRendererConfig, ShadowConfig, CustomUniformsSourceConfig } from './config.js';
 import { AERIAL_PERSPECTIVE_LUT_FORMAT, ATMOSPHERE_BUFFER_SIZE, UNIFORMS_BUFFER_SIZE, DEFAULT_AERIAL_PERSPECTIVE_LUT_SIZE, DEFAULT_MULTISCATTERING_LUT_SIZE, DEFAULT_SKY_VIEW_LUT_SIZE, MULTI_SCATTERING_LUT_FORMAT, SKY_VIEW_LUT_FORMAT, SkyAtmosphereResources, TRANSMITTANCE_LUT_FORMAT } from './resources.js';
 import { makeAerialPerspectiveLutShaderCode, makeMultiScatteringLutShaderCode, makeSkyViewLutShaderCode, makeTransmittanceLutShaderCode } from './shaders.js';
@@ -40,8 +45,9 @@ export class SkyAtmospherePipelines {
             (config.lookUpTables?.aerialPerspectiveLut?.size ?? DEFAULT_AERIAL_PERSPECTIVE_LUT_SIZE)[2],
             config.lookUpTables?.aerialPerspectiveLut?.distancePerSlice ?? (4.0 * (config.distanceScaleFactor ?? 1.0)),
             config.lookUpTables?.multiScatteringLut?.size ?? [DEFAULT_MULTISCATTERING_LUT_SIZE, DEFAULT_MULTISCATTERING_LUT_SIZE],
+            config.lookUpTables?.aerialPerspectiveLut?.randomizeRayOffsets ?? false,
             config.lights?.useMoon ?? false,
-            config.shadow,
+            (config.lookUpTables?.aerialPerspectiveLut?.affectedByShadow ?? true) ? config.shadow : undefined,
             config.customUniformsSource,
         );
     }
@@ -321,7 +327,8 @@ export class SkyViewLutPipeline {
             }),
             compute: {
                 module: device.createShaderModule({
-                    code: `${shadowConfig?.wgslCode || 'fn get_shadow(p: vec3<f32>) -> f32 { return 1.0; }'}\n${makeSkyViewLutShaderCode(skyViewLutFormat, customUniformsConfig?.wgslCode)}`,
+                    label: 'sky view LUT',
+                    code: `${shadowConfig?.wgslCode || 'fn get_shadow(p: vec3<f32>, i: u32) -> f32 { return 1.0; }'}\n${makeSkyViewLutShaderCode(skyViewLutFormat, customUniformsConfig?.wgslCode)}`,
                 }),
                 entryPoint: 'render_sky_view_lut',
                 constants: {
@@ -410,7 +417,7 @@ export class AerialPerspectiveLutPipeline {
     readonly aerialPerspectiveDistancePerSlice: number;
     readonly multiscatteringLutSize: [number, number];
 
-    constructor(device: GPUDevice, aerialPerspectiveLutFormat: GPUTextureFormat, aerialPerspectiveSliceCount: number, aerialPerspectiveDistancePerSlice: number, multiscatteringLutSize: [number, number], useMoon: boolean, shadowConfig?: ShadowConfig, customUniformsConfig?: CustomUniformsSourceConfig) {
+    constructor(device: GPUDevice, aerialPerspectiveLutFormat: GPUTextureFormat, aerialPerspectiveSliceCount: number, aerialPerspectiveDistancePerSlice: number, multiscatteringLutSize: [number, number], randomizeSampleOffsets: boolean, useMoon: boolean, shadowConfig?: ShadowConfig, customUniformsConfig?: CustomUniformsSourceConfig) {
         this.device = device;
         this.aerialPerspectiveLutFormat = aerialPerspectiveLutFormat;
         this.aerialPerspectiveSliceCount = aerialPerspectiveSliceCount;
@@ -485,7 +492,8 @@ export class AerialPerspectiveLutPipeline {
             }),
             compute: {
                 module: device.createShaderModule({
-                    code: `${shadowConfig?.wgslCode || 'fn get_shadow(p: vec3<f32>) -> f32 { return 1.0; }'}\n${makeAerialPerspectiveLutShaderCode(aerialPerspectiveLutFormat, customUniformsConfig?.wgslCode)}`,
+                    label: 'aerial perspective LUT',
+                    code: `${shadowConfig?.wgslCode || 'fn get_shadow(p: vec3<f32>, i: u32) -> f32 { return 1.0; }'}\n${makeAerialPerspectiveLutShaderCode(aerialPerspectiveLutFormat, customUniformsConfig?.wgslCode)}`,
                 }),
                 entryPoint: 'render_aerial_perspective_lut',
                 constants: {
@@ -493,6 +501,7 @@ export class AerialPerspectiveLutPipeline {
                     AP_DISTANCE_PER_SLICE: this.aerialPerspectiveDistancePerSlice,
                     MULTI_SCATTERING_LUT_RES_X: this.multiscatteringLutSize[0],
                     MULTI_SCATTERING_LUT_RES_Y: this.multiscatteringLutSize[1],
+                    RANDOMIZE_SAMPLE_OFFSET: Number(randomizeSampleOffsets),
                     USE_MOON: Number(useMoon),
                 },
             },

@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2024 Lukas Herzberger
+ * Copyright (c) 2020 Epic Games, Inc.
+ * SPDX-License-Identifier: MIT
+ */
+
 override SAMPLE_COUNT: u32 = 40;
 
 override WORKGROUP_SIZE_X: u32 = 16;

@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2024 Lukas Herzberger
+ * Copyright (c) 2020 Epic Games, Inc.
+ * SPDX-License-Identifier: MIT
+ */
+
 override AP_SLICE_COUNT: f32 = 32.0;
 override AP_DISTANCE_PER_SLICE: f32 = 4.0;
 
