@@ -30,6 +30,7 @@ export function makeUi(atmosphere, camera) {
             rayMarchingMinSpp: 14,
             rayMarchingMaxSpp: 30,
             rayMarch: false,
+            coloredTransmittance: false,
             compute: true,
             viewHeight: 1.0,
             inMeters: false,
@@ -120,7 +121,8 @@ Escape: exit pointer lock on canvas`,
             rayMarchMaxSlider.refresh();
         });
     
-    renderSettingsFolder.addBinding(params.renderSettings, 'rayMarch', {label: 'Force ray marching'});
+    renderSettingsFolder.addBinding(params.renderSettings, 'rayMarch', {label: 'Full-resolution ray marching'});
+    renderSettingsFolder.addBinding(params.renderSettings, 'coloredTransmittance', {label: 'Colored transmittance (ray march only)'});
     renderSettingsFolder.addBinding(params.renderSettings, 'compute', {label: 'Use compute'});
     renderSettingsFolder.addBinding(params.renderSettings, 'scale', {label: 'Scale', options: { '1 = 1km': '1 = 1km', '1 = 1m': '1 = 1m', }})
         .on('change', e => {

@@ -76,13 +76,13 @@
                         }
                     });
                 } catch (e) {
-                    console.warn('dual source blending not supported - disabling it', e);
+                    console.warn('dual source blending check failed', e);
                     useDualSourceBlending = false;
                 }
             }
-
-            //canvas.width = resolution[0];
-            //canvas.height = resolution[1];
+            if (!useDualSourceBlending) {
+                console.warn('dual source blending not supported - disabling colored transmittance for render passes');
+            }
 
             const context = canvas.getContext('webgpu');
             const presentationFormat = navigator.gpu.getPreferredCanvasFormat();
@@ -191,36 +191,66 @@
                     `
                 },
             };
+            const computePassConfigBase = {
+                backBuffer: {
+                    texture: backBuffer,
+                    view: backBufferView,
+                },
+                renderTarget: {
+                    texture: skyRenderTarget,
+                    view: skyRenderTarget.createView(),
+                },
+                depthBuffer: {
+                    texture: depthBuffer,
+                    view: depthBufferView,
+                    reverseZ: true,
+                },
+                useColoredTransmittanceOnPerPixelRayMarch: true,
+            };
+            const renderPassConfigBase = {
+                renderTargetFormat: skyRenderTarget.format,
+                depthBuffer: {
+                    texture: depthBuffer,
+                    view: depthBufferView,
+                    reverseZ: true,
+                },
+            };
+
             const skyAtmosphereRenderer = new SkyAtmosphereComputeRenderer(device, {
                 ...skyAtmosphereConfigBase,
-                skyRenderer: {
-                    backBuffer: {
-                        texture: backBuffer,
-                        view: backBufferView,
-                    },
-                    renderTarget: {
-                        texture: skyRenderTarget,
-                        view: skyRenderTarget.createView(),
-                    },
-                    depthBuffer: {
-                        texture: depthBuffer,
-                        view: depthBufferView,
-                        reverseZ: true,
-                    },
-                },
+                skyRenderer: computePassConfigBase,
             });
             const skyAtmosphereRasterRenderer = new SkyAtmosphereRasterRenderer(
                 device,
                 {
                     ...skyAtmosphereConfigBase,
                     skyRenderer: {
-                        renderTargetFormat: skyRenderTarget.format,
+                        ...renderPassConfigBase,
                         useDualSourceBlending,
-                        depthBuffer: {
-                            texture: depthBuffer,
-                            view: depthBufferView,
-                            reverseZ: true,
-                        },
+                    },
+                },
+                skyAtmosphereRenderer.skyAtmospherePipelines,
+                skyAtmosphereRenderer.resources,  
+            );
+            const skyAtmosphereRendererGrayscale = new SkyAtmosphereComputeRenderer(
+                device,
+                {
+                    ...skyAtmosphereConfigBase,
+                    skyRenderer: {
+                        ...computePassConfigBase,
+                        useColoredTransmittanceOnPerPixelRayMarch: false,
+                    },
+                },
+                skyAtmosphereRenderer.skyAtmospherePipelines,
+                skyAtmosphereRenderer.resources,
+            );
+            const skyAtmosphereRasterRendererGrayscale = new SkyAtmosphereRasterRenderer(
+                device,
+                {
+                    ...skyAtmosphereConfigBase,
+                    skyRenderer: {
+                        ...renderPassConfigBase,
+                        useDualSourceBlending: false,
                     },
                 },
                 skyAtmosphereRenderer.skyAtmospherePipelines,
@@ -232,21 +262,7 @@
                 device,
                 {
                     ...skyAtmosphereConfigBase,
-                    skyRenderer: {
-                        backBuffer: {
-                            texture: backBuffer,
-                            view: backBufferView,
-                        },
-                        renderTarget: {
-                            texture: skyRenderTarget,
-                            view: skyRenderTarget.createView(),
-                        },
-                        depthBuffer: {
-                            texture: depthBuffer,
-                            view: depthBufferView,
-                            reverseZ: true,
-                        },
-                    },
+                    skyRenderer: computePassConfigBase,
                 },
                 null,
                 skyAtmosphereRenderer.resources,
@@ -256,17 +272,36 @@
                 {
                     ...skyAtmosphereConfigBase,
                     skyRenderer: {
-                        renderTargetFormat: skyRenderTarget.format,
+                        ...renderPassConfigBase,
                         useDualSourceBlending,
-                        depthBuffer: {
-                            texture: depthBuffer,
-                            view: depthBufferView,
-                            reverseZ: true,
-                        },
                     },
                 },
                 skyAtmosphereRendererMeters.skyAtmospherePipelines,
                 skyAtmosphereRenderer.resources,  
+            );
+            const skyAtmosphereRendererMetersGrayscale = new SkyAtmosphereComputeRenderer(
+                device,
+                {
+                    ...skyAtmosphereConfigBase,
+                    skyRenderer: {
+                        ...computePassConfigBase,
+                        useColoredTransmittanceOnPerPixelRayMarch: false,
+                    },
+                },
+                skyAtmosphereRendererMeters.skyAtmospherePipelines,
+                skyAtmosphereRendererMeters.resources,
+            );
+            const skyAtmosphereRasterRendererMetersGrayscale = new SkyAtmosphereRasterRenderer(
+                device,
+                {
+                    ...skyAtmosphereConfigBase,
+                    skyRenderer: {
+                        ...renderPassConfigBase,
+                        useDualSourceBlending: false,
+                    },
+                },
+                skyAtmosphereRendererMeters.skyAtmospherePipelines,
+                skyAtmosphereRendererMeters.resources,  
             );
 
             function makePipeline() {
@@ -559,9 +594,15 @@
 
                 const computePass = encoder.beginComputePass();
                 if (params.renderSettings.compute) {
-                    (params.renderSettings.inMeters ? skyAtmosphereRendererMeters : skyAtmosphereRenderer).renderSkyAtmosphere(computePass, config, params.atmosphere, params.renderSettings.rayMarch);
+                    (params.renderSettings.inMeters ?
+                        (params.renderSettings.coloredTransmittance ? skyAtmosphereRendererMeters : skyAtmosphereRendererMetersGrayscale) :
+                        (params.renderSettings.coloredTransmittance ? skyAtmosphereRenderer : skyAtmosphereRendererGrayscale)
+                    ).renderSkyAtmosphere(computePass, config, params.atmosphere, params.renderSettings.rayMarch);
                 } else {
-                    (params.renderSettings.inMeters ? skyAtmosphereRasterRendererMeters : skyAtmosphereRasterRenderer).renderSkyAtmosphereLuts(computePass, config, params.atmosphere, params.renderSettings.rayMarch);
+                    (params.renderSettings.inMeters ?
+                        (params.renderSettings.coloredTransmittance ? skyAtmosphereRasterRendererMeters : skyAtmosphereRasterRendererMetersGrayscale) :
+                        (params.renderSettings.coloredTransmittance ? skyAtmosphereRasterRenderer : skyAtmosphereRasterRendererGrayscale)
+                    ).renderSkyAtmosphereLuts(computePass, config, params.atmosphere, params.renderSettings.rayMarch);
                 }
                 computePass.end();
 
@@ -573,7 +614,10 @@
                             storeOp: 'store',
                         }],
                     });
-                    (params.renderSettings.inMeters ? skyAtmosphereRasterRendererMeters : skyAtmosphereRasterRenderer).renderSky(renderPass, params.renderSettings.rayMarch);
+                    (params.renderSettings.inMeters ?
+                        (params.renderSettings.coloredTransmittance ? skyAtmosphereRasterRendererMeters : skyAtmosphereRasterRendererMetersGrayscale) :
+                        (params.renderSettings.coloredTransmittance ? skyAtmosphereRasterRenderer : skyAtmosphereRasterRendererGrayscale)
+                    ).renderSky(renderPass, params.renderSettings.rayMarch);
                     renderPass.end();
                 }
 
