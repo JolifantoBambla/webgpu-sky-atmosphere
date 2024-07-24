@@ -144,8 +144,7 @@ skyPass.end();
 
 The above renderers default to rendering the clear sky / atmosphere using low-resolution lookup tables. However, it can also be rendered by doing a full-resolution ray marching pass.
 While the former method is faster, full-resolution ray marching produces smoother volumetric shadows and allows for colored transmittance.
-It also produces a much smoother transition when moving from the top layers of the atmosphere to outer space.
-
+It also produces a much smoother transition when moving from the top layers of the atmosphere to outer space
 A typical scenario would be to switch to full-resolution ray marching if the camera is above a certain altitude threshold by passing the corresponding flag to `renderSkyAtmosphere` / `renderSky`:
 
 ```js
@@ -173,7 +172,7 @@ The atmosphere of a telluric planet, i.e., a planet with a solid planetery surfa
 
  * Rayleigh theory models the wavelength dependent scattering of light interacting with tiny air molecules. In Earth's atmosphere, it is ressponsible for the blue color of the sky.
  * Mie theory models how light is scattered around and absorbed by larger aerosols like dust or pollution. It is almost independent of wavelength and most of the incoming light is scattered in the forward direction. In Earth's atmosphere, it is responsible for the white glare around the sun.
- * Ozone: On Earth, light is also absorbed by the ozone in the atmosphere contributing to the sky's blue color when the sun is at the horizon.
+ * Extra absorption layers: On Earth, light is also absorbed by the ozone in the atmosphere contributing to the sky's blue color when the sun is low.
 
 By default, a `SkyAtmosphereRenderer` will use an Earth-like atmosphere with the origin on the planet's top pole, scaled to 1 = 1 km and assuming the y axis is pointing up.
 
@@ -194,7 +193,7 @@ To initialize an Earth-like atmosphere to use a different origin, use
 const distanceScale = 1.0; // 1 = 1km
 
 // using a specific center
-const center = [ /* whereever the planet's center is */ ];
+const center = [ /* world space position of the planet's center */ ];
 const config = {
   atmosphere: makeEarthAtmosphere(distanceScale, center),
   ...
@@ -213,7 +212,7 @@ To create a custom atmosphere, adjust the parameters to your liking (read the [d
 ```js
 const config = {
   atmosphere: {
-    // do what your heart desires
+    // ...
   },
   ...
 };
@@ -265,8 +264,7 @@ const config = {
 
 #### Sun disk rendering
 
-A simple implementation for rendering a sun and a moon disk is provided by the `SkyAtmosphereRenderer`.
-
+A simple implementation for rendering a sun and a moon disk is provided.
 Use the `Uniforms` to adjust the sun disk's appearance:
 
 ```js
@@ -348,7 +346,7 @@ const config = {
 ### Custom uniform buffers
 
 It is likely that some or even all uniforms used by a `SkyAtmosphereRenderer` are already available on the GPU in some other buffer(s) in your engine.
-To replace the `SkyAtmosphereRenderer`'s internal uniform buffer by one or more user-controlled uniform buffers, configure the renderer to inject external bind groups and WGSL code, similar to how shadows were integrated into the renderer:
+To replace the `SkyAtmosphereRenderer`'s internal uniform buffer by one or more user-controlled uniform buffers, configure the renderer to inject external bind groups and WGSL code, similar to how shadows are integrated into the renderer:
 
 ```js
 const config = {
@@ -404,7 +402,7 @@ const config = {
 
 For more information on the individual options, please refer to the [documentation](https://jolifantobambla.github.io/webgpu-sky-atmosphere/interfaces/SkyAtmosphereLutConfig).
 
-The transmittance and the multiple scattering lookup table are constant for a given atmosphere. This is why they are rendered during the `SkyAtmosphereRenderer`'s constructor by default and re-rendered by `renderSkyAtmosphere` / `renderSkyAtmosphereLuts` only if a the optional `atmopshere` parameter is set.
+The transmittance and the multiple scattering lookup table are constant for a given atmosphere. This is why they are rendered during the `SkyAtmosphereRenderer`'s constructor by default and re-rendered by `renderSkyAtmosphere` / `renderSkyAtmosphereLuts` only if the optional `atmopshere` parameter is set.
 To re-render the two lookup tables outside of these scenarios, call:
 
 ```js
@@ -417,7 +415,7 @@ skyRenderer.renderConstantLuts(
 ```
 
 While the constant lookup tables are used by both sky rendering methods, the sky view and aerial perspective lookup tables are not used by the full-resolution ray marching method.
-Since they are view dependent, they are re-rendered whenever new `Uniforms` are passed to `renderSkyAtmosphere` / `renderSkyAtmosphereLuts`.
+Since they are view dependent, they are re-rendered whenever new `Uniforms` are passed to `renderSkyAtmosphere` / `renderSkyAtmosphereLuts` and the lookup table based sky rendering technique is chosen.
 To only update these two lookup tables, call:
 
 ```js
