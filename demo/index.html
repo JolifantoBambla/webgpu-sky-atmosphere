@@ -26,7 +26,7 @@
 
         async function main() {
             const canvas = document.querySelector('canvas');
-            const resolution = [canvas.clientWidth, canvas.clientHeight];
+            const resolution = [canvas.clientWidth, canvas.clientHeight].map(s => s * window.devicePixelRatio);
             canvas.width = resolution[0];
             canvas.height = resolution[1];
 
@@ -516,6 +516,135 @@
 
             const params = makeUi(skyAtmosphereRenderer.resources.atmosphere, cameraController, timeStampQuery !== null);
 
+            const resolutionDependentStuff = {
+                projection,
+                backBuffer,
+                backBufferView,
+                depthBuffer,
+                depthBufferView,
+                skyRenderTarget,
+                bindGroup,
+                bindGroupRender,
+            };
+
+            let resizeInProgress = false;
+            const handleResize = _ => {
+                resolution[0] = canvas.clientWidth * window.devicePixelRatio;
+                resolution[1] = canvas.clientHeight * window.devicePixelRatio;
+
+                canvas.width = resolution[0];
+                canvas.height = resolution[1];
+
+                resolutionDependentStuff.projection = mat4n.perspectiveReverseZ(
+                    45.0 * (Math.PI / 180.0),
+                    resolution[0] / resolution[1],
+                    1.0,
+                );
+                resolutionDependentStuff.backBuffer = device.createTexture({
+                    size: resolution,
+                    format: 'rgba16float',
+                    usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT,
+                });
+                resolutionDependentStuff.backBufferView = resolutionDependentStuff.backBuffer.createView();
+                resolutionDependentStuff.depthBuffer = device.createTexture({
+                    size: resolution,
+                    format: 'depth24plus',
+                    usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT,
+                });
+                resolutionDependentStuff.depthBufferView = resolutionDependentStuff.depthBuffer.createView();
+                resolutionDependentStuff.skyRenderTarget = device.createTexture({
+                    size: resolution,
+                    format: 'rgba16float',
+                    usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING,
+                });
+                resolutionDependentStuff.bindGroup = device.createBindGroup({
+                    layout: presentPipeline.getBindGroupLayout(0),
+                    entries: [
+                        {
+                            binding: 0,
+                            resource: {
+                                buffer: debugViewConfigBuffer,
+                            },
+                        },
+                        {
+                            binding: 1,
+                            resource: skyAtmosphereRenderer.resources.transmittanceLut.view,
+                        },
+                        {
+                            binding: 2,
+                            resource: skyAtmosphereRenderer.resources.multiScatteringLut.view,
+                        },
+                        {
+                            binding: 3,
+                            resource: skyAtmosphereRenderer.resources.skyViewLut.view,
+                        },
+                        {
+                            binding: 4,
+                            resource: skyAtmosphereRenderer.resources.aerialPerspectiveLut.view,
+                        },
+                        {
+                            binding: 5,
+                            resource: resolutionDependentStuff.skyRenderTarget.createView(),
+                        },
+                    ],
+                });
+                resolutionDependentStuff.bindGroupRender = device.createBindGroup({
+                    layout: presentPipeline.getBindGroupLayout(0),
+                    entries: [
+                        {
+                            binding: 0,
+                            resource: {
+                                buffer: debugViewConfigBuffer,
+                            },
+                        },
+                        {
+                            binding: 1,
+                            resource: skyAtmosphereRenderer.resources.transmittanceLut.view,
+                        },
+                        {
+                            binding: 2,
+                            resource: skyAtmosphereRenderer.resources.multiScatteringLut.view,
+                        },
+                        {
+                            binding: 3,
+                            resource: skyAtmosphereRenderer.resources.skyViewLut.view,
+                        },
+                        {
+                            binding: 4,
+                            resource: skyAtmosphereRenderer.resources.aerialPerspectiveLut.view,
+                        },
+                        {
+                            binding: 5,
+                            resource: resolutionDependentStuff.backBufferView,
+                        },
+                    ],
+                });
+
+                const resizeConfigCompute = {
+                    backBuffer: resolutionDependentStuff.backBuffer,
+                    depthBuffer: resolutionDependentStuff.depthBuffer,
+                    renderTarget: resolutionDependentStuff.skyRenderTarget,
+                };
+                skyAtmosphereRenderer.onResize(resizeConfigCompute);
+                skyAtmosphereRendererGrayscale.onResize(resizeConfigCompute);
+                skyAtmosphereRendererMeters.onResize(resizeConfigCompute);
+                skyAtmosphereRendererMetersGrayscale.onResize(resizeConfigCompute);
+
+                skyAtmosphereRasterRenderer.onResize(resolutionDependentStuff.depthBuffer);
+                skyAtmosphereRasterRendererGrayscale.onResize(resolutionDependentStuff.depthBuffer);
+                skyAtmosphereRasterRendererMeters.onResize(resolutionDependentStuff.depthBuffer);
+                skyAtmosphereRasterRendererMetersGrayscale.onResize(resolutionDependentStuff.depthBuffer);
+
+                resizeInProgress = false;
+            };
+
+            let timeout = false;
+            window.addEventListener('resize', _ => {
+                resizeInProgress = true;
+                clearTimeout(timeout);
+                timeout = setTimeout(handleResize, 250);
+            });
+
             let lastTime = new Date();
             let frameId = 0;
             const render = () => {
@@ -524,6 +653,12 @@
                 lastTime = now;
 
                 ++frameId;
+
+                if (resizeInProgress) {
+                    console.log(resizeInProgress);
+                    setTimeout(render, 250);
+                    return;
+                }
 
                 cameraController.update(dt);
 
@@ -546,7 +681,7 @@
                     camera: {
                         position: cameraController.position,
                         inverseView: mat4n.inverse(cameraView),
-                        inverseProjection: mat4n.inverse(projection),
+                        inverseProjection: mat4n.inverse(resolutionDependentStuff.projection),
                     },
                     sun: {
                         illuminance: [
@@ -593,7 +728,7 @@
                 device.queue.writeBuffer(shadowBuffer, 0, new Float32Array(sunViewProjection));
                 
                 dragonRenderer.update(
-                    {view: cameraView, projection},
+                    {view: cameraView, projection: resolutionDependentStuff.projection},
                     {model, normal: mat4n.transpose(mat4n.inverse(model))},
                     {
                         direction: config.sun.direction,
@@ -620,13 +755,13 @@
 
                 const geometryPass = encoder.beginRenderPass({
                     colorAttachments: [{
-                        view: backBufferView,
+                        view: resolutionDependentStuff.backBufferView,
                         clearValue: [0,0,0,1],
                         loadOp: 'clear',
                         storeOp: 'store',
                     }],
                     depthStencilAttachment: {
-                        view: depthBufferView,
+                        view: resolutionDependentStuff.depthBufferView,
                         depthClearValue: 0.0, // reverse z
                         depthLoadOp: 'clear',
                         depthStoreOp: 'store',
@@ -658,7 +793,7 @@
                 if (!params.renderSettings.compute) {
                     const renderPass = encoder.beginRenderPass({
                         colorAttachments: [{
-                            view: backBufferView,
+                            view: resolutionDependentStuff.backBufferView,
                             loadOp: 'load',
                             storeOp: 'store',
                         }],
@@ -695,7 +830,7 @@
                     }],
                 });
                 pass.setPipeline(presentPipeline);
-                pass.setBindGroup(0, params.renderSettings.compute ? bindGroup : bindGroupRender);
+                pass.setBindGroup(0, params.renderSettings.compute ? resolutionDependentStuff.bindGroup : resolutionDependentStuff.bindGroupRender);
                 pass.draw(3);
                 pass.end();
 
