@@ -2,6 +2,9 @@ import { makeEarthAtmosphere } from '../dist/1.x/webgpu-sky-atmosphere.module.mi
 import { Pane } from 'https://cdn.jsdelivr.net/npm/tweakpane@4.0.3/dist/tweakpane.min.js';
 
 export function makeUi(atmosphere, camera) {
+    const cameraPositionKilometers = [0, 1, 100];
+    const cameraPositionMeters = [0, 50, 100000];
+
     const params = {
         debugViews: {
             showTransmittanceLut: false,
@@ -122,7 +125,7 @@ Escape: exit pointer lock on canvas`,
         .on('change', e => {
             const scale = e.value ? 1000.0 : 1 / 1000.0;
 
-            camera.height = Math.max(camera.position[1], e.value ? 25 : 1);
+            camera.position = e.value ? cameraPositionMeters : cameraPositionKilometers;
             camera.maxSpeed = e.value ? 1.0 : 0.1;
 
             params.atmosphere = {

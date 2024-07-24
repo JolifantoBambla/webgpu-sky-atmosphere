@@ -108,6 +108,10 @@ export class FPSCameraController {
         this.#maxSpeed = s;
     }
 
+    set position(p) {
+        this.#position = vec3n.fromValues(...p);
+    }
+
     get position() {
         return this.#position;
     }

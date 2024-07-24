@@ -434,6 +434,8 @@
 
             const sunProjection = mat4n.ortho(-80, 80, -80, 80, -200, 300);
 
+            const sunProjectionMeters = mat4n.ortho(-80000, 80000, -80000, 80000, -200000, 300000);
+
             const params = makeUi(skyAtmosphereRenderer.resources.atmosphere, cameraController);
 
             let lastTime = new Date();
@@ -502,9 +504,13 @@
                     frameId,
                 };
 
-                const model = mat4n.translation([0.0, -20.0, 0.0]);
-                const sunView = mat4n.lookAt(config.sun.direction, vec3n.fromValues(0, 0, 0), vec3n.normalize(vec3n.fromValues(0, 0, 1)));
-                const sunViewProjection = mat4n.multiply(sunProjection, sunView);
+                const model = mat4n.multiply(mat4n.scaling(Array(3).fill(params.scaleFromKilometers())), mat4n.translation([0.0, -20.0, 0.0]));
+                const sunView = mat4n.lookAt(
+                    config.sun.direction.map(c => c * params.scaleFromKilometers()),
+                    vec3n.fromValues(0, 0, 0),
+                    vec3n.normalize(vec3n.fromValues(0, 0, 1))
+                );
+                const sunViewProjection = mat4n.multiply(params.renderSettings.inMeters ? sunProjectionMeters : sunProjection, sunView);
 
                 device.queue.writeBuffer(shadowBuffer, 0, new Float32Array(sunViewProjection));
                 
@@ -518,7 +524,7 @@
                     },
                     {
                         sunView,
-                        sunProjection,
+                        sunProjection: params.renderSettings.inMeters ? sunProjectionMeters : sunProjection,
                     }
                 );
 
