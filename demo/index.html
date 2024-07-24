@@ -21,6 +21,8 @@
 
         import { SkyAtmosphereComputeRenderer, SkyAtmosphereRasterRenderer } from '../dist/1.x/webgpu-sky-atmosphere.module.min.js';
 
+        const urlParams = new URLSearchParams(window.location.search);
+        const useTimestampQuery = new URLSearchParams(window.location.search).has('timestamp_query');
 
         async function main() {
             const canvas = document.querySelector('canvas');
@@ -29,8 +31,16 @@
             canvas.height = resolution[1];
 
             const adapter = await navigator.gpu.requestAdapter();
-            const device = await adapter.requestDevice({requiredFeatures: adapter.features.has('dual-source-blending') ? ['dual-source-blending'] : []});
+            console.info('Available adapter features', [...adapter.features]);
 
+            const deviceFeatures = adapter.features.has('dual-source-blending') ? ['dual-source-blending'] : [];
+            if (useTimestampQuery && adapter.features.has('timestamp-query')) {
+                deviceFeatures.push('timestamp-query');
+            }
+
+            const device = await adapter.requestDevice({requiredFeatures: deviceFeatures});
+            console.info('Enabled device features', [...device.features]);
+        
             let useDualSourceBlending = device.features.has('dual-source-blending');
             if (useDualSourceBlending) {
                 // older chromium versions allow enabling dual source blending but don't allow use of 'src1' in blend state
@@ -82,6 +92,28 @@
             }
             if (!useDualSourceBlending) {
                 console.warn('dual source blending not supported - disabling colored transmittance for render passes');
+            }
+
+            let timeStampQuery = null;
+            let queryBuffers = [];
+            if (device.features.has('timestamp-query')) {
+                const numIndices = 4;
+                timeStampQuery = device.createQuerySet({
+                    type: 'timestamp',
+                    count: numIndices,
+                });
+                for (let i = 0; i < 5; ++i) {
+                    queryBuffers.push({
+                        read: device.createBuffer({
+                            size: numIndices * 8,
+                            usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+                        }),
+                        resolve: device.createBuffer({
+                            size: numIndices * 8,
+                            usage: GPUBufferUsage.QUERY_RESOLVE | GPUBufferUsage.COPY_SRC,
+                        }),
+                    });
+                }
             }
 
             const context = canvas.getContext('webgpu');
@@ -471,7 +503,7 @@
 
             const sunProjectionMeters = mat4n.ortho(-80000, 80000, -80000, 80000, -200000, 300000);
 
-            const params = makeUi(skyAtmosphereRenderer.resources.atmosphere, cameraController);
+            const params = makeUi(skyAtmosphereRenderer.resources.atmosphere, cameraController, timeStampQuery !== null);
 
             let lastTime = new Date();
             let frameId = 0;
@@ -592,7 +624,13 @@
                 dragonRenderer.encode(geometryPass);
                 geometryPass.end();
 
-                const computePass = encoder.beginComputePass();
+                const computePass = encoder.beginComputePass({
+                    timestampWrites: timeStampQuery ? {
+                        querySet: timeStampQuery,
+                        beginningOfPassWriteIndex: 0,
+                        endOfPassWriteIndex: 1,
+                    } : undefined,
+                });
                 if (params.renderSettings.compute) {
                     (params.renderSettings.inMeters ?
                         (params.renderSettings.coloredTransmittance ? skyAtmosphereRendererMeters : skyAtmosphereRendererMetersGrayscale) :
@@ -613,12 +651,28 @@
                             loadOp: 'load',
                             storeOp: 'store',
                         }],
+                        timestampWrites: timeStampQuery ? {
+                            querySet: timeStampQuery,
+                            beginningOfPassWriteIndex: 2,
+                            endOfPassWriteIndex: 3,
+                        } : undefined,
                     });
                     (params.renderSettings.inMeters ?
                         (params.renderSettings.coloredTransmittance ? skyAtmosphereRasterRendererMeters : skyAtmosphereRasterRendererMetersGrayscale) :
                         (params.renderSettings.coloredTransmittance ? skyAtmosphereRasterRenderer : skyAtmosphereRasterRendererGrayscale)
                     ).renderSky(renderPass, params.renderSettings.rayMarch);
                     renderPass.end();
+                }
+
+                if (timeStampQuery) {
+                    const resolveBuffer = queryBuffers[frameId % queryBuffers.length].resolve;
+                    const readBuffer = queryBuffers[frameId % queryBuffers.length].read;
+                    encoder.resolveQuerySet(timeStampQuery, 0, 4, resolveBuffer, 0);
+                    if (readBuffer.mapState === 'unmapped') {
+                        encoder.copyBufferToBuffer(resolveBuffer, 0, readBuffer, 0, resolveBuffer.size);
+                    } else {
+                        console.warn('timestamp query: buffer mapping lags behind', readBuffer.mapState);
+                    }
                 }
 
                 const pass = encoder.beginRenderPass({
@@ -635,6 +689,20 @@
                 pass.end();
 
                 device.queue.submit([encoder.finish()]);
+
+                if (timeStampQuery) {
+                    const readBuffer = queryBuffers[frameId % queryBuffers.length].read;
+                    if (readBuffer.mapState === 'unmapped') {
+                        readBuffer.mapAsync(GPUMapMode.READ)
+                            .then(_ => {
+                                const timestamps = new BigInt64Array(readBuffer.getMappedRange());
+                                const lutsDuration = Number(timestamps[1] - timestamps[0]) / 1_000_000;
+                                const skyDuration = params.renderSettings.compute ? 0 : Number(timestamps[3] - timestamps[2]) / 1_000_000;
+                                params.monitoring.timestamp = lutsDuration + skyDuration;
+                                readBuffer.unmap();
+                            });
+                    }
+                }
 
                 requestAnimationFrame(render);
             };

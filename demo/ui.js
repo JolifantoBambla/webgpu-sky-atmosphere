@@ -1,7 +1,7 @@
 import { makeEarthAtmosphere } from '../dist/1.x/webgpu-sky-atmosphere.module.min.js';
 import { Pane } from 'https://cdn.jsdelivr.net/npm/tweakpane@4.0.3/dist/tweakpane.min.js';
 
-export function makeUi(atmosphere, camera) {
+export function makeUi(atmosphere, camera, showPerformanceGraph) {
     const cameraPositionKilometers = [0, 1, 100];
     const cameraPositionMeters = [0, 50, 100000];
 
@@ -78,6 +78,9 @@ export function makeUi(atmosphere, camera) {
                 b: 0.4,
             },
         },
+        monitoring: {
+            timestamp: 0,
+        },
     };
     params.scaleFromKilometers = _ => params.renderSettings.inMeters ? 1000.0 : 1.0;
 
@@ -100,6 +103,16 @@ Escape: exit pointer lock on canvas`,
         multiline: true,
         rows: 5,
     });
+
+    if (showPerformanceGraph) {
+        pane.addBinding(params.monitoring, 'timestamp', {
+            label: 'LUTs + Sky performance in ms (hover)',
+            readonly: true,
+            view: 'graph',
+            min: 0,
+            max: 16.7,
+        });
+    }
 
     const renderSettingsFolder = pane.addFolder({
         title: 'Render settings',
