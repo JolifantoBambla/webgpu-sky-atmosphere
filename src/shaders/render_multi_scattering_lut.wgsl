@@ -24,72 +24,72 @@ fn get_transmittance_to_sun(sun_dir: vec3<f32>, zenith: vec3<f32>, atmosphere: A
 }
 
 struct IntegrationResults {
-	luminance: vec3<f32>,
-	multi_scattering: vec3<f32>,
+    luminance: vec3<f32>,
+    multi_scattering: vec3<f32>,
 }
 
 fn integrate_scattered_luminance(world_pos: vec3<f32>, world_dir: vec3<f32>, sun_dir: vec3<f32>, atmosphere: Atmosphere) -> IntegrationResults {
-	var result = IntegrationResults();
+    var result = IntegrationResults();
 
-	let planet_center = vec3<f32>();
-	var t_max: f32 = 0.0;
-	var t_bottom: f32 = 0.0;
-	if !find_atmosphere_t_max_t_bottom(&t_max, &t_bottom, world_pos, world_dir, planet_center, atmosphere.bottom_radius, atmosphere.top_radius) {
-	    return result;
-	}
-	t_max = min(t_max, t_max_max);
+    let planet_center = vec3<f32>();
+    var t_max: f32 = 0.0;
+    var t_bottom: f32 = 0.0;
+    if !find_atmosphere_t_max_t_bottom(&t_max, &t_bottom, world_pos, world_dir, planet_center, atmosphere.bottom_radius, atmosphere.top_radius) {
+        return result;
+    }
+    t_max = min(t_max, t_max_max);
 
-	let sample_count = f32(SAMPLE_COUNT);
+    let sample_count = f32(SAMPLE_COUNT);
     let sample_segment_t = 0.3;
     let dt = t_max / sample_count;
 
-	var throughput = vec3<f32>(1.0);
-	var t = 0.0;
-	var dt_exact = 0.0;
-	for (var s = 0.0; s < sample_count; s += 1.0) {
+    var throughput = vec3<f32>(1.0);
+    var t = 0.0;
+    var dt_exact = 0.0;
+    for (var s = 0.0; s < sample_count; s += 1.0) {
         let t_new = (s + sample_segment_t) * dt;
         dt_exact = t_new - t;
         t = t_new;
 
-		let sample_pos = world_pos + t * world_dir;
-		let sample_height = length(sample_pos);
+        let sample_pos = world_pos + t * world_dir;
+        let sample_height = length(sample_pos);
 
-		let zenith = sample_pos / sample_height;
-		let transmittance_to_sun = get_transmittance_to_sun(sun_dir, zenith, atmosphere, sample_height);
+        let zenith = sample_pos / sample_height;
+        let transmittance_to_sun = get_transmittance_to_sun(sun_dir, zenith, atmosphere, sample_height);
 
-		let medium = sample_medium(sample_height - atmosphere.bottom_radius, atmosphere);
-		let sample_transmittance = exp(-medium.extinction * dt_exact);
+        let medium = sample_medium(sample_height - atmosphere.bottom_radius, atmosphere);
+        let sample_transmittance = exp(-medium.extinction * dt_exact);
 
-		let planet_shadow = compute_planet_shadow(sample_pos, sun_dir, planet_center + planet_radius_offset * zenith, atmosphere.bottom_radius);
+        let planet_shadow = compute_planet_shadow(sample_pos, sun_dir, planet_center + planet_radius_offset * zenith, atmosphere.bottom_radius);
         let scattered_luminance = planet_shadow * transmittance_to_sun * (medium.scattering * isotropic_phase);
 
         result.multi_scattering += throughput * (medium.scattering - medium.scattering * sample_transmittance) / medium.extinction;
         result.luminance += throughput * (scattered_luminance - scattered_luminance * sample_transmittance) / medium.extinction;
 
         throughput *= sample_transmittance;
-	}
+    }
 
     // Account for light bounced off the planet
-	if t_max == t_bottom && t_bottom > 0.0 {
-		let t = t_bottom;
-		let sample_pos = world_pos + t * world_dir;
-		let sample_height = length(sample_pos);
+    if t_max == t_bottom && t_bottom > 0.0 {
+        let t = t_bottom;
+        let sample_pos = world_pos + t * world_dir;
+        let sample_height = length(sample_pos);
 
-		let zenith = sample_pos / sample_height;
+        let zenith = sample_pos / sample_height;
         let transmittance_to_sun = get_transmittance_to_sun(sun_dir, zenith, atmosphere, sample_height);
 
-		let n_dot_l = saturate(dot(zenith, sun_dir));
-		result.luminance += transmittance_to_sun * throughput * n_dot_l * atmosphere.ground_albedo / pi;
-	}
+        let n_dot_l = saturate(dot(zenith, sun_dir));
+        result.luminance += transmittance_to_sun * throughput * n_dot_l * atmosphere.ground_albedo / pi;
+    }
 
-	return result;
+    return result;
 }
 
 fn compute_sample_direction(direction_index: u32) -> vec3<f32> {
-	let sample = f32(direction_index);
-	let theta = tau * sample / golden_ratio;
-	let phi = acos(1.0 - 2.0 * (sample + 0.5) / direction_sample_count);
-	let cos_phi = cos(phi);
+    let sample = f32(direction_index);
+    let theta = tau * sample / golden_ratio;
+    let phi = acos(1.0 - 2.0 * (sample + 0.5) / direction_sample_count);
+    let cos_phi = cos(phi);
     let sin_phi = sin(phi);
     let cos_theta = cos(theta);
     let sin_theta = sin(theta);
@@ -103,28 +103,28 @@ fn compute_sample_direction(direction_index: u32) -> vec3<f32> {
 @compute
 @workgroup_size(1, 1, workgroup_size_z)
 fn render_multi_scattering_lut(@builtin(global_invocation_id) global_id: vec3<u32>) {
-	let output_size = textureDimensions(multi_scattering_lut);
-	let direction_index = global_id.z;
+    let output_size = textureDimensions(multi_scattering_lut);
+    let direction_index = global_id.z;
 
-	let pix = vec2<f32>(global_id.xy) + 0.5;
-	var uv = pix / vec2<f32>(output_size);
-	uv = vec2<f32>(from_sub_uvs_to_unit(uv.x, f32(output_size.x)), from_sub_uvs_to_unit(uv.y, f32(output_size.y)));
+    let pix = vec2<f32>(global_id.xy) + 0.5;
+    var uv = pix / vec2<f32>(output_size);
+    uv = vec2<f32>(from_sub_uvs_to_unit(uv.x, f32(output_size.x)), from_sub_uvs_to_unit(uv.y, f32(output_size.y)));
 
-	let atmosphere = atmosphere_buffer;
+    let atmosphere = atmosphere_buffer;
 
-	let cos_sun_zenith = uv.x * 2.0 - 1.0;
-	let sun_dir = vec3<f32>(0.0, sqrt(saturate(1.0 - cos_sun_zenith * cos_sun_zenith)), cos_sun_zenith);
-	let view_height = atmosphere.bottom_radius + saturate(uv.y + planet_radius_offset) * (atmosphere.top_radius - atmosphere.bottom_radius - planet_radius_offset);
+    let cos_sun_zenith = uv.x * 2.0 - 1.0;
+    let sun_dir = vec3<f32>(0.0, sqrt(saturate(1.0 - cos_sun_zenith * cos_sun_zenith)), cos_sun_zenith);
+    let view_height = atmosphere.bottom_radius + saturate(uv.y + planet_radius_offset) * (atmosphere.top_radius - atmosphere.bottom_radius - planet_radius_offset);
 
-	let world_pos = vec3<f32>(0.0, 0.0, view_height);
-	let world_dir = compute_sample_direction(direction_index);
+    let world_pos = vec3<f32>(0.0, 0.0, view_height);
+    let world_dir = compute_sample_direction(direction_index);
 
     let scattering_result = integrate_scattered_luminance(world_pos, world_dir, normalize(sun_dir), atmosphere);
 
     shared_multi_scattering[direction_index] = scattering_result.multi_scattering / direction_sample_count;
     shared_luminance[direction_index] = scattering_result.luminance / direction_sample_count;
 
-	workgroupBarrier();
+    workgroupBarrier();
 
     // reduce samples - the last remaining thread publishes the result
     for (var i = 32u; i > 0; i = i >> 1) {
@@ -132,10 +132,10 @@ fn render_multi_scattering_lut(@builtin(global_invocation_id) global_id: vec3<u3
             shared_multi_scattering[direction_index] += shared_multi_scattering[direction_index + i];
             shared_luminance[direction_index] += shared_luminance[direction_index + i];
         }
-    	workgroupBarrier();
+        workgroupBarrier();
     }
-	if direction_index > 0 {
-		return;
+    if direction_index > 0 {
+        return;
     }
 
     let luminance = shared_luminance[0] * (1.0 / (1.0 - shared_multi_scattering[0]));
