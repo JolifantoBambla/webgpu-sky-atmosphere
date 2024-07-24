@@ -33,6 +33,7 @@ export function makeUi(atmosphere, camera) {
             compute: true,
             viewHeight: 1.0,
             inMeters: false,
+            scale: '1 = 1km',
         },
         atmosphereHelper: {
             bottomRadius: 6360.0,
@@ -121,12 +122,19 @@ Escape: exit pointer lock on canvas`,
     
     renderSettingsFolder.addBinding(params.renderSettings, 'rayMarch', {label: 'Force ray marching'});
     renderSettingsFolder.addBinding(params.renderSettings, 'compute', {label: 'Use compute'});
-    renderSettingsFolder.addBinding(params.renderSettings, 'inMeters', {label: '1 = 1m'})
+    renderSettingsFolder.addBinding(params.renderSettings, 'scale', {label: 'Scale', options: { '1 = 1km': '1 = 1km', '1 = 1m': '1 = 1m', }})
         .on('change', e => {
-            const scale = e.value ? 1000.0 : 1 / 1000.0;
+            const old = params.renderSettings.inMeters;
+            params.renderSettings.inMeters = e.value === '1 = 1m';
+            
+            if (old === params.renderSettings.inMeters) {
+                return;
+            }
+            
+            const scale = params.renderSettings.inMeters ? 1000.0 : 1 / 1000.0;
 
-            camera.position = e.value ? cameraPositionMeters : cameraPositionKilometers;
-            camera.maxSpeed = e.value ? 1.0 : 0.1;
+            camera.position = params.renderSettings.inMeters ? cameraPositionMeters : cameraPositionKilometers;
+            camera.maxSpeed = params.renderSettings.inMeters ? 1.0 : 0.1;
 
             params.atmosphere = {
                 center: params.atmosphere.center.map(c => c * scale),
