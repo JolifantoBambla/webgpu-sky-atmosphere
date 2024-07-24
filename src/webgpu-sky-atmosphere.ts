@@ -1360,18 +1360,9 @@ export class SkyAtmosphereRasterRenderer extends SkyAtmosphereRenderer {
      * @see {@link renderDynamicLuts}: Called internally, if the the `useFullScreenRayMarch` is true or if it is undefined and {@link defaultToPerPixelRayMarch} is true.
      */
     public override renderSkyAtmosphereLuts(passEncoder: GPUComputePassEncoder, uniforms?: Uniforms, atmosphere?: Atmosphere, useFullScreenRayMarch?: boolean, forceConstantLutRendering?: boolean) {
-        if (atmosphere || (forceConstantLutRendering ?? false)) {
-            this.renderConstantLuts(passEncoder, atmosphere);
-        }
-        if (useFullScreenRayMarch ?? false) {
-            if (uniforms) {
-                this.updateUniforms(uniforms);
-            }
-            if (!this.rayMarchDistantSky) {
-                this.renderSkyViewLut(passEncoder);
-            }
-        } else {
-            this.renderDynamicLuts(passEncoder, uniforms);
+        super.renderSkyAtmosphereLuts(passEncoder, uniforms, atmosphere, useFullScreenRayMarch, forceConstantLutRendering);
+        if ((useFullScreenRayMarch ?? false) && !this.rayMarchDistantSky) {
+            this.renderSkyViewLut(passEncoder);
         }
     }
 }
