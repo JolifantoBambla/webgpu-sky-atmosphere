@@ -105,14 +105,44 @@ export {
 export class SkyAtmosphereRenderer {
     readonly resources: SkyAtmosphereResources;
     readonly skyAtmospherePipelines: SkyAtmospherePipelines;
-
     public defaultToPerPixelRayMarch: boolean;
     readonly usesCustomUniforms: boolean;
+    protected transmittanceLutPass: ComputePass;
+    protected multiScatteringLutPass: ComputePass;
+    protected skyViewLutPass: ComputePass;
+    protected aerialPerspectiveLutPass: ComputePass;
 
-    private transmittanceLutPass: ComputePass;
-    private multiScatteringLutPass: ComputePass;
-    private skyViewLutPass: ComputePass;
-    private aerialPerspectiveLutPass: ComputePass;
+    protected constructor(
+        lutRenderer?: SkyAtmosphereRenderer,
+        resources?: SkyAtmosphereResources,
+        skyAtmospherePipelines?: SkyAtmospherePipelines,
+        defaultToPerPixelRayMarch?: boolean,
+        usesCustomUniforms?: boolean,
+        transmittanceLutPass?: ComputePass,
+        multiScatteringLutPass?: ComputePass,
+        skyViewLutPass?: ComputePass,
+        aerialPerspectiveLutPass?: ComputePass,
+    ) {
+        if (lutRenderer) {
+            this.resources = lutRenderer.resources;
+            this.skyAtmospherePipelines = lutRenderer.skyAtmospherePipelines;
+            this.defaultToPerPixelRayMarch = lutRenderer.defaultToPerPixelRayMarch;
+            this.usesCustomUniforms = lutRenderer.usesCustomUniforms;
+            this.transmittanceLutPass = lutRenderer.transmittanceLutPass;
+            this.multiScatteringLutPass = lutRenderer.multiScatteringLutPass;
+            this.skyViewLutPass = lutRenderer.skyViewLutPass;
+            this.aerialPerspectiveLutPass = lutRenderer.aerialPerspectiveLutPass;
+        } else {
+            this.resources = resources!;
+            this.skyAtmospherePipelines = skyAtmospherePipelines!;
+            this.defaultToPerPixelRayMarch = defaultToPerPixelRayMarch!;
+            this.usesCustomUniforms = usesCustomUniforms!;
+            this.transmittanceLutPass = transmittanceLutPass!;
+            this.multiScatteringLutPass = multiScatteringLutPass!;
+            this.skyViewLutPass = skyViewLutPass!;
+            this.aerialPerspectiveLutPass = aerialPerspectiveLutPass!;
+        }
+    }
 
     /**
      * Creates a {@link SkyAtmosphereRenderer}.
@@ -121,30 +151,65 @@ export class SkyAtmosphereRenderer {
      * @param existingPipelines If this is defined, no new pipelines for rendering the internal lookup tables will be created. Instead, the existing pipelines given will be reused. The existing pipelines must be compatible with the {@link SkyAtmosphereRendererConfig}. Especially, {@link SkyAtmosphereRendererConfig.lookUpTables} and {@link SkyAtmosphereRendererConfig.shadow} should be the same.
      * @param existingResources If this is defined, no new resources (buffers, textures, samplers) will be created. Instead, the existing resources given will be used.
      */
-    constructor(device: GPUDevice, config: SkyAtmosphereRendererConfig, existingPipelines?: SkyAtmospherePipelines, existingResources?: SkyAtmosphereResources) {
-        this.defaultToPerPixelRayMarch = config.skyRenderer?.defaultToPerPixelRayMarch ?? false;
-        this.usesCustomUniforms = config.customUniformsSource !== undefined;
-
+    static create(device: GPUDevice, config: SkyAtmosphereRendererConfig, existingPipelines?: SkyAtmospherePipelines, existingResources?: SkyAtmosphereResources): SkyAtmosphereRenderer {
+        let skyAtmospherePipelines;
         if ((existingPipelines?.transmittanceLutPipeline.device || device) !== device) {
-            this.skyAtmospherePipelines = new SkyAtmospherePipelines(device, config);
+            skyAtmospherePipelines = SkyAtmospherePipelines.create(device, config);
         } else {
-            this.skyAtmospherePipelines = existingPipelines || new SkyAtmospherePipelines(device, config);
+            skyAtmospherePipelines = existingPipelines || SkyAtmospherePipelines.create(device, config);
         }
 
-        this.resources = existingResources || new SkyAtmosphereResources(device, config);
+        const defaultToPerPixelRayMarch = config.skyRenderer?.defaultToPerPixelRayMarch ?? false;
+        const usesCustomUniforms = config.customUniformsSource !== undefined;
 
-        this.transmittanceLutPass = this.skyAtmospherePipelines.transmittanceLutPipeline.makeComputePass(this.resources);
-        this.multiScatteringLutPass = this.skyAtmospherePipelines.multiScatteringLutPipeline.makeComputePass(this.resources);
-        this.skyViewLutPass = this.skyAtmospherePipelines.skyViewLutPipeline.makeComputePass(this.resources, (config.lookUpTables?.skyViewLut?.affectedByShadow ?? true) ? config.shadow?.bindGroups : undefined, config.customUniformsSource?.bindGroups);
-        this.aerialPerspectiveLutPass = this.skyAtmospherePipelines.aerialPerspectiveLutPipeline.makeComputePass(this.resources, (config.lookUpTables?.aerialPerspectiveLut?.affectedByShadow ?? true) ? config.shadow?.bindGroups : undefined, config.customUniformsSource?.bindGroups);
+        const resources = existingResources || new SkyAtmosphereResources(device, config);
+
+        const transmittanceLutPass = skyAtmospherePipelines.transmittanceLutPipeline.makeComputePass(resources);
+        const multiScatteringLutPass = skyAtmospherePipelines.multiScatteringLutPipeline.makeComputePass(resources);
+        const skyViewLutPass = skyAtmospherePipelines.skyViewLutPipeline.makeComputePass(resources, (config.lookUpTables?.skyViewLut?.affectedByShadow ?? true) ? config.shadow?.bindGroups : undefined, config.customUniformsSource?.bindGroups);
+        const aerialPerspectiveLutPass = skyAtmospherePipelines.aerialPerspectiveLutPipeline.makeComputePass(resources, (config.lookUpTables?.aerialPerspectiveLut?.affectedByShadow ?? true) ? config.shadow?.bindGroups : undefined, config.customUniformsSource?.bindGroups);
+
+        const lutRenderer = new SkyAtmosphereRenderer(
+            undefined,
+            resources,
+            skyAtmospherePipelines,
+            defaultToPerPixelRayMarch,
+            usesCustomUniforms,
+            transmittanceLutPass,
+            multiScatteringLutPass,
+            skyViewLutPass,
+            aerialPerspectiveLutPass,
+        );
 
         if (config.initializeConstantLuts ?? true) {
             const commandEncoder = device.createCommandEncoder();
             const computePassEncoder = commandEncoder.beginComputePass();
-            this.renderConstantLuts(computePassEncoder);
+            lutRenderer.renderConstantLuts(computePassEncoder);
             computePassEncoder.end();
             device.queue.submit([commandEncoder.finish()]);
         }
+
+        return lutRenderer;
+    }
+
+    /**
+     * Asynchronously creates a {@link SkyAtmosphereRenderer}.
+     *
+     * All pipelines used by this renderer are created asynchronously.
+     *
+     * @param device The `GPUDevice` used to create internal resources (textures, pipelines, etc.).
+     * @param config A {@link SkyAtmosphereRendererConfig} used to configure internal resources and behavior.
+     * @param existingPipelines If this is defined, no new pipelines for rendering the internal lookup tables will be created. Instead, the existing pipelines given will be reused. The existing pipelines must be compatible with the {@link SkyAtmosphereRendererConfig}. Especially, {@link SkyAtmosphereRendererConfig.lookUpTables} and {@link SkyAtmosphereRendererConfig.shadow} should be the same.
+     * @param existingResources If this is defined, no new resources (buffers, textures, samplers) will be created. Instead, the existing resources given will be used.
+     */
+    static async createAsync(device: GPUDevice, config: SkyAtmosphereRendererConfig, existingPipelines?: SkyAtmospherePipelines, existingResources?: SkyAtmosphereResources): Promise<SkyAtmosphereRenderer> {
+        let skyAtmospherePipelines;
+        if ((existingPipelines?.transmittanceLutPipeline.device || device) !== device) {
+            skyAtmospherePipelines = await SkyAtmospherePipelines.createAsync(device, config);
+        } else {
+            skyAtmospherePipelines = existingPipelines || await SkyAtmospherePipelines.createAsync(device, config);
+        }
+        return this.create(device, config, skyAtmospherePipelines, existingResources);
     }
 
     /**
@@ -354,25 +419,50 @@ export interface SkyAtmosphereComputeRendererResizeConfig {
  * A {@link SkyAtmosphereRenderer} that uses `GPUComputePipeline`s to render the sky / atmosphere.
  */
 export class SkyAtmosphereComputeRenderer extends SkyAtmosphereRenderer {
-    private renderSkyWithLutsBindGroupLayout: GPUBindGroupLayout;
     private renderSkyWithLutsPass: ComputePass;
-    private renderSkyRaymarchingBindGroupLayout: GPUBindGroupLayout;
     private renderSkyRaymarchingPass: ComputePass;
 
-    private rayMarchDistantSky: boolean;
+    private constructor(
+        lutRenderer: SkyAtmosphereRenderer,
+        private renderSkyWithLutsBindGroupLayout: GPUBindGroupLayout,
+        private renderSkyRaymarchingBindGroupLayout: GPUBindGroupLayout,
+        private rayMarchDistantSky: boolean,
+        withLutsPipeline: GPUComputePipeline,
+        rayMarchPipeline: GPUComputePipeline,
+        config: SkyAtmosphereComputeRendererConfig,
+    ) {
+        super(lutRenderer);
 
-    /**
-     * Creates a {@link SkyAtmosphereComputeRenderer}.
-     * @param device The `GPUDevice` used to create internal resources (textures, pipelines, etc.).
-     * @param config A {@link SkyAtmosphereRendererConfig} used to configure internal resources and behavior.
-     * @param existingPipelines If this is defined, no new pipelines for rendering the internal lookup tables will be created. Instead, the existing pipelines given will be reused. The existing pipelines must be compatible with the {@link SkyAtmosphereRendererConfig}. Especially, {@link SkyAtmosphereRendererConfig.lookUpTables} and {@link SkyAtmosphereRendererConfig.shadow} should be the same.
-     * @param existingResources If this is defined, no new resources (buffers, textures, samplers) will be created. Instead, the existing resources given will be used.
-     */
-    constructor(device: GPUDevice, config: SkyAtmosphereComputeRendererConfig, existingPipelines?: SkyAtmospherePipelines, existingResources?: SkyAtmosphereResources) {
-        super(device, config, existingPipelines, existingResources);
+        const [withLutsBindGroup, rayMarchingBindGroup] = this.makeBindGroups({
+            depthBuffer: config.skyRenderer.depthBuffer.view ?? config.skyRenderer.depthBuffer.texture,
+            backBuffer: config.skyRenderer.backBuffer.view ?? config.skyRenderer.backBuffer.texture,
+            renderTarget: config.skyRenderer.renderTarget.view ?? config.skyRenderer.renderTarget.texture,
+        });
 
-        this.rayMarchDistantSky = config.skyRenderer.rayMarch?.rayMarchDistantSky ?? true;
+        const dispatchDimensions: [number, number, number] = [
+            Math.ceil(config.skyRenderer.renderTarget.texture.width / 16.0),
+            Math.ceil(config.skyRenderer.renderTarget.texture.height / 16.0),
+            1,
+        ];
 
+        this.renderSkyWithLutsPass = new ComputePass(
+            withLutsPipeline,
+            [withLutsBindGroup, ...(config.customUniformsSource?.bindGroups ?? [])],
+            dispatchDimensions,
+        );
+
+        this.renderSkyRaymarchingPass = new ComputePass(
+            rayMarchPipeline,
+            [
+                rayMarchingBindGroup,
+                ...(config.shadow?.bindGroups ?? []),
+                ...(config.customUniformsSource?.bindGroups ?? []),
+            ],
+            dispatchDimensions,
+        );
+    }
+
+    private static makeBindGroupLayouts(device: GPUDevice, config: SkyAtmosphereComputeRendererConfig, resources: SkyAtmosphereResources, rayMarchDistantSky: boolean): [GPUBindGroupLayout, GPUBindGroupLayout] {
         const renderSkyBindGroupLayoutBaseEntries: GPUBindGroupLayoutEntry[] = [
             {
                 binding: 0,
@@ -404,7 +494,7 @@ export class SkyAtmosphereComputeRenderer extends SkyAtmosphereRenderer {
                 visibility: GPUShaderStage.COMPUTE,
                 texture: {
                     sampleType: 'float',
-                    viewDimension: this.resources.transmittanceLut.texture.dimension,
+                    viewDimension: resources.transmittanceLut.texture.dimension,
                     multisampled: false,
                 },
             },
@@ -439,38 +529,9 @@ export class SkyAtmosphereComputeRenderer extends SkyAtmosphereRenderer {
             },
         ];
 
-        this.renderSkyWithLutsBindGroupLayout = device.createBindGroupLayout({
-            label: `Render sky with luts bind group layout [${this.resources.label}]`,
-            entries: [
-                ...renderSkyBindGroupLayoutBaseEntries,
-                {
-                    binding: 4,
-                    visibility: GPUShaderStage.COMPUTE,
-                    texture: {
-                        sampleType: 'float',
-                        viewDimension: this.resources.skyViewLut.texture.dimension,
-                        multisampled: false,
-                    },
-                },
-                {
-                    binding: 5,
-                    visibility: GPUShaderStage.COMPUTE,
-                    texture: {
-                        sampleType: 'float',
-                        viewDimension: this.resources.aerialPerspectiveLut.texture.dimension,
-                        multisampled: false,
-                    },
-                },
-                ...externalResourcesLayoutEntries,
-            ].map((v, i) => {
-                v.binding = i;
-                return v;
-            }) as GPUBindGroupLayoutEntry[],
-        });
-
-        if (this.rayMarchDistantSky) {
-            this.renderSkyRaymarchingBindGroupLayout = device.createBindGroupLayout({
-                label: `Render sky raymarching bind group layout [${this.resources.label}]`,
+        return [
+            device.createBindGroupLayout({
+                label: `Render sky with luts bind group layout [${resources.label}]`,
                 entries: [
                     ...renderSkyBindGroupLayoutBaseEntries,
                     {
@@ -478,27 +539,7 @@ export class SkyAtmosphereComputeRenderer extends SkyAtmosphereRenderer {
                         visibility: GPUShaderStage.COMPUTE,
                         texture: {
                             sampleType: 'float',
-                            viewDimension: this.resources.multiScatteringLut.texture.dimension,
-                            multisampled: false,
-                        },
-                    },
-                    ...externalResourcesLayoutEntries,
-                ].map((v, i) => {
-                    v.binding = i;
-                    return v;
-                }) as GPUBindGroupLayoutEntry[],
-            });
-        } else {
-            this.renderSkyRaymarchingBindGroupLayout = device.createBindGroupLayout({
-                label: `Render sky raymarching bind group layout [${this.resources.label}]`,
-                entries: [
-                    ...renderSkyBindGroupLayoutBaseEntries,
-                    {
-                        binding: 4,
-                        visibility: GPUShaderStage.COMPUTE,
-                        texture: {
-                            sampleType: 'float',
-                            viewDimension: this.resources.multiScatteringLut.texture.dimension,
+                            viewDimension: resources.skyViewLut.texture.dimension,
                             multisampled: false,
                         },
                     },
@@ -507,7 +548,7 @@ export class SkyAtmosphereComputeRenderer extends SkyAtmosphereRenderer {
                         visibility: GPUShaderStage.COMPUTE,
                         texture: {
                             sampleType: 'float',
-                            viewDimension: this.resources.skyViewLut.texture.dimension,
+                            viewDimension: resources.aerialPerspectiveLut.texture.dimension,
                             multisampled: false,
                         },
                     },
@@ -516,137 +557,172 @@ export class SkyAtmosphereComputeRenderer extends SkyAtmosphereRenderer {
                     v.binding = i;
                     return v;
                 }) as GPUBindGroupLayoutEntry[],
+            }),
+            device.createBindGroupLayout({
+                label: `Render sky raymarching bind group layout [${resources.label}]`,
+                entries: ([
+                    ...renderSkyBindGroupLayoutBaseEntries,
+                    {
+                        binding: 4,
+                        visibility: GPUShaderStage.COMPUTE,
+                        texture: {
+                            sampleType: 'float',
+                            viewDimension: resources.multiScatteringLut.texture.dimension,
+                            multisampled: false,
+                        },
+                    },
+                    rayMarchDistantSky ? undefined : {
+                        binding: 5,
+                        visibility: GPUShaderStage.COMPUTE,
+                        texture: {
+                            sampleType: 'float',
+                            viewDimension: resources.skyViewLut.texture.dimension,
+                            multisampled: false,
+                        },
+                    },
+                    ...externalResourcesLayoutEntries,
+                ].filter(e => e !== undefined) as GPUBindGroupLayoutEntry[])
+                .map((v, i) => {
+                    v.binding = i;
+                    return v;
+                }) as GPUBindGroupLayoutEntry[],
+            }),
+        ];
+    }
+
+    private static makeWithLutsPiplelineDescriptor(device: GPUDevice, config: SkyAtmosphereComputeRendererConfig, lutRenderer: SkyAtmosphereRenderer, renderSkyWithLutsBindGroupLayout: GPUBindGroupLayout): GPUComputePipelineDescriptor {
+        return {
+            label: `Render sky with LUTs pipeline [${lutRenderer.resources.label}]`,
+            layout: device.createPipelineLayout({
+                label: `Render sky with LUTs pipeline layout [${lutRenderer.resources.label}]`,
+                bindGroupLayouts: [
+                    renderSkyWithLutsBindGroupLayout,
+                    ...(config.customUniformsSource?.bindGroupLayouts ?? []),
+                ],
+            }),
+            compute: {
+                module: device.createShaderModule({
+                    code: makeRenderSkyWithLutsShaderCode(config.skyRenderer.renderTarget.texture.format, config.customUniformsSource?.wgslCode),
+                }),
+                entryPoint: 'render_sky_atmosphere',
+                constants: {
+                    AP_SLICE_COUNT: lutRenderer.resources.aerialPerspectiveLut.texture.depthOrArrayLayers,
+                    AP_DISTANCE_PER_SLICE: lutRenderer.skyAtmospherePipelines.aerialPerspectiveLutPipeline.aerialPerspectiveDistancePerSlice,
+                    AP_INV_DISTANCE_PER_SLICE: lutRenderer.skyAtmospherePipelines.aerialPerspectiveLutPipeline.aerialPerspectiveInvDistancePerSlice,
+                    SKY_VIEW_LUT_RES_X: lutRenderer.resources.skyViewLut.texture.width,
+                    SKY_VIEW_LUT_RES_Y: lutRenderer.resources.skyViewLut.texture.height,
+                    IS_REVERSE_Z: Number(config.skyRenderer.depthBuffer.reverseZ ?? false),
+                    RENDER_SUN_DISK: Number(config.lights?.renderSunDisk ?? true),
+                    RENDER_MOON_DISK: Number(config.lights?.renderMoonDisk ?? (config.lights?.useMoon ?? false)),
+                    LIMB_DARKENING_ON_SUN: Number(config.lights?.applyLimbDarkeningOnSun ?? true),
+                    LIMB_DARKENING_ON_MOON: Number(config.lights?.applyLimbDarkeningOnMoon ?? false),
+                    USE_MOON: Number(config.lights?.useMoon ?? false),
+                },
+            },
+        };
+    }
+
+    private static makeRayMarchPipelineDescriptor(device: GPUDevice, config: SkyAtmosphereComputeRendererConfig, lutRenderer: SkyAtmosphereRenderer, renderSkyRaymarchingBindGroupLayout: GPUBindGroupLayout, rayMarchDistantSky: boolean): GPUComputePipelineDescriptor {
+        const constants: Record<string, number> = {
+            INV_DISTANCE_TO_MAX_SAMPLE_COUNT: 1.0 / (config.skyRenderer.distanceToMaxSampleCount ?? (100.0 * (config.distanceScaleFactor ?? 1.0))),
+            RANDOMIZE_SAMPLE_OFFSET: Number(config.skyRenderer.rayMarch?.randomizeRayOffsets ?? true),
+            MULTI_SCATTERING_LUT_RES_X: lutRenderer.resources.multiScatteringLut.texture.width,
+            MULTI_SCATTERING_LUT_RES_Y: lutRenderer.resources.multiScatteringLut.texture.height,
+            IS_REVERSE_Z: Number(config.skyRenderer.depthBuffer.reverseZ ?? false),
+            RENDER_SUN_DISK: Number(config.lights?.renderSunDisk ?? true),
+            RENDER_MOON_DISK: Number(config.lights?.renderMoonDisk ?? (config.lights?.useMoon ?? false)),
+            LIMB_DARKENING_ON_SUN: Number(config.lights?.applyLimbDarkeningOnSun ?? true),
+            LIMB_DARKENING_ON_MOON: Number(config.lights?.applyLimbDarkeningOnMoon ?? false),
+            USE_MOON: Number(config.lights?.useMoon ?? false),
+            USE_COLORED_TRANSMISSION: Number(config.skyRenderer.rayMarch?.useColoredTransmittance ?? true),
+        };
+
+        let module;
+        if (rayMarchDistantSky) {
+            module = device.createShaderModule({
+                code: `${config.shadow?.wgslCode || 'fn get_shadow(p: vec3<f32>, i: u32) -> f32 { return 1.0; }'}\n${makeRenderSkyRaymarchingShaderCode(config.skyRenderer.renderTarget.texture.format, config.customUniformsSource?.wgslCode)}`,
+            });
+        } else {
+            constants['SKY_VIEW_LUT_RES_X'] = lutRenderer.resources.skyViewLut.texture.width;
+            constants['SKY_VIEW_LUT_RES_Y'] = lutRenderer.resources.skyViewLut.texture.height;
+            module = device.createShaderModule({
+                code: `${config.shadow?.wgslCode || 'fn get_shadow(p: vec3<f32>, i: u32) -> f32 { return 1.0; }'}\n${makeRenderSkyLutAndRaymarchingShaderCode(config.skyRenderer.renderTarget.texture.format, config.customUniformsSource?.wgslCode)}`,
             });
         }
 
-        const [withLutsBindGroup, rayMarchingBindGroup] = this.makeBindGroups({
-            depthBuffer: config.skyRenderer.depthBuffer.view ?? config.skyRenderer.depthBuffer.texture,
-            backBuffer: config.skyRenderer.backBuffer.view ?? config.skyRenderer.backBuffer.texture,
-            renderTarget: config.skyRenderer.renderTarget.view ?? config.skyRenderer.renderTarget.texture,
-        });
-
-        const dispatchDimensions: [number, number, number] = [
-            Math.ceil(config.skyRenderer.renderTarget.texture.width / 16.0),
-            Math.ceil(config.skyRenderer.renderTarget.texture.height / 16.0),
-            1,
-        ];
-
-        this.renderSkyWithLutsPass = new ComputePass(
-            device.createComputePipeline({
-                label: `Render sky with LUTs pipeline [${this.resources.label}]`,
-                layout: device.createPipelineLayout({
-                    label: `Render sky with LUTs pipeline layout [${this.resources.label}]`,
-                    bindGroupLayouts: [
-                        this.renderSkyWithLutsBindGroupLayout,
-                        ...(config.customUniformsSource?.bindGroupLayouts ?? []),
-                    ],
-                }),
-                compute: {
-                    module: device.createShaderModule({
-                        code: makeRenderSkyWithLutsShaderCode(config.skyRenderer.renderTarget.texture.format, config.customUniformsSource?.wgslCode),
-                    }),
-                    entryPoint: 'render_sky_atmosphere',
-                    constants: {
-                        AP_SLICE_COUNT: this.resources.aerialPerspectiveLut.texture.depthOrArrayLayers,
-                        AP_DISTANCE_PER_SLICE: this.skyAtmospherePipelines.aerialPerspectiveLutPipeline.aerialPerspectiveDistancePerSlice,
-                        AP_INV_DISTANCE_PER_SLICE: this.skyAtmospherePipelines.aerialPerspectiveLutPipeline.aerialPerspectiveInvDistancePerSlice,
-                        SKY_VIEW_LUT_RES_X: this.resources.skyViewLut.texture.width,
-                        SKY_VIEW_LUT_RES_Y: this.resources.skyViewLut.texture.height,
-                        IS_REVERSE_Z: Number(config.skyRenderer.depthBuffer.reverseZ ?? false),
-                        RENDER_SUN_DISK: Number(config.lights?.renderSunDisk ?? true),
-                        RENDER_MOON_DISK: Number(config.lights?.renderMoonDisk ?? (config.lights?.useMoon ?? false)),
-                        LIMB_DARKENING_ON_SUN: Number(config.lights?.applyLimbDarkeningOnSun ?? true),
-                        LIMB_DARKENING_ON_MOON: Number(config.lights?.applyLimbDarkeningOnMoon ?? false),
-                        USE_MOON: Number(config.lights?.useMoon ?? false),
-                    },
-                },
+        return {
+            label: `Render sky raymarching pipeline [${lutRenderer.resources.label}]`,
+            layout: device.createPipelineLayout({
+                label: 'Render sky raymarching pipeline layout',
+                bindGroupLayouts: [
+                    renderSkyRaymarchingBindGroupLayout,
+                    ...(config.shadow?.bindGroupLayouts ?? []),
+                    ...(config.customUniformsSource?.bindGroupLayouts ?? []),
+                ],
             }),
-            [withLutsBindGroup, ...(config.customUniformsSource?.bindGroups ?? [])],
-            dispatchDimensions,
-        );
-
-        if (this.rayMarchDistantSky) {
-            this.renderSkyRaymarchingPass = new ComputePass(
-                device.createComputePipeline({
-                    label: `Render sky raymarching pipeline [${this.resources.label}]`,
-                    layout: device.createPipelineLayout({
-                        label: 'Render sky raymarching pipeline layout',
-                        bindGroupLayouts: [
-                            this.renderSkyRaymarchingBindGroupLayout,
-                            ...(config.shadow?.bindGroupLayouts ?? []),
-                            ...(config.customUniformsSource?.bindGroupLayouts ?? []),
-                        ],
-                    }),
-                    compute: {
-                        module: device.createShaderModule({
-                            code: `${config.shadow?.wgslCode || 'fn get_shadow(p: vec3<f32>, i: u32) -> f32 { return 1.0; }'}\n${makeRenderSkyRaymarchingShaderCode(config.skyRenderer.renderTarget.texture.format, config.customUniformsSource?.wgslCode)}`,
-                        }),
-                        entryPoint: 'render_sky_atmosphere',
-                        constants: {
-                            INV_DISTANCE_TO_MAX_SAMPLE_COUNT: 1.0 / (config.skyRenderer.distanceToMaxSampleCount ?? (100.0 * (config.distanceScaleFactor ?? 1.0))),
-                            RANDOMIZE_SAMPLE_OFFSET: Number(config.skyRenderer.rayMarch?.randomizeRayOffsets ?? true),
-                            MULTI_SCATTERING_LUT_RES_X: this.resources.multiScatteringLut.texture.width,
-                            MULTI_SCATTERING_LUT_RES_Y: this.resources.multiScatteringLut.texture.height,
-                            IS_REVERSE_Z: Number(config.skyRenderer.depthBuffer.reverseZ ?? false),
-                            RENDER_SUN_DISK: Number(config.lights?.renderSunDisk ?? true),
-                            RENDER_MOON_DISK: Number(config.lights?.renderMoonDisk ?? (config.lights?.useMoon ?? false)),
-                            LIMB_DARKENING_ON_SUN: Number(config.lights?.applyLimbDarkeningOnSun ?? true),
-                            LIMB_DARKENING_ON_MOON: Number(config.lights?.applyLimbDarkeningOnMoon ?? false),
-                            USE_MOON: Number(config.lights?.useMoon ?? false),
-                            USE_COLORED_TRANSMISSION: Number(config.skyRenderer.rayMarch?.useColoredTransmittance ?? true),
-                        },
-                    },
-                }),
-                [
-                    rayMarchingBindGroup,
-                    ...(config.shadow?.bindGroups ?? []),
-                    ...(config.customUniformsSource?.bindGroups ?? []),
-                ],
-                dispatchDimensions,
-            );
-        } else {
-            this.renderSkyRaymarchingPass = new ComputePass(
-                device.createComputePipeline({
-                    label: `Render sky raymarching pipeline [${this.resources.label}]`,
-                    layout: device.createPipelineLayout({
-                        label: 'Render sky raymarching pipeline layout',
-                        bindGroupLayouts: [
-                            this.renderSkyRaymarchingBindGroupLayout,
-                            ...(config.shadow?.bindGroupLayouts ?? []),
-                            ...(config.customUniformsSource?.bindGroupLayouts ?? []),
-                        ],
-                    }),
-                    compute: {
-                        module: device.createShaderModule({
-                            code: `${config.shadow?.wgslCode || 'fn get_shadow(p: vec3<f32>, i: u32) -> f32 { return 1.0; }'}\n${makeRenderSkyLutAndRaymarchingShaderCode(config.skyRenderer.renderTarget.texture.format, config.customUniformsSource?.wgslCode)}`,
-                        }),
-                        entryPoint: 'render_sky_atmosphere',
-                        constants: {
-                            INV_DISTANCE_TO_MAX_SAMPLE_COUNT: 1.0 / (config.skyRenderer.distanceToMaxSampleCount ?? (100.0 * (config.distanceScaleFactor ?? 1.0))),
-                            RANDOMIZE_SAMPLE_OFFSET: Number(config.skyRenderer.rayMarch?.randomizeRayOffsets ?? true),
-                            MULTI_SCATTERING_LUT_RES_X: this.resources.multiScatteringLut.texture.width,
-                            MULTI_SCATTERING_LUT_RES_Y: this.resources.multiScatteringLut.texture.height,
-                            SKY_VIEW_LUT_RES_X: this.resources.skyViewLut.texture.width,
-                            SKY_VIEW_LUT_RES_Y: this.resources.skyViewLut.texture.height,
-                            IS_REVERSE_Z: Number(config.skyRenderer.depthBuffer.reverseZ ?? false),
-                            RENDER_SUN_DISK: Number(config.lights?.renderSunDisk ?? true),
-                            RENDER_MOON_DISK: Number(config.lights?.renderMoonDisk ?? (config.lights?.useMoon ?? false)),
-                            LIMB_DARKENING_ON_SUN: Number(config.lights?.applyLimbDarkeningOnSun ?? true),
-                            LIMB_DARKENING_ON_MOON: Number(config.lights?.applyLimbDarkeningOnMoon ?? false),
-                            USE_MOON: Number(config.lights?.useMoon ?? false),
-                            USE_COLORED_TRANSMISSION: Number(config.skyRenderer.rayMarch?.useColoredTransmittance ?? true),
-                        },
-                    },
-                }),
-                [
-                    rayMarchingBindGroup,
-                    ...(config.shadow?.bindGroups ?? []),
-                    ...(config.customUniformsSource?.bindGroups ?? []),
-                ],
-                dispatchDimensions,
-            );
-        }
+            compute: {
+                module,
+                entryPoint: 'render_sky_atmosphere',
+                constants,
+            },
+        };
     }
+
+    /**
+     * Asynchronously creates a {@link SkyAtmosphereComputeRenderer}.
+     *
+     * All pipelines used by this renderer are created asynchronously.
+     *
+     * @param device The `GPUDevice` used to create internal resources (textures, pipelines, etc.).
+     * @param config A {@link SkyAtmosphereRendererConfig} used to configure internal resources and behavior.
+     * @param existingPipelines If this is defined, no new pipelines for rendering the internal lookup tables will be created. Instead, the existing pipelines given will be reused. The existing pipelines must be compatible with the {@link SkyAtmosphereRendererConfig}. Especially, {@link SkyAtmosphereRendererConfig.lookUpTables} and {@link SkyAtmosphereRendererConfig.shadow} should be the same.
+     * @param existingResources If this is defined, no new resources (buffers, textures, samplers) will be created. Instead, the existing resources given will be used.
+     */
+    static async createAsync(device: GPUDevice, config: SkyAtmosphereComputeRendererConfig, existingPipelines?: SkyAtmospherePipelines, existingResources?: SkyAtmosphereResources): Promise<SkyAtmosphereComputeRenderer> {
+        const rayMarchDistantSky = config.skyRenderer.rayMarch?.rayMarchDistantSky ?? true;
+        const lutRenderer = await super.createAsync(device, config, existingPipelines, existingResources);
+        const [renderSkyWithLutsBindGroupLayout, renderSkyRaymarchingBindGroupLayout] = this.makeBindGroupLayouts(device, config, lutRenderer.resources, rayMarchDistantSky);
+        const [renderSkyWithLutsPipeline, renderSkyRaymarchingPipeline] = await Promise.all([
+            device.createComputePipelineAsync(this.makeWithLutsPiplelineDescriptor(device, config, lutRenderer, renderSkyWithLutsBindGroupLayout)),
+            device.createComputePipelineAsync(this.makeRayMarchPipelineDescriptor(device, config, lutRenderer, renderSkyRaymarchingBindGroupLayout, rayMarchDistantSky)),
+        ]);
+        return new SkyAtmosphereComputeRenderer(
+            lutRenderer,
+            renderSkyWithLutsBindGroupLayout,
+            renderSkyRaymarchingBindGroupLayout,
+            rayMarchDistantSky,
+            renderSkyWithLutsPipeline,
+            renderSkyRaymarchingPipeline,
+            config,
+        );
+    }
+
+    /**
+     * Creates a {@link SkyAtmosphereComputeRenderer}.
+     * @param device The `GPUDevice` used to create internal resources (textures, pipelines, etc.).
+     * @param config A {@link SkyAtmosphereRendererConfig} used to configure internal resources and behavior.
+     * @param existingPipelines If this is defined, no new pipelines for rendering the internal lookup tables will be created. Instead, the existing pipelines given will be reused. The existing pipelines must be compatible with the {@link SkyAtmosphereRendererConfig}. Especially, {@link SkyAtmosphereRendererConfig.lookUpTables} and {@link SkyAtmosphereRendererConfig.shadow} should be the same.
+     * @param existingResources If this is defined, no new resources (buffers, textures, samplers) will be created. Instead, the existing resources given will be used.
+     */
+    static create(device: GPUDevice, config: SkyAtmosphereComputeRendererConfig, existingPipelines?: SkyAtmospherePipelines, existingResources?: SkyAtmosphereResources): SkyAtmosphereComputeRenderer {
+        const rayMarchDistantSky = config.skyRenderer.rayMarch?.rayMarchDistantSky ?? true;
+        const lutRenderer = super.create(device, config, existingPipelines, existingResources);
+        const [renderSkyWithLutsBindGroupLayout, renderSkyRaymarchingBindGroupLayout] = this.makeBindGroupLayouts(device, config, lutRenderer.resources, rayMarchDistantSky);
+        const [renderSkyWithLutsPipeline, renderSkyRaymarchingPipeline] = [
+            device.createComputePipeline(this.makeWithLutsPiplelineDescriptor(device, config, lutRenderer, renderSkyWithLutsBindGroupLayout)),
+            device.createComputePipeline(this.makeRayMarchPipelineDescriptor(device, config, lutRenderer, renderSkyRaymarchingBindGroupLayout, rayMarchDistantSky)),
+        ];
+        return new SkyAtmosphereComputeRenderer(
+            lutRenderer,
+            renderSkyWithLutsBindGroupLayout,
+            renderSkyRaymarchingBindGroupLayout,
+            rayMarchDistantSky,
+            renderSkyWithLutsPipeline,
+            renderSkyRaymarchingPipeline,
+            config,
+        );
+    }
+
 
     private makeBindGroups(config: SkyAtmosphereComputeRendererResizeConfig): [GPUBindGroup, GPUBindGroup] {
         const renderSkyBindGroupBaseEntries: GPUBindGroupEntry[] = [
@@ -865,62 +941,49 @@ export class SkyAtmosphereComputeRenderer extends SkyAtmosphereRenderer {
  * A {@link SkyAtmosphereRenderer} that uses `GPURenderPipeline`s to render the sky / atmosphere.
  */
 export class SkyAtmosphereRasterRenderer extends SkyAtmosphereRenderer {
-    private renderSkyWithLutsBindGroupLayout: GPUBindGroupLayout;
     private renderSkyWithLutsPass: RenderPass;
     private renderSkyWithLutsBundle?: GPURenderBundle;
-    private renderSkyWithLutsTargetFormats: GPUTextureFormat[];
 
-    private renderSkyRaymarchingBindGroupLayout: GPUBindGroupLayout;
     private renderSkyRaymarchingPass: RenderPass;
     private renderSkyRaymarchingBundle?: GPURenderBundle;
-    private renderSkyRaymarchingTargetFormats: GPUTextureFormat[];
 
+    private constructor(
+        lutRenderer: SkyAtmosphereRenderer,
+        private renderSkyWithLutsBindGroupLayout: GPUBindGroupLayout,
+        private renderSkyRaymarchingBindGroupLayout: GPUBindGroupLayout,
+        private renderSkyWithLutsTargetFormats: GPUTextureFormat[],
+        private renderSkyRaymarchingTargetFormats: GPUTextureFormat[],
+        private rayMarchDistantSky: boolean,
+        withLutsPipeline: GPURenderPipeline,
+        rayMarchPipeline: GPURenderPipeline,
+        config: SkyAtmosphereRasterRendererConfig,
+    ) {
+        super(lutRenderer);
 
-    private rayMarchDistantSky: boolean;
+        const [withLutsBindGroup, rayMarchingBindGroup] = this.makeBindGroups(
+            config.skyRenderer.depthBuffer.view ?? config.skyRenderer.depthBuffer.texture,
+        );
 
-    
-    /**
-     * Creates a {@link SkyAtmosphereRasterRenderer}.
-     * @param device The `GPUDevice` used to create internal resources (textures, pipelines, etc.).
-     * @param config A {@link SkyAtmosphereRendererConfig} used to configure internal resources and behavior.
-     * @param existingPipelines If this is defined, no new pipelines for rendering the internal lookup tables will be created. Instead, the existing pipelines given will be reused. The existing pipelines must be compatible with the {@link SkyAtmosphereRendererConfig}. Especially, {@link SkyAtmosphereRendererConfig.lookUpTables} and {@link SkyAtmosphereRendererConfig.shadow} should be the same.
-     * @param existingResources If this is defined, no new resources (buffers, textures, samplers) will be created. Instead, the existing resources given will be used.
-     */
-    constructor(device: GPUDevice, config: SkyAtmosphereRasterRendererConfig, existingPipelines?: SkyAtmospherePipelines, existingResources?: SkyAtmosphereResources) {
-        super(device, config, existingPipelines, existingResources);
+        this.renderSkyWithLutsPass = new RenderPass(
+            withLutsPipeline,
+            [withLutsBindGroup, ...(config.customUniformsSource?.bindGroups ?? [])],
+        );
 
-        this.rayMarchDistantSky = config.skyRenderer.rayMarch?.rayMarchDistantSky ?? true;
+        this.renderSkyRaymarchingPass = new RenderPass(
+            rayMarchPipeline,
+            [
+                rayMarchingBindGroup,
+                ...(config.shadow?.bindGroups ?? []),
+                ...(config.customUniformsSource?.bindGroups ?? []),
+            ],
+        );
 
-        const useDualSourceBlending = device.features.has('dual-source-blending') && (config.skyRenderer.rayMarch?.useColoredTransmittance ?? false);
-        if (!useDualSourceBlending && config.skyRenderer.rayMarch?.useColoredTransmittance) {
-            console.warn('[SkyAtmosphereRenderer]: dual source blending was requested but the device feature is not enabled');
+        if (config.skyRenderer.recordInternalRenderBundles ?? true) {
+            [this.renderSkyWithLutsBundle, this.renderSkyRaymarchingBundle] = this.recordBundles();
         }
+    }
 
-        const blendState: GPUBlendState = {
-            color: {
-                operation: 'add',
-                srcFactor: 'one',
-                dstFactor: 'one-minus-src-alpha',
-            },
-            alpha: {
-                operation: 'add',
-                srcFactor: 'zero',
-                dstFactor: 'one',
-            },
-        };
-        const dualBlendState: GPUBlendState = {
-            color: {
-                operation: 'add',
-                srcFactor: 'one',
-                dstFactor: 'src1',
-            },
-            alpha: {
-                operation: 'add',
-                srcFactor: 'zero',
-                dstFactor: 'one',
-            },
-        };
-
+    private static makeBindGroupLayouts(device: GPUDevice, config: SkyAtmosphereRasterRendererConfig, resources: SkyAtmosphereResources, rayMarchDistantSky: boolean): [GPUBindGroupLayout, GPUBindGroupLayout] {
         const renderSkyBindGroupLayoutBaseEntries: GPUBindGroupLayoutEntry[] = [
             {
                 binding: 0,
@@ -952,7 +1015,7 @@ export class SkyAtmosphereRasterRenderer extends SkyAtmosphereRenderer {
                 visibility: GPUShaderStage.FRAGMENT,
                 texture: {
                     sampleType: 'float',
-                    viewDimension: this.resources.transmittanceLut.texture.dimension,
+                    viewDimension: resources.transmittanceLut.texture.dimension,
                     multisampled: false,
                 },
             },
@@ -969,38 +1032,9 @@ export class SkyAtmosphereRasterRenderer extends SkyAtmosphereRenderer {
             },
         ];
 
-        this.renderSkyWithLutsBindGroupLayout = device.createBindGroupLayout({
-            label: `Render sky with luts bind group layout [${this.resources.label}]`,
-            entries: [
-                ...renderSkyBindGroupLayoutBaseEntries,
-                {
-                    binding: 4,
-                    visibility: GPUShaderStage.FRAGMENT,
-                    texture: {
-                        sampleType: 'float',
-                        viewDimension: this.resources.skyViewLut.texture.dimension,
-                        multisampled: false,
-                    },
-                },
-                {
-                    binding: 5,
-                    visibility: GPUShaderStage.FRAGMENT,
-                    texture: {
-                        sampleType: 'float',
-                        viewDimension: this.resources.aerialPerspectiveLut.texture.dimension,
-                        multisampled: false,
-                    },
-                },
-                ...externalResourcesLayoutEntries,
-            ].map((v, i) => {
-                v.binding = i;
-                return v;
-            }) as GPUBindGroupLayoutEntry[],
-        });
-
-        if (this.rayMarchDistantSky) {
-            this.renderSkyRaymarchingBindGroupLayout = device.createBindGroupLayout({
-                label: `Render sky raymarching bind group layout [${this.resources.label}]`,
+        return [
+            device.createBindGroupLayout({
+                label: `Render sky with luts bind group layout [${resources.label}]`,
                 entries: [
                     ...renderSkyBindGroupLayoutBaseEntries,
                     {
@@ -1008,27 +1042,7 @@ export class SkyAtmosphereRasterRenderer extends SkyAtmosphereRenderer {
                         visibility: GPUShaderStage.FRAGMENT,
                         texture: {
                             sampleType: 'float',
-                            viewDimension: this.resources.multiScatteringLut.texture.dimension,
-                            multisampled: false,
-                        },
-                    },
-                    ...externalResourcesLayoutEntries,
-                ].map((v, i) => {
-                    v.binding = i;
-                    return v;
-                }) as GPUBindGroupLayoutEntry[],
-            });
-        } else {
-            this.renderSkyRaymarchingBindGroupLayout = device.createBindGroupLayout({
-                label: `Render sky raymarching bind group layout [${this.resources.label}]`,
-                entries: [
-                    ...renderSkyBindGroupLayoutBaseEntries,
-                    {
-                        binding: 4,
-                        visibility: GPUShaderStage.FRAGMENT,
-                        texture: {
-                            sampleType: 'float',
-                            viewDimension: this.resources.multiScatteringLut.texture.dimension,
+                            viewDimension: resources.skyViewLut.texture.dimension,
                             multisampled: false,
                         },
                     },
@@ -1037,7 +1051,7 @@ export class SkyAtmosphereRasterRenderer extends SkyAtmosphereRenderer {
                         visibility: GPUShaderStage.FRAGMENT,
                         texture: {
                             sampleType: 'float',
-                            viewDimension: this.resources.skyViewLut.texture.dimension,
+                            viewDimension: resources.aerialPerspectiveLut.texture.dimension,
                             multisampled: false,
                         },
                     },
@@ -1046,87 +1060,138 @@ export class SkyAtmosphereRasterRenderer extends SkyAtmosphereRenderer {
                     v.binding = i;
                     return v;
                 }) as GPUBindGroupLayoutEntry[],
-            });
-        }
-
-        const [withLutsBindGroup, rayMarchingBindGroup] = this.makeBindGroups(
-            config.skyRenderer.depthBuffer.view ?? config.skyRenderer.depthBuffer.texture,
-        );
-
-        // render sky with luts pass
-        {
-            const writeTransmissionOnlyOnPerPixelRayMarch = config.skyRenderer.writeTransmissionOnlyOnPerPixelRayMarch ?? true;
-            const useTwoTargets = config.skyRenderer.transmissionFormat && !useDualSourceBlending && !writeTransmissionOnlyOnPerPixelRayMarch;
-            const targets: GPUColorTargetState[] = [
-                {
-                    format: config.skyRenderer.renderTargetFormat,
-                    writeMask: GPUColorWrite.ALL,
-                },
-            ];
-            if (useTwoTargets) {
-                targets.push({ format: config.skyRenderer.transmissionFormat!, });
-            } else {
-                targets[0].blend = useDualSourceBlending && !writeTransmissionOnlyOnPerPixelRayMarch ? dualBlendState : blendState;
-            }
-
-            let code = makeRenderSkyWithLutsShaderCode('rgba16float', config.customUniformsSource?.wgslCode);
-            if (useDualSourceBlending && !writeTransmissionOnlyOnPerPixelRayMarch) {
-                code = `enable dual_source_blending;\n${code}`;
-                code = code.replace('@location(0)', '@location(0) @blend_src(0)');
-                code = code.replace('@location(1)', '@location(0) @blend_src(1)');
-            } else if (targets.length !== 2) {
-                code = code.replace('@location(1) transmittance: vec4<f32>,', '');
-                code = code.replace(
-                    'RenderSkyFragment(vec4(result.rgb, 1.0), vec4(vec3(result.a), 1.0))',
-                    'RenderSkyFragment(result)',
-                );
-            }
-
-            const module = device.createShaderModule({
-                label: 'Render sky with LUTs',
-                code,
-            });
-
-            this.renderSkyWithLutsPass = new RenderPass(
-                device.createRenderPipeline({
-                    label: `Render sky with LUTs pipeline [${this.resources.label}]`,
-                    layout: device.createPipelineLayout({
-                        label: 'Render sky with LUTs pipeline layout',
-                        bindGroupLayouts: [
-                            this.renderSkyWithLutsBindGroupLayout,
-                            ...(config.customUniformsSource?.bindGroupLayouts ?? []),
-                        ],
-                    }),
-                    vertex: {
-                        module,
-                    },
-                    fragment: {
-                        module,
-                        constants: {
-                            AP_SLICE_COUNT: this.resources.aerialPerspectiveLut.texture.depthOrArrayLayers,
-                            AP_DISTANCE_PER_SLICE: this.skyAtmospherePipelines.aerialPerspectiveLutPipeline.aerialPerspectiveDistancePerSlice,
-                            AP_INV_DISTANCE_PER_SLICE: this.skyAtmospherePipelines.aerialPerspectiveLutPipeline.aerialPerspectiveInvDistancePerSlice,
-                            SKY_VIEW_LUT_RES_X: this.resources.skyViewLut.texture.width,
-                            SKY_VIEW_LUT_RES_Y: this.resources.skyViewLut.texture.height,
-                            IS_REVERSE_Z: Number(config.skyRenderer.depthBuffer.reverseZ ?? false),
-                            RENDER_SUN_DISK: Number(config.lights?.renderSunDisk ?? true),
-                            RENDER_MOON_DISK: Number(config.lights?.renderMoonDisk ?? (config.lights?.useMoon ?? false)),
-                            LIMB_DARKENING_ON_SUN: Number(config.lights?.applyLimbDarkeningOnSun ?? true),
-                            LIMB_DARKENING_ON_MOON: Number(config.lights?.applyLimbDarkeningOnMoon ?? false),
-                            USE_MOON: Number(config.lights?.useMoon ?? false),
+            }),
+            device.createBindGroupLayout({
+                label: `Render sky raymarching bind group layout [${resources.label}]`,
+                entries: ([
+                        ...renderSkyBindGroupLayoutBaseEntries,
+                        {
+                            binding: 4,
+                            visibility: GPUShaderStage.FRAGMENT,
+                            texture: {
+                                sampleType: 'float',
+                                viewDimension: resources.multiScatteringLut.texture.dimension,
+                                multisampled: false,
+                            },
                         },
-                        targets,
-                    },
-                }),
-                [withLutsBindGroup, ...(config.customUniformsSource?.bindGroups ?? [])],
-            );
+                        rayMarchDistantSky ? undefined : {
+                            binding: 5,
+                            visibility: GPUShaderStage.FRAGMENT,
+                            texture: {
+                                sampleType: 'float',
+                                viewDimension: resources.skyViewLut.texture.dimension,
+                                multisampled: false,
+                            },
+                        },
+                        ...externalResourcesLayoutEntries,
+                    ].filter(e => e !== undefined) as GPUBindGroupLayoutEntry[])
+                    .map((v, i) => {
+                        v.binding = i;
+                        return v;
+                    }) as GPUBindGroupLayoutEntry[],
+            }),
+        ];
+    }
 
-            this.renderSkyWithLutsTargetFormats = targets.map(t => t.format);
+    private static makeBlendStates() {
+        return {
+            single: {
+                color: {
+                    operation: 'add',
+                    srcFactor: 'one',
+                    dstFactor: 'one-minus-src-alpha',
+                },
+                alpha: {
+                    operation: 'add',
+                    srcFactor: 'zero',
+                    dstFactor: 'one',
+                },
+            } as GPUBlendState,
+            dual: {
+                color: {
+                    operation: 'add',
+                    srcFactor: 'one',
+                    dstFactor: 'src1',
+                },
+                alpha: {
+                    operation: 'add',
+                    srcFactor: 'zero',
+                    dstFactor: 'one',
+                },
+            } as GPUBlendState,
+        };
+    }
+
+    private static makeWithLutsPiplelineDescriptor(device: GPUDevice, config: SkyAtmosphereRasterRendererConfig, lutRenderer: SkyAtmosphereRenderer, renderSkyWithLutsBindGroupLayout: GPUBindGroupLayout, blendState: GPUBlendState, dualBlendState: GPUBlendState, useDualSourceBlending: boolean): [GPURenderPipelineDescriptor, GPUTextureFormat[]] {
+        const writeTransmissionOnlyOnPerPixelRayMarch = config.skyRenderer.writeTransmissionOnlyOnPerPixelRayMarch ?? true;
+        const useTwoTargets = config.skyRenderer.transmissionFormat && !useDualSourceBlending && !writeTransmissionOnlyOnPerPixelRayMarch;
+        const targets: GPUColorTargetState[] = [
+            {
+                format: config.skyRenderer.renderTargetFormat,
+                writeMask: GPUColorWrite.ALL,
+            },
+        ];
+        if (useTwoTargets) {
+            targets.push({ format: config.skyRenderer.transmissionFormat!, });
+        } else {
+            targets[0].blend = useDualSourceBlending && !writeTransmissionOnlyOnPerPixelRayMarch ? dualBlendState : blendState;
         }
 
-        // render sky raymarching
-        {
-            const useTwoTargets = config.skyRenderer.transmissionFormat && !useDualSourceBlending;
+        let code = makeRenderSkyWithLutsShaderCode('rgba16float', config.customUniformsSource?.wgslCode);
+        if (useDualSourceBlending && !writeTransmissionOnlyOnPerPixelRayMarch) {
+            code = `enable dual_source_blending;\n${code}`;
+            code = code.replace('@location(0)', '@location(0) @blend_src(0)');
+            code = code.replace('@location(1)', '@location(0) @blend_src(1)');
+        } else if (targets.length !== 2) {
+            code = code.replace('@location(1) transmittance: vec4<f32>,', '');
+            code = code.replace(
+                'RenderSkyFragment(vec4(result.rgb, 1.0), vec4(vec3(result.a), 1.0))',
+                'RenderSkyFragment(result)',
+            );
+        }
+
+        const module = device.createShaderModule({
+            label: 'Render sky with LUTs',
+            code,
+        });
+
+        return [
+            {
+                label: `Render sky with LUTs pipeline [${lutRenderer.resources.label}]`,
+                layout: device.createPipelineLayout({
+                    label: 'Render sky with LUTs pipeline layout',
+                    bindGroupLayouts: [
+                        renderSkyWithLutsBindGroupLayout,
+                        ...(config.customUniformsSource?.bindGroupLayouts ?? []),
+                    ],
+                }),
+                vertex: {
+                    module,
+                },
+                fragment: {
+                    module,
+                    constants: {
+                        AP_SLICE_COUNT: lutRenderer.resources.aerialPerspectiveLut.texture.depthOrArrayLayers,
+                        AP_DISTANCE_PER_SLICE: lutRenderer.skyAtmospherePipelines.aerialPerspectiveLutPipeline.aerialPerspectiveDistancePerSlice,
+                        AP_INV_DISTANCE_PER_SLICE: lutRenderer.skyAtmospherePipelines.aerialPerspectiveLutPipeline.aerialPerspectiveInvDistancePerSlice,
+                        SKY_VIEW_LUT_RES_X: lutRenderer.resources.skyViewLut.texture.width,
+                        SKY_VIEW_LUT_RES_Y: lutRenderer.resources.skyViewLut.texture.height,
+                        IS_REVERSE_Z: Number(config.skyRenderer.depthBuffer.reverseZ ?? false),
+                        RENDER_SUN_DISK: Number(config.lights?.renderSunDisk ?? true),
+                        RENDER_MOON_DISK: Number(config.lights?.renderMoonDisk ?? (config.lights?.useMoon ?? false)),
+                        LIMB_DARKENING_ON_SUN: Number(config.lights?.applyLimbDarkeningOnSun ?? true),
+                        LIMB_DARKENING_ON_MOON: Number(config.lights?.applyLimbDarkeningOnMoon ?? false),
+                        USE_MOON: Number(config.lights?.useMoon ?? false),
+                    },
+                    targets,
+                },
+            },
+            targets.map(t => t.format),
+        ];
+    }
+
+    private static makeRayMarchPipelineDescriptor(device: GPUDevice, config: SkyAtmosphereRasterRendererConfig, lutRenderer: SkyAtmosphereRenderer, renderSkyRaymarchingBindGroupLayout: GPUBindGroupLayout, rayMarchDistantSky: boolean, blendState: GPUBlendState, dualBlendState: GPUBlendState, useDualSourceBlending: boolean): [GPURenderPipelineDescriptor, GPUTextureFormat[]] {
+        const useTwoTargets = config.skyRenderer.transmissionFormat && !useDualSourceBlending;
             const targets: GPUColorTargetState[] = [
                 {
                     format: config.skyRenderer.renderTargetFormat,
@@ -1139,7 +1204,7 @@ export class SkyAtmosphereRasterRenderer extends SkyAtmosphereRenderer {
                 targets[0].blend = useDualSourceBlending ? dualBlendState : blendState;
             }
 
-            let code = this.rayMarchDistantSky ?
+            let code = rayMarchDistantSky ?
                 makeRenderSkyRaymarchingShaderCode('rgba16float', config.customUniformsSource?.wgslCode) :
                 makeRenderSkyLutAndRaymarchingShaderCode('rgba16float', config.customUniformsSource?.wgslCode);
             if (useDualSourceBlending) {
@@ -1160,8 +1225,8 @@ export class SkyAtmosphereRasterRenderer extends SkyAtmosphereRenderer {
             const constants: Record<string, GPUPipelineConstantValue> = {
                 INV_DISTANCE_TO_MAX_SAMPLE_COUNT: 1.0 / (config.skyRenderer.distanceToMaxSampleCount ?? (100.0 * (config.distanceScaleFactor ?? 1.0))),
                 RANDOMIZE_SAMPLE_OFFSET: Number(config.skyRenderer.rayMarch?.randomizeRayOffsets ?? true),
-                MULTI_SCATTERING_LUT_RES_X: this.resources.multiScatteringLut.texture.width,
-                MULTI_SCATTERING_LUT_RES_Y: this.resources.multiScatteringLut.texture.height,
+                MULTI_SCATTERING_LUT_RES_X: lutRenderer.resources.multiScatteringLut.texture.width,
+                MULTI_SCATTERING_LUT_RES_Y: lutRenderer.resources.multiScatteringLut.texture.height,
                 IS_REVERSE_Z: Number(config.skyRenderer.depthBuffer.reverseZ ?? false),
                 RENDER_SUN_DISK: Number(config.lights?.renderSunDisk ?? true),
                 RENDER_MOON_DISK: Number(config.lights?.renderMoonDisk ?? (config.lights?.useMoon ?? false)),
@@ -1170,18 +1235,18 @@ export class SkyAtmosphereRasterRenderer extends SkyAtmosphereRenderer {
                 USE_MOON: Number(config.lights?.useMoon ?? false),
             };
 
-            if (!this.rayMarchDistantSky) {
-                constants['SKY_VIEW_LUT_RES_X'] = this.resources.skyViewLut.texture.width;
-                constants['SKY_VIEW_LUT_RES_Y'] = this.resources.skyViewLut.texture.height;
+            if (!rayMarchDistantSky) {
+                constants['SKY_VIEW_LUT_RES_X'] = lutRenderer.resources.skyViewLut.texture.width;
+                constants['SKY_VIEW_LUT_RES_Y'] = lutRenderer.resources.skyViewLut.texture.height;
             }
 
-            this.renderSkyRaymarchingPass = new RenderPass(
-                device.createRenderPipeline({
-                    label: `Render sky raymarching pipeline [${this.resources.label}]`,
+            return [
+                {
+                    label: `Render sky raymarching pipeline [${lutRenderer.resources.label}]`,
                     layout: device.createPipelineLayout({
-                        label: `Render sky raymarching pipeline layout [${this.resources.label}]`,
+                        label: `Render sky raymarching pipeline layout [${lutRenderer.resources.label}]`,
                         bindGroupLayouts: [
-                            this.renderSkyRaymarchingBindGroupLayout,
+                            renderSkyRaymarchingBindGroupLayout,
                             ...(config.shadow?.bindGroupLayouts || []),
                             ...(config.customUniformsSource?.bindGroupLayouts ?? []),
                         ],
@@ -1194,20 +1259,86 @@ export class SkyAtmosphereRasterRenderer extends SkyAtmosphereRenderer {
                         constants,
                         targets,
                     },
-                }),
-                [
-                    rayMarchingBindGroup,
-                    ...(config.shadow?.bindGroups ?? []),
-                    ...(config.customUniformsSource?.bindGroups ?? []),
-                ],
-            );
+                },
+                targets.map(t => t.format),
+            ];
+    }
 
-            this.renderSkyRaymarchingTargetFormats = targets.map(t => t.format);
+    /**
+     * Asynchronously creates a {@link SkyAtmosphereRasterRenderer}.
+     *
+     * All pipelines used by this renderer are created asynchronously.
+     *
+     * @param device The `GPUDevice` used to create internal resources (textures, pipelines, etc.).
+     * @param config A {@link SkyAtmosphereRendererConfig} used to configure internal resources and behavior.
+     * @param existingPipelines If this is defined, no new pipelines for rendering the internal lookup tables will be created. Instead, the existing pipelines given will be reused. The existing pipelines must be compatible with the {@link SkyAtmosphereRendererConfig}. Especially, {@link SkyAtmosphereRendererConfig.lookUpTables} and {@link SkyAtmosphereRendererConfig.shadow} should be the same.
+     * @param existingResources If this is defined, no new resources (buffers, textures, samplers) will be created. Instead, the existing resources given will be used.
+     */
+    static async createAsync(device: GPUDevice, config: SkyAtmosphereRasterRendererConfig, existingPipelines?: SkyAtmospherePipelines, existingResources?: SkyAtmosphereResources): Promise<SkyAtmosphereRasterRenderer> {
+        const useDualSourceBlending = device.features.has('dual-source-blending') && (config.skyRenderer.rayMarch?.useColoredTransmittance ?? false);
+        if (!useDualSourceBlending && config.skyRenderer.rayMarch?.useColoredTransmittance) {
+            console.warn('[SkyAtmosphereRenderer]: dual source blending was requested but the device feature is not enabled');
         }
 
-        if (config.skyRenderer.recordInternalRenderBundles ?? true) {
-            [this.renderSkyWithLutsBundle, this.renderSkyRaymarchingBundle] = this.recordBundles();
+        const rayMarchDistantSky = config.skyRenderer.rayMarch?.rayMarchDistantSky ?? true;
+        const lutRenderer = await super.createAsync(device, config, existingPipelines, existingResources);
+        const [renderSkyWithLutsBindGroupLayout, renderSkyRaymarchingBindGroupLayout] = this.makeBindGroupLayouts(device, config, lutRenderer.resources, rayMarchDistantSky);
+        const blendStates = this.makeBlendStates();
+        const [withLutsDescriptor, withLutsFormats] = this.makeWithLutsPiplelineDescriptor(device, config, lutRenderer, renderSkyWithLutsBindGroupLayout, blendStates.single, blendStates.dual, useDualSourceBlending);
+        const [rayMarchDescriptor, rayMarchFormats] = this.makeRayMarchPipelineDescriptor(device, config, lutRenderer, renderSkyRaymarchingBindGroupLayout, rayMarchDistantSky, blendStates.single, blendStates.dual, useDualSourceBlending);
+        const [renderSkyWithLutsPipeline, renderSkyRaymarchingPipeline] = await Promise.all([
+            device.createRenderPipelineAsync(withLutsDescriptor),
+            device.createRenderPipelineAsync(rayMarchDescriptor),
+        ]);
+
+        return new SkyAtmosphereRasterRenderer(
+            lutRenderer,
+            renderSkyWithLutsBindGroupLayout,
+            renderSkyRaymarchingBindGroupLayout,
+            withLutsFormats,
+            rayMarchFormats,
+            rayMarchDistantSky,
+            renderSkyWithLutsPipeline,
+            renderSkyRaymarchingPipeline,
+            config,
+        );
+    }
+
+    /**
+     * Creates a {@link SkyAtmosphereRasterRenderer}.
+     * @param device The `GPUDevice` used to create internal resources (textures, pipelines, etc.).
+     * @param config A {@link SkyAtmosphereRendererConfig} used to configure internal resources and behavior.
+     * @param existingPipelines If this is defined, no new pipelines for rendering the internal lookup tables will be created. Instead, the existing pipelines given will be reused. The existing pipelines must be compatible with the {@link SkyAtmosphereRendererConfig}. Especially, {@link SkyAtmosphereRendererConfig.lookUpTables} and {@link SkyAtmosphereRendererConfig.shadow} should be the same.
+     * @param existingResources If this is defined, no new resources (buffers, textures, samplers) will be created. Instead, the existing resources given will be used.
+     */
+    static create(device: GPUDevice, config: SkyAtmosphereRasterRendererConfig, existingPipelines?: SkyAtmospherePipelines, existingResources?: SkyAtmosphereResources): SkyAtmosphereRasterRenderer {
+        const useDualSourceBlending = device.features.has('dual-source-blending') && (config.skyRenderer.rayMarch?.useColoredTransmittance ?? false);
+        if (!useDualSourceBlending && config.skyRenderer.rayMarch?.useColoredTransmittance) {
+            console.warn('[SkyAtmosphereRenderer]: dual source blending was requested but the device feature is not enabled');
         }
+
+        const rayMarchDistantSky = config.skyRenderer.rayMarch?.rayMarchDistantSky ?? true;
+        const lutRenderer = super.create(device, config, existingPipelines, existingResources);
+        const [renderSkyWithLutsBindGroupLayout, renderSkyRaymarchingBindGroupLayout] = this.makeBindGroupLayouts(device, config, lutRenderer.resources, rayMarchDistantSky);
+        const blendStates = this.makeBlendStates();
+        const [withLutsDescriptor, withLutsFormats] = this.makeWithLutsPiplelineDescriptor(device, config, lutRenderer, renderSkyWithLutsBindGroupLayout, blendStates.single, blendStates.dual, useDualSourceBlending);
+        const [rayMarchDescriptor, rayMarchFormats] = this.makeRayMarchPipelineDescriptor(device, config, lutRenderer, renderSkyRaymarchingBindGroupLayout, rayMarchDistantSky, blendStates.single, blendStates.dual, useDualSourceBlending);
+        const [renderSkyWithLutsPipeline, renderSkyRaymarchingPipeline] = [
+            device.createRenderPipeline(withLutsDescriptor),
+            device.createRenderPipeline(rayMarchDescriptor),
+        ];
+
+        return new SkyAtmosphereRasterRenderer(
+            lutRenderer,
+            renderSkyWithLutsBindGroupLayout,
+            renderSkyRaymarchingBindGroupLayout,
+            withLutsFormats,
+            rayMarchFormats,
+            rayMarchDistantSky,
+            renderSkyWithLutsPipeline,
+            renderSkyRaymarchingPipeline,
+            config,
+        );
     }
 
     private makeBindGroups(depthBuffer: GPUTextureView | GPUTexture): [GPUBindGroup, GPUBindGroup] {

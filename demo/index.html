@@ -253,99 +253,58 @@
                 },
             };
 
-            const skyAtmosphereRenderer = new SkyAtmosphereComputeRenderer(device, {
-                ...skyAtmosphereConfigBase,
-                skyRenderer: computePassConfigBase,
-            });
-            const skyAtmosphereRasterRenderer = new SkyAtmosphereRasterRenderer(
-                device,
-                {
-                    ...skyAtmosphereConfigBase,
-                    skyRenderer: {
-                        ...renderPassConfigBase,
-                    },
-                },
-                skyAtmosphereRenderer.skyAtmospherePipelines,
-                skyAtmosphereRenderer.resources,  
-            );
-            const skyAtmosphereRendererGrayscale = new SkyAtmosphereComputeRenderer(
-                device,
-                {
-                    ...skyAtmosphereConfigBase,
-                    skyRenderer: {
-                        ...computePassConfigBase,
-                        rayMarch: {
-                            useColoredTransmittance: false,
-                        },
-                    },
-                },
-                skyAtmosphereRenderer.skyAtmospherePipelines,
-                skyAtmosphereRenderer.resources,
-            );
-            const skyAtmosphereRasterRendererGrayscale = new SkyAtmosphereRasterRenderer(
-                device,
-                {
-                    ...skyAtmosphereConfigBase,
-                    skyRenderer: {
-                        ...renderPassConfigBase,
-                        rayMarch: {
-                            useColoredTransmittance: false,
-                        },
-                    },
-                },
-                skyAtmosphereRenderer.skyAtmospherePipelines,
-                skyAtmosphereRenderer.resources,  
-            );
+            const skyRenderers = [];
+            for (let inMeters = 0; inMeters < 2; ++inMeters) {
+                if (inMeters === 1) {
+                    skyAtmosphereConfigBase.distanceScaleFactor = 1000.0;
+                }
+                skyRenderers.push([]);
+                for (let compute = 0; compute < 2; ++compute) {
+                    skyRenderers[inMeters].push([]);
+                    for (let colored = 0; colored < 2; ++colored) {
+                        skyRenderers[inMeters][compute].push([]);
+                        for (let skyLut = 0; skyLut < 2; ++skyLut) {
+                            const existing = compute + colored + skyLut > 0 ? skyRenderers[inMeters][0][0][0] : undefined;
+                            skyRenderers[inMeters][compute][colored].push(
+                                (compute === 1 ? 
+                                    SkyAtmosphereComputeRenderer.create(
+                                        device,
+                                        {
+                                            ...skyAtmosphereConfigBase,
+                                            skyRenderer: {
+                                                ...computePassConfigBase,
+                                                rayMarch: {
+                                                    useColoredTransmittance: colored === 1,
+                                                    rayMarchDistantSky: skyLut === 1,
+                                                },
+                                            },
+                                        },
+                                        (existing ? existing.skyAtmospherePipelines : undefined),
+                                        (existing ? existing.resources : undefined),
+                                    ) :
+                                    SkyAtmosphereRasterRenderer.create(
+                                        device,
+                                        {
+                                            ...skyAtmosphereConfigBase,
+                                            skyRenderer: {
+                                                ...renderPassConfigBase,
+                                                rayMarch: {
+                                                    useColoredTransmittance: colored === 1,
+                                                    rayMarchDistantSky: skyLut === 1,
+                                                },
+                                            },
+                                        },
+                                        (existing ? existing.skyAtmospherePipelines : undefined),
+                                        (existing ? existing.resources : undefined),
+                                    )
+                                )
+                            );
+                        }
+                    }
+                }
+            }
 
-            skyAtmosphereConfigBase.distanceScaleFactor = 1000.0;
-            const skyAtmosphereRendererMeters = new SkyAtmosphereComputeRenderer(
-                device,
-                {
-                    ...skyAtmosphereConfigBase,
-                    skyRenderer: computePassConfigBase,
-                },
-                null,
-                skyAtmosphereRenderer.resources,
-            );
-            const skyAtmosphereRasterRendererMeters = new SkyAtmosphereRasterRenderer(
-                device,
-                {
-                    ...skyAtmosphereConfigBase,
-                    skyRenderer: {
-                        ...renderPassConfigBase,
-                    },
-                },
-                skyAtmosphereRendererMeters.skyAtmospherePipelines,
-                skyAtmosphereRenderer.resources,  
-            );
-            const skyAtmosphereRendererMetersGrayscale = new SkyAtmosphereComputeRenderer(
-                device,
-                {
-                    ...skyAtmosphereConfigBase,
-                    skyRenderer: {
-                        ...computePassConfigBase,
-                        rayMarch: {
-                            useColoredTransmittance: false,
-                        },
-                    },
-                },
-                skyAtmosphereRendererMeters.skyAtmospherePipelines,
-                skyAtmosphereRendererMeters.resources,
-            );
-            const skyAtmosphereRasterRendererMetersGrayscale = new SkyAtmosphereRasterRenderer(
-                device,
-                {
-                    ...skyAtmosphereConfigBase,
-                    skyRenderer: {
-                        ...renderPassConfigBase,
-                        rayMarch: {
-                            useColoredTransmittance: false,
-                        },
-                    },
-                },
-                skyAtmosphereRendererMeters.skyAtmospherePipelines,
-                skyAtmosphereRendererMeters.resources,  
-            );
+            const skyAtmosphereRenderer = skyRenderers[0][1][1][0];
 
             function makePipeline() {
                 const module = device.createShaderModule({
@@ -769,16 +728,12 @@
                 dragonRenderer.encode(geometryPass);
                 geometryPass.end();
 
-                const skyRenderer = params.renderSettings.compute ?
-                    (params.renderSettings.inMeters ?
-                        (params.renderSettings.coloredTransmittance ? skyAtmosphereRendererMeters : skyAtmosphereRendererMetersGrayscale) :
-                        (params.renderSettings.coloredTransmittance ? skyAtmosphereRenderer : skyAtmosphereRendererGrayscale)
-                    ) :
-                    (params.renderSettings.inMeters ?
-                        (params.renderSettings.coloredTransmittance ? skyAtmosphereRasterRendererMeters : skyAtmosphereRasterRendererMetersGrayscale) :
-                        (params.renderSettings.coloredTransmittance ? skyAtmosphereRasterRenderer : skyAtmosphereRasterRendererGrayscale)
-                    );
-
+                const skyRenderer = (skyRenderers
+                    [+params.renderSettings.inMeters]
+                    [+params.renderSettings.compute]
+                    [+params.renderSettings.coloredTransmittance]
+                    [+params.renderSettings.rayMarchDistantSky]
+                );
                 
                 if (timeStampQuery) {
                     skyRenderer.updateAtmosphere(params.atmosphere);
@@ -804,7 +759,7 @@
                     skyRenderer.renderMultiScatteringLut(multiScatteringLutPass);
                     multiScatteringLutPass.end();
 
-                    if (!params.renderSettings.rayMarch) {
+                    if (!params.renderSettings.rayMarch || !params.renderSettings.rayMarchDistantSky) {
                         const skyViewLutPass = encoder.beginComputePass({
                             timestampWrites: {
                                 querySet: timeStampQuery,
@@ -814,7 +769,9 @@
                         });
                         skyRenderer.renderSkyViewLut(skyViewLutPass);
                         skyViewLutPass.end();
+                    }
 
+                    if (!params.renderSettings.rayMarch) {
                         const aerialPerspectiveLutPass = encoder.beginComputePass({
                             timestampWrites: {
                                 querySet: timeStampQuery,

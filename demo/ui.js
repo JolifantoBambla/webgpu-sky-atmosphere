@@ -31,6 +31,7 @@ export function makeUi(atmosphere, camera, showPerformanceGraph) {
             rayMarchingMaxSpp: 30,
             rayMarch: false,
             coloredTransmittance: false,
+            rayMarchDistantSky: true,
             compute: true,
             viewHeight: 1.0,
             inMeters: false,
@@ -227,6 +228,7 @@ Escape: exit pointer lock on canvas`,
     });
     renderSettingsFolder.addBinding(params.renderSettings, 'rayMarch', {label: 'Full-resolution ray marching'});
     renderSettingsFolder.addBinding(params.renderSettings, 'coloredTransmittance', {label: 'Colored transmittance (ray march only)'});
+    renderSettingsFolder.addBinding(params.renderSettings, 'rayMarchDistantSky', {label: 'Raymarch distant sky (ray march only)'});
     renderSettingsFolder.addBinding(params.renderSettings, 'compute', {label: 'Use compute'});
     const rayMarchMinSlider = renderSettingsFolder.addBinding(params.renderSettings, 'rayMarchingMinSpp', {min: 14, max: 99, step: 1, label: 'Min. SPP'});
     const rayMarchMaxSlider = renderSettingsFolder.addBinding(params.renderSettings, 'rayMarchingMaxSpp', {min: 15, max: 100, step: 1, label: 'Max. SPP'});
