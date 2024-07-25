@@ -48,7 +48,7 @@ import {
     makeRenderSkyRaymarchingShaderCode,
     makeRenderSkyLutAndRaymarchingShaderCode,
 } from './shaders.js';
-import { SkyAtmospherePipelines } from './pipelines.js';
+import { SkyAtmospherePipelines, SkyAtmosphereRasterPipelines, SkyViewLutRasterPipeline } from './pipelines.js';
 import { ComputePass, LookUpTable, RenderPass } from './util.js';
 
 export {
@@ -878,6 +878,13 @@ export class SkyAtmosphereRasterRenderer extends SkyAtmosphereRenderer {
 
     private rayMarchDistantSky: boolean;
 
+
+    private rasterLutPipelines: SkyAtmosphereRasterPipelines;
+    private rasterSkyViewPass: RenderPass;
+    private rasterAerialPerspectivePass: RenderPass;
+    private skyViewPassBundle: GPURenderBundle;
+    private aerialPerspectiveBundles: GPURenderBundle[];
+
     
     /**
      * Creates a {@link SkyAtmosphereRasterRenderer}.
@@ -888,6 +895,32 @@ export class SkyAtmosphereRasterRenderer extends SkyAtmosphereRenderer {
      */
     constructor(device: GPUDevice, config: SkyAtmosphereRasterRendererConfig, existingPipelines?: SkyAtmospherePipelines, existingResources?: SkyAtmosphereResources) {
         super(device, config, existingPipelines, existingResources);
+
+        {
+            this.rasterLutPipelines = new SkyAtmosphereRasterPipelines(device, config);
+            this.rasterSkyViewPass = this.rasterLutPipelines.skyViewLutPipeline.makeRenderPass(this.resources, (config.lookUpTables?.skyViewLut?.affectedByShadow ?? true) ? config.shadow?.bindGroups : undefined, config.customUniformsSource?.bindGroups);
+            this.rasterAerialPerspectivePass = this.rasterLutPipelines.aerialPerspectiveLutPipeline.makeRenderPass(this.resources, (config.lookUpTables?.aerialPerspectiveLut?.affectedByShadow ?? true) ? config.shadow?.bindGroups : undefined, config.customUniformsSource?.bindGroups);
+
+            {
+                const bundleEncoder = this.resources.device.createRenderBundleEncoder({
+                    label: 'Render sky with LUTs',
+                    colorFormats: [this.resources.skyViewLut.texture.format],
+                });
+                this.rasterSkyViewPass.encode(bundleEncoder);
+                this.skyViewPassBundle = bundleEncoder.finish();
+            }
+            {
+                this.aerialPerspectiveBundles = [];
+                for (let i = 0; i < this.resources.aerialPerspectiveLut.texture.depthOrArrayLayers; ++i) {
+                    const bundleEncoder = device.createRenderBundleEncoder({
+                        label: `Render aerial perspective slice {i}`,
+                        colorFormats: [this.resources.aerialPerspectiveLut.texture.format],
+                    });
+                    this.rasterAerialPerspectivePass.encode(bundleEncoder, false, i);
+                    this.aerialPerspectiveBundles.push(bundleEncoder.finish());
+                }
+            }
+        }
 
         this.rayMarchDistantSky = config.skyRenderer.rayMarch?.rayMarchDistantSky ?? true;
 
@@ -1207,6 +1240,45 @@ export class SkyAtmosphereRasterRenderer extends SkyAtmosphereRenderer {
 
         if (config.skyRenderer.recordInternalRenderBundles ?? true) {
             [this.renderSkyWithLutsBundle, this.renderSkyRaymarchingBundle] = this.recordBundles();
+        }
+    }
+
+    public rasterDynamicLuts(commandEncoder: GPUCommandEncoder, uniforms: Uniforms, querySet: GPUQuerySet) {
+        this.updateUniforms(uniforms);
+
+        const skyViewLutPass = commandEncoder.beginRenderPass({
+            colorAttachments: [{
+                view: this.resources.skyViewLut.view,
+                clearValue: [0, 0, 0, 1],
+                loadOp: 'clear',
+                storeOp: 'store',
+            }],
+            timestampWrites: {
+                querySet,
+                beginningOfPassWriteIndex: 6,
+                endOfPassWriteIndex: 7,
+            },
+        });
+        skyViewLutPass.executeBundles([this.skyViewPassBundle]);
+        skyViewLutPass.end();
+
+        for (let i = 0; i < this.resources.aerialPerspectiveLut.texture.depthOrArrayLayers; ++i) {
+            const aerialPerspectiveLutPass = commandEncoder.beginRenderPass({
+                colorAttachments: [{
+                    view: this.resources.aerialPerspectiveLut.view,
+                    depthSlice: i,
+                    clearValue: [0, 0, 0, 1],
+                    loadOp: 'clear',
+                    storeOp: 'store',
+                }],
+                timestampWrites: {
+                    querySet,
+                    beginningOfPassWriteIndex: 6 + i * 2,
+                    endOfPassWriteIndex: 7 + i * 2,
+                },
+            });
+            aerialPerspectiveLutPass.executeBundles([this.aerialPerspectiveBundles[i]]);
+            aerialPerspectiveLutPass.end();
         }
     }
 

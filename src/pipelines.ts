@@ -6,7 +6,7 @@
 import { SkyAtmosphereRendererConfig, ShadowConfig, CustomUniformsSourceConfig } from './config.js';
 import { AERIAL_PERSPECTIVE_LUT_FORMAT, ATMOSPHERE_BUFFER_SIZE, UNIFORMS_BUFFER_SIZE, DEFAULT_AERIAL_PERSPECTIVE_LUT_SIZE, DEFAULT_MULTISCATTERING_LUT_SIZE, DEFAULT_SKY_VIEW_LUT_SIZE, MULTI_SCATTERING_LUT_FORMAT, SKY_VIEW_LUT_FORMAT, SkyAtmosphereResources, TRANSMITTANCE_LUT_FORMAT } from './resources.js';
 import { makeAerialPerspectiveLutShaderCode, makeMultiScatteringLutShaderCode, makeSkyViewLutShaderCode, makeTransmittanceLutShaderCode } from './shaders.js';
-import { ComputePass } from './util.js';
+import { ComputePass, RenderPass } from './util.js';
 
 export const DEFAULT_TRANSMITTANCE_LUT_SAMPLE_COUNT: number = 40;
 export const DEFAULT_MULTI_SCATTERING_LUT_SAMPLE_COUNT: number = 20;
@@ -40,6 +40,47 @@ export class SkyAtmospherePipelines {
             config.customUniformsSource,
         );
         this.aerialPerspectiveLutPipeline = new AerialPerspectiveLutPipeline(
+            device,
+            config.lookUpTables?.aerialPerspectiveLut?.format ?? AERIAL_PERSPECTIVE_LUT_FORMAT,
+            (config.lookUpTables?.aerialPerspectiveLut?.size ?? DEFAULT_AERIAL_PERSPECTIVE_LUT_SIZE)[2],
+            config.lookUpTables?.aerialPerspectiveLut?.distancePerSlice ?? (4.0 * (config.distanceScaleFactor ?? 1.0)),
+            config.lookUpTables?.multiScatteringLut?.size ?? [DEFAULT_MULTISCATTERING_LUT_SIZE, DEFAULT_MULTISCATTERING_LUT_SIZE],
+            config.lookUpTables?.aerialPerspectiveLut?.randomizeRayOffsets ?? false,
+            config.lights?.useMoon ?? false,
+            (config.lookUpTables?.aerialPerspectiveLut?.affectedByShadow ?? true) ? config.shadow : undefined,
+            config.customUniformsSource,
+        );
+    }
+}
+
+export class SkyAtmosphereRasterPipelines {
+    readonly transmittanceLutPipeline: TransmittanceLutPipeline;
+    readonly multiScatteringLutPipeline: MultiScatteringLutPipeline;
+    readonly skyViewLutPipeline: SkyViewLutRasterPipeline;
+    readonly aerialPerspectiveLutPipeline: AerialPerspectiveLutRasterPipeline;
+
+    constructor(device: GPUDevice, config: SkyAtmosphereRendererConfig) {
+        this.transmittanceLutPipeline = new TransmittanceLutPipeline(
+            device,
+            config.lookUpTables?.transmittanceLut?.format ?? TRANSMITTANCE_LUT_FORMAT,
+            config.lookUpTables?.transmittanceLut?.sampleCount ?? DEFAULT_TRANSMITTANCE_LUT_SAMPLE_COUNT,
+        );
+        this.multiScatteringLutPipeline = new MultiScatteringLutPipeline(
+            device,
+            config.lookUpTables?.multiScatteringLut?.format ?? MULTI_SCATTERING_LUT_FORMAT,
+            config.lookUpTables?.multiScatteringLut?.sampleCount ?? DEFAULT_MULTI_SCATTERING_LUT_SAMPLE_COUNT,
+        );
+        this.skyViewLutPipeline = new SkyViewLutRasterPipeline(
+            device,
+            config.lookUpTables?.skyViewLut?.format ?? SKY_VIEW_LUT_FORMAT,
+            config.lookUpTables?.skyViewLut?.size ?? DEFAULT_SKY_VIEW_LUT_SIZE,
+            config.lookUpTables?.multiScatteringLut?.size ?? [DEFAULT_MULTISCATTERING_LUT_SIZE, DEFAULT_MULTISCATTERING_LUT_SIZE],
+            config.skyRenderer?.distanceToMaxSampleCount ?? (100.0 * (config.distanceScaleFactor ?? 1.0)),
+            config.lights?.useMoon ?? false,
+            (config.lookUpTables?.skyViewLut?.affectedByShadow ?? true) ? config.shadow : undefined,
+            config.customUniformsSource,
+        );
+        this.aerialPerspectiveLutPipeline = new AerialPerspectiveLutRasterPipeline(
             device,
             config.lookUpTables?.aerialPerspectiveLut?.format ?? AERIAL_PERSPECTIVE_LUT_FORMAT,
             (config.lookUpTables?.aerialPerspectiveLut?.size ?? DEFAULT_AERIAL_PERSPECTIVE_LUT_SIZE)[2],
@@ -330,7 +371,7 @@ export class SkyViewLutPipeline {
                     label: 'sky view LUT',
                     code: `${shadowConfig?.wgslCode || 'fn get_shadow(p: vec3<f32>, i: u32) -> f32 { return 1.0; }'}\n${makeSkyViewLutShaderCode(skyViewLutFormat, customUniformsConfig?.wgslCode)}`,
                 }),
-                entryPoint: 'render_sky_view_lut',
+                entryPoint: 'compute',
                 constants: {
                     SKY_VIEW_LUT_RES_X: this.skyViewLutSize[0],
                     SKY_VIEW_LUT_RES_Y: this.skyViewLutSize[1],
@@ -495,7 +536,7 @@ export class AerialPerspectiveLutPipeline {
                     label: 'aerial perspective LUT',
                     code: `${shadowConfig?.wgslCode || 'fn get_shadow(p: vec3<f32>, i: u32) -> f32 { return 1.0; }'}\n${makeAerialPerspectiveLutShaderCode(aerialPerspectiveLutFormat, customUniformsConfig?.wgslCode)}`,
                 }),
-                entryPoint: 'render_aerial_perspective_lut',
+                entryPoint: 'compute',
                 constants: {
                     AP_SLICE_COUNT: this.aerialPerspectiveSliceCount,
                     AP_DISTANCE_PER_SLICE: this.aerialPerspectiveDistancePerSlice,
@@ -580,3 +621,319 @@ export class AerialPerspectiveLutPipeline {
         return 1.0 / this.aerialPerspectiveDistancePerSlice;
     }
 }
+
+export class SkyViewLutRasterPipeline {
+    readonly device: GPUDevice;
+    readonly pipeline: GPURenderPipeline;
+    readonly bindGroupLayout: GPUBindGroupLayout;
+    readonly skyViewLutFormat: GPUTextureFormat;
+    readonly skyViewLutSize: [number, number];
+    readonly multiscatteringLutSize: [number, number];
+
+    constructor(device: GPUDevice, skyViewLutFormat: GPUTextureFormat, skyViewLutSize: [number, number], multiscatteringLutSize: [number, number], distanceToMaxSampleCount: number, useMoon: boolean, shadowConfig?: ShadowConfig, customUniformsConfig?: CustomUniformsSourceConfig) {
+        this.device = device;
+        this.skyViewLutFormat = skyViewLutFormat;
+        this.skyViewLutSize = skyViewLutSize;
+        this.multiscatteringLutSize = multiscatteringLutSize;
+        this.bindGroupLayout = device.createBindGroupLayout({
+            label: 'sky view LUT pass',
+            entries: ([
+                {
+                    binding: 0,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    buffer: {
+                        type: 'uniform',
+                        hasDynamicOffset: false,
+                        minBindingSize: ATMOSPHERE_BUFFER_SIZE,
+                    },
+                },
+                customUniformsConfig ? undefined : {
+                    binding: 1,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    buffer: {
+                        type: 'uniform',
+                        hasDynamicOffset: false,
+                        minBindingSize: UNIFORMS_BUFFER_SIZE,
+                    },
+                },
+                {
+                    binding: 2,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    sampler: {
+                        type: 'filtering',
+                    },
+                },
+                {
+                    binding: 3,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    texture: {
+                        sampleType: 'float',
+                        viewDimension: '2d',
+                        multisampled: false,
+                    },
+                },
+                {
+                    binding: 4,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    texture: {
+                        sampleType: 'float',
+                        viewDimension: '2d',
+                        multisampled: false,
+                    },
+                },
+            ].filter(e => e !== undefined) as GPUBindGroupLayoutEntry[])
+            .map((e, i) => {
+                e.binding = i;
+                return e;
+            }) as GPUBindGroupLayoutEntry[],
+        });
+
+        const module = device.createShaderModule({
+            label: 'sky view LUT',
+            code: `${shadowConfig?.wgslCode || 'fn get_shadow(p: vec3<f32>, i: u32) -> f32 { return 1.0; }'}\n${makeSkyViewLutShaderCode(skyViewLutFormat, customUniformsConfig?.wgslCode)}`,
+        });
+        
+        this.pipeline = device.createRenderPipeline({
+            label: 'sky view LUT pass',
+            layout: device.createPipelineLayout({
+                label: 'sky view LUT pass',
+                bindGroupLayouts: [this.bindGroupLayout, ...(shadowConfig?.bindGroupLayouts ?? []), ...(customUniformsConfig?.bindGroupLayouts ?? [])],
+            }),
+            vertex: {
+                module,
+            },
+            fragment: {
+                module,
+                targets: [{ format: this.skyViewLutFormat, }],
+                constants: {
+                    SKY_VIEW_LUT_RES_X: this.skyViewLutSize[0],
+                    SKY_VIEW_LUT_RES_Y: this.skyViewLutSize[1],
+                    INV_DISTANCE_TO_MAX_SAMPLE_COUNT: 1.0 / distanceToMaxSampleCount,
+                    MULTI_SCATTERING_LUT_RES_X: this.multiscatteringLutSize[0],
+                    MULTI_SCATTERING_LUT_RES_Y: this.multiscatteringLutSize[1],
+                    USE_MOON: Number(useMoon),
+                }
+            },
+        });
+    }
+
+    public makeRenderPass(resources: SkyAtmosphereResources, shadowBindGroups?: GPUBindGroup[], customUniformsBindGroups?: GPUBindGroup[]): RenderPass {
+        if (this.device !== resources.device) {
+            throw new Error(`[SkyViewLutPipeline::makeComputePass]: device mismatch`);
+        }
+        if (resources.atmosphereBuffer.size < ATMOSPHERE_BUFFER_SIZE) {
+            throw new Error(`[SkyViewLutPipeline::makeComputePass]: buffer too small for atmosphere parameters (${resources.atmosphereBuffer.size} < ${ATMOSPHERE_BUFFER_SIZE})`);
+        }
+        if (resources.uniformsBuffer && resources.uniformsBuffer.size < UNIFORMS_BUFFER_SIZE) {
+            throw new Error(`[SkyViewLutPipeline::makeComputePass]: buffer too small for config (${resources.atmosphereBuffer.size} < ${ATMOSPHERE_BUFFER_SIZE})`);
+        }
+        if (resources.multiScatteringLut.texture.width !== this.multiscatteringLutSize[0] || resources.multiScatteringLut.texture.height !== this.multiscatteringLutSize[1]) {
+            throw new Error(`[SkyViewLutPipeline::makeComputePass]: wrong texture size for multiple scattering LUT. expected '${this.multiscatteringLutSize}', got ${[resources.multiScatteringLut.texture.width, resources.multiScatteringLut.texture.height]}`);
+        }
+        if (resources.skyViewLut.texture.format !== this.skyViewLutFormat) {
+            throw new Error(`[SkyViewLutPipeline::makeComputePass]: wrong texture format for sky view LUT. expected '${this.skyViewLutFormat}', got ${resources.skyViewLut.texture.format}`);
+        }
+        if (resources.skyViewLut.texture.width !== this.skyViewLutSize[0] || resources.skyViewLut.texture.height !== this.skyViewLutSize[1]) {
+            throw new Error(`[SkyViewLutPipeline::makeComputePass]: wrong texture size for sky view LUT. expected '${this.skyViewLutSize}', got ${[resources.skyViewLut.texture.width, resources.skyViewLut.texture.height]}`);
+        }
+        const bindGroup = resources.device.createBindGroup({
+            label: `sky view LUT pass [${resources.label}]`,
+            layout: this.bindGroupLayout,
+            entries: ([
+                {
+                    binding: 0,
+                    resource: {
+                        buffer: resources.atmosphereBuffer,
+                    },
+                },
+                customUniformsBindGroups ? undefined : {
+                    binding: 1,
+                    resource: {
+                        buffer: resources.uniformsBuffer,
+                    },
+                },
+                {
+                    binding: 2,
+                    resource: resources.lutSampler,
+                },
+                {
+                    binding: 3,
+                    resource: resources.transmittanceLut.view,
+                },
+                {
+                    binding: 4,
+                    resource: resources.multiScatteringLut.view,
+                },
+            ].filter(e => e !== undefined) as GPUBindGroupEntry[])
+            .map((e, i) => {
+                e.binding = i;
+                return e;
+            }) as GPUBindGroupEntry[],
+        });
+        return new RenderPass(
+            this.pipeline,
+            [bindGroup, ...(shadowBindGroups ?? []), ...(customUniformsBindGroups ?? [])],
+        );
+    }
+}
+export class AerialPerspectiveLutRasterPipeline {
+    readonly device: GPUDevice;
+    readonly pipeline: GPURenderPipeline;
+    readonly bindGroupLayout: GPUBindGroupLayout;
+    readonly aerialPerspectiveLutFormat: GPUTextureFormat;
+    readonly aerialPerspectiveSliceCount: number;
+    readonly aerialPerspectiveDistancePerSlice: number;
+    readonly multiscatteringLutSize: [number, number];
+
+    constructor(device: GPUDevice, aerialPerspectiveLutFormat: GPUTextureFormat, aerialPerspectiveSliceCount: number, aerialPerspectiveDistancePerSlice: number, multiscatteringLutSize: [number, number], randomizeSampleOffsets: boolean, useMoon: boolean, shadowConfig?: ShadowConfig, customUniformsConfig?: CustomUniformsSourceConfig) {
+        this.device = device;
+        this.aerialPerspectiveLutFormat = aerialPerspectiveLutFormat;
+        this.aerialPerspectiveSliceCount = aerialPerspectiveSliceCount;
+        this.aerialPerspectiveDistancePerSlice = aerialPerspectiveDistancePerSlice;
+        this.multiscatteringLutSize = multiscatteringLutSize;
+        this.bindGroupLayout = device.createBindGroupLayout({
+            label: 'aerial perspective LUT pass',
+            entries: ([
+                {
+                    binding: 0,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    buffer: {
+                        type: 'uniform',
+                        hasDynamicOffset: false,
+                        minBindingSize: ATMOSPHERE_BUFFER_SIZE,
+                    },
+                },
+                customUniformsConfig ? undefined : {
+                    binding: 1,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    buffer: {
+                        type: 'uniform',
+                        hasDynamicOffset: false,
+                        minBindingSize: UNIFORMS_BUFFER_SIZE,
+                    },
+                },
+                {
+                    binding: 2,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    sampler: {
+                        type: 'filtering',
+                    },
+                },
+                {
+                    binding: 3,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    texture: {
+                        sampleType: 'float',
+                        viewDimension: '2d',
+                        multisampled: false,
+                    },
+                },
+                {
+                    binding: 4,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    texture: {
+                        sampleType: 'float',
+                        viewDimension: '2d',
+                        multisampled: false,
+                    },
+                },
+            ].filter(e => e !== undefined) as GPUBindGroupLayoutEntry[])
+            .map((e, i) => {
+                e.binding = i;
+                return e;
+            }) as GPUBindGroupLayoutEntry[],
+        });
+
+        const module = device.createShaderModule({
+            label: 'aerial perspective LUT',
+            code: `${shadowConfig?.wgslCode || 'fn get_shadow(p: vec3<f32>, i: u32) -> f32 { return 1.0; }'}\n${makeAerialPerspectiveLutShaderCode(aerialPerspectiveLutFormat, customUniformsConfig?.wgslCode)}`,
+        });
+
+        this.pipeline = device.createRenderPipeline({
+            label: 'aerial perspective LUT pass',
+            layout: device.createPipelineLayout({
+                label: 'aerial perspective LUT pass',
+                bindGroupLayouts: [this.bindGroupLayout, ...(shadowConfig?.bindGroupLayouts ?? []), ...(customUniformsConfig?.bindGroupLayouts ?? [])],
+            }),
+            vertex: {
+                module,
+            },
+            fragment: {
+                module,
+                targets: [{ format: this.aerialPerspectiveLutFormat, }],
+                constants: {
+                    AP_SLICE_COUNT: this.aerialPerspectiveSliceCount,
+                    AP_DISTANCE_PER_SLICE: this.aerialPerspectiveDistancePerSlice,
+                    MULTI_SCATTERING_LUT_RES_X: this.multiscatteringLutSize[0],
+                    MULTI_SCATTERING_LUT_RES_Y: this.multiscatteringLutSize[1],
+                    RANDOMIZE_SAMPLE_OFFSET: Number(randomizeSampleOffsets),
+                    USE_MOON: Number(useMoon),
+                },
+            },
+        });
+    }
+
+    public makeRenderPass(resources: SkyAtmosphereResources, shadowBindGroups?: GPUBindGroup[], customUniformsBindGroups?: GPUBindGroup[]): RenderPass {
+        if (this.device !== resources.device) {
+            throw new Error(`[AerialPerspectiveLutPipeline::makeComputePass]: device mismatch`);
+        }
+        if (resources.atmosphereBuffer.size < ATMOSPHERE_BUFFER_SIZE) {
+            throw new Error(`[AerialPerspectiveLutPipeline::makeComputePass]: buffer too small for atmosphere parameters (${resources.atmosphereBuffer.size} < ${ATMOSPHERE_BUFFER_SIZE})`);
+        }
+        if (resources.uniformsBuffer && resources.uniformsBuffer.size < UNIFORMS_BUFFER_SIZE) {
+            throw new Error(`[AerialPerspectiveLutPipeline::makeComputePass]: buffer too small for config (${resources.atmosphereBuffer.size} < ${ATMOSPHERE_BUFFER_SIZE})`);
+        }
+        if (resources.multiScatteringLut.texture.width !== this.multiscatteringLutSize[0] || resources.multiScatteringLut.texture.height !== this.multiscatteringLutSize[1]) {
+            throw new Error(`[AerialPerspectiveLutPipeline::makeComputePass]: wrong texture size for multiple scattering LUT. expected '${this.multiscatteringLutSize}', got ${[resources.multiScatteringLut.texture.width, resources.multiScatteringLut.texture.height]}`);
+        }
+        if (resources.aerialPerspectiveLut.texture.format !== this.aerialPerspectiveLutFormat) {
+            throw new Error(`[AerialPerspectiveLutPipeline::makeComputePass]: wrong texture format for aerial perspective LUT. expected '${this.aerialPerspectiveLutFormat}', got ${resources.aerialPerspectiveLut.texture.format}`);
+        }
+        if (resources.aerialPerspectiveLut.texture.depthOrArrayLayers !== this.aerialPerspectiveSliceCount) {
+            throw new Error(`[AerialPerspectiveLutPipeline::makeComputePass]: wrong texture depth for aerial perspective LUT. expected '${this.aerialPerspectiveSliceCount}', got ${resources.aerialPerspectiveLut.texture.depthOrArrayLayers}`);
+        }
+        const bindGroup = resources.device.createBindGroup({
+            label: `aerial perspective LUT pass [${resources.label}]`,
+            layout: this.bindGroupLayout,
+            entries: ([
+                {
+                    binding: 0,
+                    resource: {
+                        buffer: resources.atmosphereBuffer,
+                    },
+                },
+                customUniformsBindGroups ? undefined : {
+                    binding: 1,
+                    resource: {
+                        buffer: resources.uniformsBuffer,
+                    },
+                },
+                {
+                    binding: 2,
+                    resource: resources.lutSampler,
+                },
+                {
+                    binding: 3,
+                    resource: resources.transmittanceLut.view,
+                },
+                {
+                    binding: 4,
+                    resource: resources.multiScatteringLut.view,
+                },
+            ].filter(e => e !== undefined) as GPUBindGroupEntry[])
+            .map((e, i) => {
+                e.binding = i;
+                return e;
+            }) as GPUBindGroupEntry[],
+        });
+        return new RenderPass(
+            this.pipeline,
+            [bindGroup, ...(shadowBindGroups ?? []), ...(customUniformsBindGroups ?? [])],
+        );
+    }
+
+    get aerialPerspectiveInvDistancePerSlice(): number {
+        return 1.0 / this.aerialPerspectiveDistancePerSlice;
+    }
+}
+

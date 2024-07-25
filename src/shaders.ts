@@ -37,7 +37,7 @@ export function makeMultiScatteringLutShaderCode(multiScatteringLutFormat: GPUTe
 }
 
 export function makeSkyViewLutShaderCode(skyViewLutFormat: GPUTextureFormat = 'rgba16float', customUniforms?: string) {
-    const base = `${constantsWgsl}\n${intersectionWgsl}\n${mediumWgsl}\n${phaseWgsl}\n${uvWgsl}\n${uniformsWgsl}\n${customUniforms ? `${customUniforms}\n${customUniformsWgsl}\n` : ''}${coordinateSystemWgsl}\n${multipleScatteringWgsl}\n`;
+    const base = `${constantsWgsl}\n${intersectionWgsl}\n${mediumWgsl}\n${phaseWgsl}\n${uvWgsl}\n${uniformsWgsl}\n${customUniforms ? `${customUniforms}\n${customUniformsWgsl}\n` : ''}${coordinateSystemWgsl}\n${multipleScatteringWgsl}\n${fullScreenVertexShaderWgsl}\n`;
     let shader = renderSkyViewLutWgsl.replace('rgba16float', skyViewLutFormat);
     if (customUniforms) {
         shader = shader.replace('let config = config_buffer', 'let config = get_uniforms()');

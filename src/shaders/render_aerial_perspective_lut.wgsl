@@ -111,26 +111,18 @@ fn thread_z_to_slice(thread_z: u32) -> f32 {
 	return (slice * slice) * AP_SLICE_COUNT; // squared distribution
 }
 
-@compute
-@workgroup_size(WORKGROUP_SIZE_X, WORKGROUP_SIZE_Y, 1)
-fn render_aerial_perspective_lut(@builtin(global_invocation_id) global_id: vec3<u32>) {
-	let output_size = vec2<u32>(textureDimensions(aerial_perspective_lut).xy);
-	if output_size.x <= global_id.x || output_size.y <= global_id.y {
-		return;
-	}
-
+fn render_aerial_perspective_lut(pix: vec2<f32>, slice_id: u32) -> vec4<f32> {
 	let atmosphere = atmosphere_buffer;
 	let config = config_buffer;
 
-	let pix = vec2<f32>(global_id.xy) + 0.5;
-	let uv = pix / vec2<f32>(output_size.xy);
+	let uv = pix / vec2<f32>(32.0, 32.0); // todo: override constants
 
 	var world_dir = uv_to_world_dir(uv, config.inverse_projection, config.inverse_view);
 	let cam_pos = config.camera_world_position - atmosphere.planet_center;
 
 	var world_pos = cam_pos;
 
-	var t_max = aerial_perspective_slice_to_depth(thread_z_to_slice(global_id.z));
+	var t_max = aerial_perspective_slice_to_depth(thread_z_to_slice(slice_id));
 	var slice_start_pos = world_pos + t_max * world_dir;
 
 	var view_height = length(slice_start_pos);
@@ -144,20 +136,46 @@ fn render_aerial_perspective_lut(@builtin(global_invocation_id) global_id: vec3<
 	if view_height >= atmosphere.top_radius {
 		let prev_world_pos = world_pos;
 		if !move_to_atmosphere_top(&world_pos, world_dir, atmosphere.top_radius) {
-			textureStore(aerial_perspective_lut, global_id, vec4(0.0, 0.0, 0.0, 1.0));
-			return;
+			return vec4(0.0, 0.0, 0.0, 1.0);
 		}
 		let distance_to_atmosphere = length(prev_world_pos - world_pos);
 		if t_max < distance_to_atmosphere {
-			textureStore(aerial_perspective_lut, global_id, vec4(0.0, 0.0, 0.0, 1.0));
-			return;
+			return vec4(0.0, 0.0, 0.0, 1.0);
 		}
 		t_max = max(0.0, t_max - distance_to_atmosphere);
 	}
 
-	let sample_count = max(1.0, f32(global_id.z + 1) * 2.0);
+	let sample_count = max(1.0, f32(slice_id + 1) * 2.0);
 	let ss = integrate_scattered_luminance(uv, world_pos, world_dir, atmosphere, config, sample_count, t_max);
 
 	let transmittance = dot(ss.transmittance, vec3(1.0 / 3.0));
-	textureStore(aerial_perspective_lut, global_id, vec4(ss.luminance, 1.0 - transmittance));
+	return vec4(ss.luminance, 1.0 - transmittance);
+}
+
+struct VertexOut {
+	@builtin(position) position: vec4<f32>,
+	@location(0) @interpolate(flat) slice_id: u32,
+}
+
+@vertex
+fn vertex(@builtin(vertex_index) vertex_index: u32, @builtin(instance_index) instance_index: u32) -> VertexOut {
+	return VertexOut(vec4(vec2(f32((vertex_index << 1) & 2), f32(vertex_index & 2)) * 2 - 1, 0, 1), instance_index);
+}
+
+@fragment
+fn fragment(frag: VertexOut) -> @location(0) vec4<f32> {
+	return render_aerial_perspective_lut(frag.position.xy, frag.slice_id);
+}
+
+@compute
+@workgroup_size(WORKGROUP_SIZE_X, WORKGROUP_SIZE_Y, 1)
+fn compute(@builtin(global_invocation_id) global_id: vec3<u32>) {
+	let output_size = vec2<u32>(textureDimensions(aerial_perspective_lut).xy);
+	if output_size.x <= global_id.x || output_size.y <= global_id.y {
+		return;
+	}
+
+	let pix = vec2<f32>(global_id.xy) + 0.5;
+
+	textureStore(aerial_perspective_lut, global_id, render_aerial_perspective_lut(pix, global_id.z));
 }

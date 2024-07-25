@@ -48,12 +48,12 @@ export class ComputePass {
  */
 export class RenderPass {
     constructor(readonly pipeline: GPURenderPipeline, readonly bindGroups: GPUBindGroup[]) {}
-    encode(passEncoder: GPURenderPassEncoder | GPURenderBundleEncoder, resetBindGroups: boolean = false) {
+    encode(passEncoder: GPURenderPassEncoder | GPURenderBundleEncoder, resetBindGroups: boolean = false, firstInstance: number = 0) {
         passEncoder.setPipeline(this.pipeline);
         for (let i = 0; i < this.bindGroups.length; ++i) {
             passEncoder.setBindGroup(i, this.bindGroups[i]);
         }
-        passEncoder.draw(3);
+        passEncoder.draw(3, 1, 0, firstInstance);
         if (resetBindGroups) {
             for (let i = 0; i < this.bindGroups.length; ++i) {
                 passEncoder.setBindGroup(i, null);

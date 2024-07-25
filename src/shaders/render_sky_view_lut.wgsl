@@ -152,17 +152,9 @@ fn compute_world_dir(uv_in: vec2<f32>, sky_view_res: vec2<f32>, view_height: f32
 	);
 }
 
-@compute
-@workgroup_size(WORKGROUP_SIZE_X, WORKGROUP_SIZE_Y, 1)
-fn render_sky_view_lut(@builtin(global_invocation_id) global_id: vec3<u32>) {
-	let output_size = vec2<u32>(textureDimensions(sky_view_lut));
-	if output_size.x <= global_id.x || output_size.y <= global_id.y {
-		return;
-	}
+fn render_sky_view_lut(pix: vec2<f32>) -> vec4<f32> {
+	let sky_view_lut_res = vec2<f32>(SKY_VIEW_LUT_RES_X, SKY_VIEW_LUT_RES_Y); // using textureDimensions produces artefacts?
 
-	let sky_view_lut_res = vec2<f32>(SKY_VIEW_LUT_RES_X, SKY_VIEW_LUT_RES_Y); // vec2<f32>(output_size); <- tex dimensions produce artefacts!
-
-	let pix = vec2<f32>(global_id.xy) + 0.5;
 	let uv = pix / sky_view_lut_res;
 
 	let atmosphere = atmosphere_buffer;
@@ -182,11 +174,29 @@ fn render_sky_view_lut(@builtin(global_invocation_id) global_id: vec3<u32>) {
 	let world_dir = compute_world_dir(uv, sky_view_lut_res, view_height, atmosphere);
 
 	if !move_to_atmosphere_top(&world_pos, world_dir, atmosphere.top_radius) {
-		textureStore(sky_view_lut, global_id.xy, vec4<f32>(0, 0, 0, 1));
-		return;
+		return vec4<f32>(0, 0, 0, 1);
 	}
 
 	let ss = integrate_scattered_luminance(world_pos, world_dir, sun_dir, moon_dir, atmosphere, config);
 
-	textureStore(sky_view_lut, global_id.xy, vec4<f32>(ss.luminance, 1.0 - dot(ss.transmittance, vec3(1.0 / 3.0))));
+	return vec4<f32>(ss.luminance, 1.0 - dot(ss.transmittance, vec3(1.0 / 3.0)));
 }
+
+@fragment
+fn fragment(@builtin(position) coord: vec4<f32>) -> @location(0) vec4<f32> {
+	return render_sky_view_lut(coord.xy);
+}
+
+@compute
+@workgroup_size(WORKGROUP_SIZE_X, WORKGROUP_SIZE_Y, 1)
+fn compute(@builtin(global_invocation_id) global_id: vec3<u32>) {
+	let output_size = vec2<u32>(textureDimensions(sky_view_lut));
+	if output_size.x <= global_id.x || output_size.y <= global_id.y {
+		return;
+	}
+
+	let pix = vec2<f32>(global_id.xy) + 0.5;
+
+	textureStore(sky_view_lut, global_id.xy, render_sky_view_lut(pix));
+}
+

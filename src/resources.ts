@@ -135,7 +135,8 @@ export class SkyAtmosphereResources {
             label: `sky view LUT [${this.label}]`,
             size: config.lookUpTables?.skyViewLut?.size ?? DEFAULT_SKY_VIEW_LUT_SIZE,
             format: config.lookUpTables?.skyViewLut?.format ?? SKY_VIEW_LUT_FORMAT,
-            usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING,
+            // todo: either storage or render
+            usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT,
         }));
 
         this.aerialPerspectiveLut = new LookUpTable(device.createTexture({
@@ -143,7 +144,8 @@ export class SkyAtmosphereResources {
             size: config.lookUpTables?.aerialPerspectiveLut?.size ?? DEFAULT_AERIAL_PERSPECTIVE_LUT_SIZE,
             format: config.lookUpTables?.aerialPerspectiveLut?.format ?? AERIAL_PERSPECTIVE_LUT_FORMAT,
             dimension: '3d',
-            usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING,
+            // todo: either storage or render
+            usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT,
         }));
     }
 
