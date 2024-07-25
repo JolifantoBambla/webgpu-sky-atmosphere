@@ -103,7 +103,7 @@ export function makeUi(atmosphere, camera, showPerformanceGraph) {
         info: `WASD: move horizontally
 Arrow Up / Down: move vertically
 Space (hold): move faster
-Mouse (click on canvas): look around
+Mouse (click on canvas first): look around
 Escape: exit pointer lock on canvas`,
     }, 'info', {
         label: null,
@@ -228,11 +228,6 @@ Escape: exit pointer lock on canvas`,
     renderSettingsFolder.addBinding(params.renderSettings, 'rayMarch', {label: 'Full-resolution ray marching'});
     renderSettingsFolder.addBinding(params.renderSettings, 'coloredTransmittance', {label: 'Colored transmittance (ray march only)'});
     renderSettingsFolder.addBinding(params.renderSettings, 'compute', {label: 'Use compute'});
-    renderSettingsFolder.addBinding(params.renderSettings.sun, 'illuminance', {color: {type: 'float'}, label: 'Sun illuminance (outer space)'});
-    renderSettingsFolder.addBinding(params.renderSettings.sun, 'illuminanceFactor', {min: 0.1, max: 10.0, step: 0.1, label: 'Sun illum. scale'});
-    renderSettingsFolder.addBinding(params.renderSettings.sun, 'direction', {picker: 'inline', expanded: true, y: {inverted: true, min: -1.0, max: 1.0}, x: {min: -1.0, max: 1.0}, label: 'Sun direction'});
-    renderSettingsFolder.addBinding(params.renderSettings.sun, 'diskDiameter', {min: 0.1, max: 100.0, step: 0.1, label: 'Sun disk ang. diameter (deg)'});
-    renderSettingsFolder.addBinding(params.renderSettings.sun, 'diskIlluminance', {min: 1.0, max: 100.0, step: 1, label: 'Sun disk luminance scale'});
     const rayMarchMinSlider = renderSettingsFolder.addBinding(params.renderSettings, 'rayMarchingMinSpp', {min: 14, max: 99, step: 1, label: 'Min. SPP'});
     const rayMarchMaxSlider = renderSettingsFolder.addBinding(params.renderSettings, 'rayMarchingMaxSpp', {min: 15, max: 100, step: 1, label: 'Max. SPP'});
     rayMarchMaxSlider.on('change', e => {
@@ -289,9 +284,20 @@ Escape: exit pointer lock on canvas`,
             };
         });
 
+    const sunFolder = pane.addFolder({
+        title: 'Sun',
+        expanded: !showPerformanceGraph,
+    });
+    sunFolder.addBinding(params.renderSettings.sun, 'illuminance', {color: {type: 'float'}, label: 'Illuminance (outer space)'});
+    sunFolder.addBinding(params.renderSettings.sun, 'illuminanceFactor', {min: 0.1, max: 10.0, step: 0.1, label: 'Illuminance scale'});
+    sunFolder.addBinding(params.renderSettings.sun, 'direction', {picker: 'inline', expanded: true, y: {inverted: true, min: -1.0, max: 1.0}, x: {min: -1.0, max: 1.0}, label: 'Direction'});
+    sunFolder.addBinding(params.renderSettings.sun, 'diskDiameter', {min: 0.1, max: 100.0, step: 0.1, label: 'Sun disk angular diameter (deg)'});
+    sunFolder.addBinding(params.renderSettings.sun, 'diskIlluminance', {min: 1.0, max: 100.0, step: 1, label: 'Sun disk luminance scale'});
+    
+
     const atmosphereFolder = pane.addFolder({
         title: 'Atmosphere',
-        expanded: true,
+        expanded: !showPerformanceGraph,
     });
     atmosphereFolder.addBinding(params.atmosphereHelper, 'bottomRadius', {min: 100.0, max: 10000.0, step: 10.0, label: 'ground radius (in km)'})
         .on('change', e => {
