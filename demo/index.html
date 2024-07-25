@@ -95,21 +95,21 @@
             }
 
             let timeStampQuery = null;
+            const numTimestamps = 10;
             let queryBuffers = [];
             if (device.features.has('timestamp-query')) {
-                const numIndices = 4;
                 timeStampQuery = device.createQuerySet({
                     type: 'timestamp',
-                    count: numIndices,
+                    count: numTimestamps,
                 });
                 for (let i = 0; i < 5; ++i) {
                     queryBuffers.push({
                         read: device.createBuffer({
-                            size: numIndices * 8,
+                            size: numTimestamps * 8,
                             usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
                         }),
                         resolve: device.createBuffer({
-                            size: numIndices * 8,
+                            size: numTimestamps * 8,
                             usage: GPUBufferUsage.QUERY_RESOLVE | GPUBufferUsage.COPY_SRC,
                         }),
                     });
@@ -769,25 +769,82 @@
                 dragonRenderer.encode(geometryPass);
                 geometryPass.end();
 
-                const computePass = encoder.beginComputePass({
-                    timestampWrites: timeStampQuery ? {
-                        querySet: timeStampQuery,
-                        beginningOfPassWriteIndex: 0,
-                        endOfPassWriteIndex: 1,
-                    } : undefined,
-                });
-                if (params.renderSettings.compute) {
+                const skyRenderer = params.renderSettings.compute ?
                     (params.renderSettings.inMeters ?
                         (params.renderSettings.coloredTransmittance ? skyAtmosphereRendererMeters : skyAtmosphereRendererMetersGrayscale) :
                         (params.renderSettings.coloredTransmittance ? skyAtmosphereRenderer : skyAtmosphereRendererGrayscale)
-                    ).renderSkyAtmosphere(computePass, config, params.atmosphere, params.renderSettings.rayMarch);
-                } else {
+                    ) :
                     (params.renderSettings.inMeters ?
                         (params.renderSettings.coloredTransmittance ? skyAtmosphereRasterRendererMeters : skyAtmosphereRasterRendererMetersGrayscale) :
                         (params.renderSettings.coloredTransmittance ? skyAtmosphereRasterRenderer : skyAtmosphereRasterRendererGrayscale)
-                    ).renderSkyAtmosphereLuts(computePass, config, params.atmosphere, params.renderSettings.rayMarch);
+                    );
+
+                
+                if (timeStampQuery) {
+                    skyRenderer.updateAtmosphere(params.atmosphere);
+                    skyRenderer.updateUniforms(config);
+
+                    const transmittanceLutPass = encoder.beginComputePass({
+                        timestampWrites: {
+                            querySet: timeStampQuery,
+                            beginningOfPassWriteIndex: 0,
+                            endOfPassWriteIndex: 1,
+                        },
+                    });
+                    skyRenderer.renderTransmittanceLut(transmittanceLutPass);
+                    transmittanceLutPass.end();
+
+                    const multiScatteringLutPass = encoder.beginComputePass({
+                        timestampWrites: {
+                            querySet: timeStampQuery,
+                            beginningOfPassWriteIndex: 2,
+                            endOfPassWriteIndex: 3,
+                        },
+                    });
+                    skyRenderer.renderMultiScatteringLut(multiScatteringLutPass);
+                    multiScatteringLutPass.end();
+
+                    if (!params.renderSettings.rayMarch) {
+                        const skyViewLutPass = encoder.beginComputePass({
+                            timestampWrites: {
+                                querySet: timeStampQuery,
+                                beginningOfPassWriteIndex: 4,
+                                endOfPassWriteIndex: 5,
+                            },
+                        });
+                        skyRenderer.renderSkyViewLut(skyViewLutPass);
+                        skyViewLutPass.end();
+
+                        const aerialPerspectiveLutPass = encoder.beginComputePass({
+                            timestampWrites: {
+                                querySet: timeStampQuery,
+                                beginningOfPassWriteIndex: 6,
+                                endOfPassWriteIndex: 7,
+                            },
+                        });
+                        skyRenderer.renderAerialPerspectiveLut(aerialPerspectiveLutPass);
+                        aerialPerspectiveLutPass.end();
+                    }
+                    if (params.renderSettings.compute) {
+                        const skyPass = encoder.beginComputePass({
+                            timestampWrites: {
+                                querySet: timeStampQuery,
+                                beginningOfPassWriteIndex: 8,
+                                endOfPassWriteIndex: 9,
+                            },
+                        });
+                        skyRenderer.renderSky(skyPass, params.renderSettings.rayMarch);
+                        skyPass.end();
+                    }
+                } else {
+                    const computePass = encoder.beginComputePass();
+                    if (params.renderSettings.compute) {
+                        skyRenderer.renderSkyAtmosphere(computePass, config, params.atmosphere, params.renderSettings.rayMarch);
+                    } else {
+                        skyRenderer.renderSkyAtmosphereLuts(computePass, config, params.atmosphere, params.renderSettings.rayMarch);
+                    }
+                    computePass.end();
                 }
-                computePass.end();
 
                 if (!params.renderSettings.compute) {
                     const renderPass = encoder.beginRenderPass({
@@ -798,21 +855,18 @@
                         }],
                         timestampWrites: timeStampQuery ? {
                             querySet: timeStampQuery,
-                            beginningOfPassWriteIndex: 2,
-                            endOfPassWriteIndex: 3,
+                            beginningOfPassWriteIndex: 8,
+                            endOfPassWriteIndex: 9,
                         } : undefined,
                     });
-                    (params.renderSettings.inMeters ?
-                        (params.renderSettings.coloredTransmittance ? skyAtmosphereRasterRendererMeters : skyAtmosphereRasterRendererMetersGrayscale) :
-                        (params.renderSettings.coloredTransmittance ? skyAtmosphereRasterRenderer : skyAtmosphereRasterRendererGrayscale)
-                    ).renderSky(renderPass, params.renderSettings.rayMarch);
+                    skyRenderer.renderSky(renderPass, params.renderSettings.rayMarch);
                     renderPass.end();
                 }
 
                 if (timeStampQuery) {
                     const resolveBuffer = queryBuffers[frameId % queryBuffers.length].resolve;
                     const readBuffer = queryBuffers[frameId % queryBuffers.length].read;
-                    encoder.resolveQuerySet(timeStampQuery, 0, 4, resolveBuffer, 0);
+                    encoder.resolveQuerySet(timeStampQuery, 0, numTimestamps, resolveBuffer, 0);
                     if (readBuffer.mapState === 'unmapped') {
                         encoder.copyBufferToBuffer(resolveBuffer, 0, readBuffer, 0, resolveBuffer.size);
                     } else {
@@ -841,10 +895,27 @@
                         readBuffer.mapAsync(GPUMapMode.READ)
                             .then(_ => {
                                 const timestamps = new BigInt64Array(readBuffer.getMappedRange());
-                                const lutsDuration = Number(timestamps[1] - timestamps[0]) / 1_000_000;
-                                const skyDuration = params.renderSettings.compute ? 0 : Number(timestamps[3] - timestamps[2]) / 1_000_000;
-                                params.monitoring.timestamp = lutsDuration + skyDuration;
+                                const transmittanceLutDuration = Number(timestamps[1] - timestamps[0]) / 1_000_000;
+                                const multiScatteringLutDruation = Number(timestamps[3] - timestamps[2]) / 1_000_000;
+                                const skyViewLutDuration = params.renderSettings.rayMarch ? 0 : Number(timestamps[5] - timestamps[4]) / 1_000_000;
+                                const aerialPerspectiveLutDuration = params.renderSettings.rayMarch ? 0 : Number(timestamps[7] - timestamps[6]) / 1_000_000;
+                                const skyDuration = Number(timestamps[9] - timestamps[8]) / 1_000_000;
                                 readBuffer.unmap();
+
+                                const constantDuration = transmittanceLutDuration + multiScatteringLutDruation;
+                                const dynamicDuration = skyViewLutDuration + aerialPerspectiveLutDuration;
+                                const lutsDuration = constantDuration + dynamicDuration;
+                                const totalDuration = lutsDuration + skyDuration;
+
+                                params.monitoring.transtmittance = transmittanceLutDuration;
+                                params.monitoring.multiScattering = multiScatteringLutDruation;
+                                params.monitoring.skyView = skyViewLutDuration;
+                                params.monitoring.aerialPerspective = aerialPerspectiveLutDuration;
+                                params.monitoring.sky = skyDuration;
+                                params.monitoring.constant = constantDuration;
+                                params.monitoring.dynamic = dynamicDuration;
+                                params.monitoring.luts = lutsDuration;
+                                params.monitoring.total = totalDuration;
                             });
                     }
                 }

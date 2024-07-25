@@ -79,7 +79,15 @@ export function makeUi(atmosphere, camera, showPerformanceGraph) {
             },
         },
         monitoring: {
-            timestamp: 0,
+            transmittance: 0,
+            multiScattering: 0,
+            skyView: 0,
+            aerialPerspective: 0,
+            sky: 0,
+            constant: 0,
+            dynamic: 0,
+            luts: 0,
+            total: 0,
         },
     };
     params.scaleFromKilometers = _ => params.renderSettings.inMeters ? 1000.0 : 1.0;
@@ -105,19 +113,121 @@ Escape: exit pointer lock on canvas`,
     });
 
     if (showPerformanceGraph) {
-        pane.addBinding(params.monitoring, 'timestamp', {
-            label: 'LUTs + Sky performance in ms (hover)',
+        const performanceFolder = pane.addFolder({
+            title: 'Performance',
+            expanded: true,
+        });
+        performanceFolder.addBinding(params.monitoring, 'transmittance', {
+            label: 'Transmittance LUT ([0, 1] ms)',
             readonly: true,
             view: 'graph',
             min: 0,
-            max: 16.7,
+            max: 1,
         });
+        performanceFolder.addBinding(params.monitoring, 'transmittance', {
+            label: '',
+            readonly: true,
+        });
+        performanceFolder.addBinding(params.monitoring, 'multiScattering', {
+            label: 'Multiple Scattering LUT ([0, 1] ms)',
+            readonly: true,
+            view: 'graph',
+            min: 0,
+            max: 1,
+        });
+        performanceFolder.addBinding(params.monitoring, 'multiScattering', {
+            label: '',
+            readonly: true,
+        });
+        performanceFolder.addBinding(params.monitoring, 'skyView', {
+            label: 'Sky View LUT ([0, 1] ms)',
+            readonly: true,
+            view: 'graph',
+            min: 0,
+            max: 1,
+        });
+        performanceFolder.addBinding(params.monitoring, 'skyView', {
+            label: '',
+            readonly: true,
+        });
+        performanceFolder.addBinding(params.monitoring, 'aerialPerspective', {
+            label: 'Aerial Perspective LUT ([0, 1] ms)',
+            readonly: true,
+            view: 'graph',
+            min: 0,
+            max: 1,
+        });
+        performanceFolder.addBinding(params.monitoring, 'aerialPerspective', {
+            label: '',
+            readonly: true,
+        });
+        performanceFolder.addBinding(params.monitoring, 'sky', {
+            label: 'Sky  ([0, 5] ms)',
+            readonly: true,
+            view: 'graph',
+            min: 0,
+            max: 5,
+        });
+        performanceFolder.addBinding(params.monitoring, 'sky', {
+            label: '',
+            readonly: true,
+        });
+        performanceFolder.addBlade({view: 'separator'});
+        performanceFolder.addBinding(params.monitoring, 'constant', {
+            label: 'Constant LUTs ([0, 1] ms)',
+            readonly: true,
+            view: 'graph',
+            min: 0,
+            max: 1,
+        });
+        performanceFolder.addBinding(params.monitoring, 'constant', {
+            label: '',
+            readonly: true,
+        });
+        performanceFolder.addBinding(params.monitoring, 'dynamic', {
+            label: 'Dynamic LUTs ([0, 1] ms)',
+            readonly: true,
+            view: 'graph',
+            min: 0,
+            max: 1,
+        });
+        performanceFolder.addBinding(params.monitoring, 'dynamic', {
+            label: '',
+            readonly: true,
+        });
+        performanceFolder.addBinding(params.monitoring, 'luts', {
+            label: 'LUTs ([0, 1] ms)',
+            readonly: true,
+            view: 'graph',
+            min: 0,
+            max: 1,
+        });
+        performanceFolder.addBinding(params.monitoring, 'luts', {
+            label: '',
+            readonly: true,
+        });
+        performanceFolder.addBlade({view: 'separator'});
+        performanceFolder.addBinding(params.monitoring, 'total', {
+            label: 'Total  ([0, 16.6] ms)',
+            readonly: true,
+            view: 'graph',
+            min: 0,
+            max: 16.6,
+        });
+        performanceFolder.addBinding(params.monitoring, 'total', {
+            label: '',
+            readonly: true,
+        });
+
     }
 
     const renderSettingsFolder = pane.addFolder({
         title: 'Render settings',
         expanded: true,
     });
+    renderSettingsFolder.addBinding(params.renderSettings, 'rayMarch', {label: 'Full-resolution ray marching'});
+    renderSettingsFolder.addBinding(params.renderSettings, 'coloredTransmittance', {label: 'Colored transmittance (ray march only)'});
+    renderSettingsFolder.addBinding(params.renderSettings, 'compute', {label: 'Use compute'});
     renderSettingsFolder.addBinding(params.renderSettings.sun, 'illuminance', {color: {type: 'float'}, label: 'Sun illuminance (outer space)'});
     renderSettingsFolder.addBinding(params.renderSettings.sun, 'illuminanceFactor', {min: 0.1, max: 10.0, step: 0.1, label: 'Sun illum. scale'});
     renderSettingsFolder.addBinding(params.renderSettings.sun, 'direction', {picker: 'inline', expanded: true, y: {inverted: true, min: -1.0, max: 1.0}, x: {min: -1.0, max: 1.0}, label: 'Sun direction'});
@@ -133,10 +243,7 @@ Escape: exit pointer lock on canvas`,
             params.renderSettings.rayMarchingMaxSpp = Math.max(params.renderSettings.rayMarchingMaxSpp, e.value + 1);
             rayMarchMaxSlider.refresh();
         });
-    
-    renderSettingsFolder.addBinding(params.renderSettings, 'rayMarch', {label: 'Full-resolution ray marching'});
-    renderSettingsFolder.addBinding(params.renderSettings, 'coloredTransmittance', {label: 'Colored transmittance (ray march only)'});
-    renderSettingsFolder.addBinding(params.renderSettings, 'compute', {label: 'Use compute'});
+
     renderSettingsFolder.addBinding(params.renderSettings, 'scale', {label: 'Scale', options: { '1 = 1km': '1 = 1km', '1 = 1m': '1 = 1m', }})
         .on('change', e => {
             const old = params.renderSettings.inMeters;
