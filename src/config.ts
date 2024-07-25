@@ -307,6 +307,13 @@ export interface SkyRendererRasterConfig extends SkyRendererConfigBase {
     renderTargetFormat: GPUTextureFormat,
 
     /**
+     * If this is true, the sky rendering passes are pre-recorded into internally managed `GPURenderBundle`s instead of encoding the passes each frame. 
+     * 
+     * Defaults to true.
+     */
+    recordInternalRenderBundles?: boolean,
+
+    /**
      * Settings for the full-resolution ray marching pass.
      */
     rayMarch?: FullResolutionRayMarchConfig,

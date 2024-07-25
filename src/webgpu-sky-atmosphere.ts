@@ -867,11 +867,18 @@ export class SkyAtmosphereComputeRenderer extends SkyAtmosphereRenderer {
 export class SkyAtmosphereRasterRenderer extends SkyAtmosphereRenderer {
     private renderSkyWithLutsBindGroupLayout: GPUBindGroupLayout;
     private renderSkyWithLutsPass: RenderPass;
+    private renderSkyWithLutsBundle?: GPURenderBundle;
+    private renderSkyWithLutsTargetFormats: GPUTextureFormat[];
+
     private renderSkyRaymarchingBindGroupLayout: GPUBindGroupLayout;
     private renderSkyRaymarchingPass: RenderPass;
+    private renderSkyRaymarchingBundle?: GPURenderBundle;
+    private renderSkyRaymarchingTargetFormats: GPUTextureFormat[];
+
 
     private rayMarchDistantSky: boolean;
 
+    
     /**
      * Creates a {@link SkyAtmosphereRasterRenderer}.
      * @param device The `GPUDevice` used to create internal resources (textures, pipelines, etc.).
@@ -1113,6 +1120,8 @@ export class SkyAtmosphereRasterRenderer extends SkyAtmosphereRenderer {
                 }),
                 [withLutsBindGroup, ...(config.customUniformsSource?.bindGroups ?? [])],
             );
+
+            this.renderSkyWithLutsTargetFormats = targets.map(t => t.format);
         }
 
         // render sky raymarching
@@ -1192,11 +1201,16 @@ export class SkyAtmosphereRasterRenderer extends SkyAtmosphereRenderer {
                     ...(config.customUniformsSource?.bindGroups ?? []),
                 ],
             );
+
+            this.renderSkyRaymarchingTargetFormats = targets.map(t => t.format);
         }
 
+        if (config.skyRenderer.recordInternalRenderBundles ?? true) {
+            [this.renderSkyWithLutsBundle, this.renderSkyRaymarchingBundle] = this.recordBundles();
+        }
     }
 
-    private makeBindGroups(depthBuffer: GPUTextureView | GPUTexture,): [GPUBindGroup, GPUBindGroup] {
+    private makeBindGroups(depthBuffer: GPUTextureView | GPUTexture): [GPUBindGroup, GPUBindGroup] {
         const renderSkyBindGroupBaseEntries: GPUBindGroupEntry[] = [
             {
                 binding: 0,
@@ -1285,6 +1299,24 @@ export class SkyAtmosphereRasterRenderer extends SkyAtmosphereRenderer {
         ];
     }
 
+    private recordBundles(): [GPURenderBundle, GPURenderBundle] {
+        const withLutsEncoder = this.resources.device.createRenderBundleEncoder({
+            label: 'Render sky with LUTs',
+            colorFormats: this.renderSkyWithLutsTargetFormats,
+        });
+        this.renderSkyWithLuts(withLutsEncoder);
+        const renderSkyWithLutsBundle = withLutsEncoder.finish();
+
+        const rayMarchEncoder = this.resources.device.createRenderBundleEncoder({
+            label: 'Render sky with LUTs',
+            colorFormats: this.renderSkyRaymarchingTargetFormats,
+        });
+        this.renderSkyRaymarching(rayMarchEncoder);
+        const renderSkyRaymarchingBundle = rayMarchEncoder.finish();
+
+        return [renderSkyWithLutsBundle, renderSkyRaymarchingBundle];
+    }
+
     /**
      * Replaces potentially screen-size dependent external resources (depth buffer) in the internal bind groups.
      *
@@ -1297,6 +1329,10 @@ export class SkyAtmosphereRasterRenderer extends SkyAtmosphereRenderer {
         const [withLutsBindGroup, rayMarchingBindGroup] = this.makeBindGroups(depthBuffer);
         this.renderSkyWithLutsPass.replaceBindGroup(0, withLutsBindGroup);
         this.renderSkyRaymarchingPass.replaceBindGroup(0, rayMarchingBindGroup);
+
+        if (this.renderSkyWithLutsBundle && this.renderSkyRaymarchingBundle) {
+            [this.renderSkyWithLutsBundle, this.renderSkyRaymarchingBundle] = this.recordBundles();
+        }
     }
 
     /**
@@ -1310,7 +1346,11 @@ export class SkyAtmosphereRasterRenderer extends SkyAtmosphereRenderer {
      * @see {@link renderDynamicLuts}: To initialize the lookup tables required, call this function.
      */
     public renderSkyWithLuts(passEncoder: GPURenderPassEncoder | GPURenderBundleEncoder) {
-        this.renderSkyWithLutsPass.encode(passEncoder);
+        if (passEncoder instanceof GPURenderPassEncoder && this.renderSkyWithLutsBundle) {
+            passEncoder.executeBundles([this.renderSkyWithLutsBundle]);
+        } else {
+            this.renderSkyWithLutsPass.encode(passEncoder);
+        }
     }
 
     /**
@@ -1324,7 +1364,11 @@ export class SkyAtmosphereRasterRenderer extends SkyAtmosphereRenderer {
      * @see {@link renderConstantLuts}: To initialize the lookup tables required, call this function.
      */
     public renderSkyRaymarching(passEncoder: GPURenderPassEncoder | GPURenderBundleEncoder) {
-        this.renderSkyRaymarchingPass.encode(passEncoder);
+        if (passEncoder instanceof GPURenderPassEncoder && this.renderSkyRaymarchingBundle) {
+            passEncoder.executeBundles([this.renderSkyRaymarchingBundle]);
+        } else {
+            this.renderSkyRaymarchingPass.encode(passEncoder);
+        }
     }
 
     /**
