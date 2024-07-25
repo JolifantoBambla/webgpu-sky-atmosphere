@@ -39,7 +39,7 @@ To render the clear sky / atmosphere, use a `SkyAtmosphereComputeRenderer`:
 import { SkyAtmosphereComputeRenderer } from 'webgpu-sky-atmosphere';
 
 // during setup
-const skyRenderer = new SkyAtmosphereComputeRenderer(device, {
+const skyRenderer = SkyAtmosphereComputeRenderer.create(device, {
   // configurate the renderer here
   skyRenderer: {
     backBuffer: {
@@ -57,6 +57,10 @@ const skyRenderer = new SkyAtmosphereComputeRenderer(device, {
   },
 });
 
+// or use the async version
+const skyRenderer = await SkyAtmosphereComputeRenderer.createAsync(device, { /* config */ });
+
+
 // during render loop
 const skyUniforms = {
   camera: {
@@ -73,6 +77,7 @@ const skyPass = commandEncoder.beginComputePass();
 skyRenderer.renderSkyAtmosphere(skyPass, skyUniforms);
 skyPass.end();
 
+
 // and in case of a resolution change: 
 skyRenderer.onResize({
   depthBuffer,
@@ -87,7 +92,7 @@ Or, if you prefer render passes / bundles, use a `SkyAtmosphereRasterRenderer`:
 import { SkyAtmosphereRasterRenderer } from 'webgpu-sky-atmosphere';
 
 // during setup
-const skyRenderer = new SkyAtmosphereRasterRenderer(device, {
+const skyRenderer = SkyAtmosphereRasterRenderer.create(device, {
   // configurate the renderer here
   skyRenderer: {
     // the format of the render target at location 0
@@ -98,6 +103,10 @@ const skyRenderer = new SkyAtmosphereRasterRenderer(device, {
     },
   },
 });
+
+// or use the async version
+const skyRenderer = await SkyAtmosphereRasterRenderer.createAsync(device, { /* config */ });
+
 
 // during render loop
 const skyUniforms = {
@@ -116,6 +125,7 @@ const skyPass = commandEncoder.beginRenderPass({
 skyRenderer.renderSky(skyPass);
 skyPass.end();
 
+
 // and in case of a resolution change: 
 skyRenderer.onResize(depthBuffer);
 ```
@@ -127,9 +137,13 @@ If you only need the lookup tables and want to roll your own sky renderer, use a
 import { SkyAtmosphereRenderer } from 'webgpu-sky-atmosphere';
 
 // during setup
-const skyRenderer = new SkyAtmosphereRenderer(device, {
+const skyRenderer = SkyAtmosphereRenderer.create(device, {
   // configurate the renderer here or use the defaults
 });
+
+// or use the async version
+const skyRenderer = await SkyAtmosphereRenderer.createAsync(device, { /* config */ });
+
 
 // during render loop
 const skyUniforms = {
