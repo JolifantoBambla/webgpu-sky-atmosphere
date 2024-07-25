@@ -95,7 +95,7 @@
             }
 
             let timeStampQuery = null;
-            const numTimestamps = 10;
+            const numTimestamps = 8 + 32 * 2;
             let queryBuffers = [];
             if (device.features.has('timestamp-query')) {
                 timeStampQuery = device.createQuerySet({
@@ -805,32 +805,36 @@
                     multiScatteringLutPass.end();
 
                     if (!params.renderSettings.rayMarch) {
-                        const skyViewLutPass = encoder.beginComputePass({
-                            timestampWrites: {
-                                querySet: timeStampQuery,
-                                beginningOfPassWriteIndex: 4,
-                                endOfPassWriteIndex: 5,
-                            },
-                        });
-                        skyRenderer.renderSkyViewLut(skyViewLutPass);
-                        skyViewLutPass.end();
+                        if (params.renderSettings.compute) {
+                            const skyViewLutPass = encoder.beginComputePass({
+                                timestampWrites: {
+                                    querySet: timeStampQuery,
+                                    beginningOfPassWriteIndex: 4,
+                                    endOfPassWriteIndex: 5,
+                                },
+                            });
+                            skyRenderer.renderSkyViewLut(skyViewLutPass);
+                            skyViewLutPass.end();
 
-                        const aerialPerspectiveLutPass = encoder.beginComputePass({
-                            timestampWrites: {
-                                querySet: timeStampQuery,
-                                beginningOfPassWriteIndex: 6,
-                                endOfPassWriteIndex: 7,
-                            },
-                        });
-                        skyRenderer.renderAerialPerspectiveLut(aerialPerspectiveLutPass);
-                        aerialPerspectiveLutPass.end();
+                            const aerialPerspectiveLutPass = encoder.beginComputePass({
+                                timestampWrites: {
+                                    querySet: timeStampQuery,
+                                    beginningOfPassWriteIndex: 6,
+                                    endOfPassWriteIndex: 7,
+                                },
+                            });
+                            skyRenderer.renderAerialPerspectiveLut(aerialPerspectiveLutPass);
+                            aerialPerspectiveLutPass.end();
+                        } else {
+                            skyRenderer.rasterDynamicLuts(encoder, config, timeStampQuery);
+                        }
                     }
                     if (params.renderSettings.compute) {
                         const skyPass = encoder.beginComputePass({
                             timestampWrites: {
                                 querySet: timeStampQuery,
-                                beginningOfPassWriteIndex: 8,
-                                endOfPassWriteIndex: 9,
+                                beginningOfPassWriteIndex: numTimestamps - 2,
+                                endOfPassWriteIndex: numTimestamps - 1,
                             },
                         });
                         skyRenderer.renderSky(skyPass, params.renderSettings.rayMarch);
@@ -855,8 +859,8 @@
                         }],
                         timestampWrites: timeStampQuery ? {
                             querySet: timeStampQuery,
-                            beginningOfPassWriteIndex: 8,
-                            endOfPassWriteIndex: 9,
+                            beginningOfPassWriteIndex: numTimestamps - 2,
+                            endOfPassWriteIndex: numTimestamps  - 1,
                         } : undefined,
                     });
                     skyRenderer.renderSky(renderPass, params.renderSettings.rayMarch);
@@ -898,8 +902,17 @@
                                 const transmittanceLutDuration = Number(timestamps[1] - timestamps[0]) / 1_000_000;
                                 const multiScatteringLutDruation = Number(timestamps[3] - timestamps[2]) / 1_000_000;
                                 const skyViewLutDuration = params.renderSettings.rayMarch ? 0 : Number(timestamps[5] - timestamps[4]) / 1_000_000;
-                                const aerialPerspectiveLutDuration = params.renderSettings.rayMarch ? 0 : Number(timestamps[7] - timestamps[6]) / 1_000_000;
-                                const skyDuration = Number(timestamps[9] - timestamps[8]) / 1_000_000;
+                                let aerialPerspectiveLutDuration = 0;
+                                if (!params.renderSettings.rayMarch) {
+                                    if (params.renderSettings.compute) {
+                                        aerialPerspectiveLutDuration = Number(timestamps[7] - timestamps[6]) / 1_000_000;
+                                    } else {
+                                        for (let i = 0; i < 32; ++i) {
+                                            aerialPerspectiveLutDuration += Number(timestamps[7 + i * 2] - timestamps[6 + i * 2]) / 1_000_000;
+                                        }
+                                    }
+                                }
+                                const skyDuration = Number(timestamps[numTimestamps - 1] - timestamps[numTimestamps - 2]) / 1_000_000;
                                 readBuffer.unmap();
 
                                 const constantDuration = transmittanceLutDuration + multiScatteringLutDruation;
