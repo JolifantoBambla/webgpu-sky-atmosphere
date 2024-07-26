@@ -8,7 +8,7 @@ Renders the clear sky / atmosphere for both ground and space views as a post pro
 
 Find the docs [here](https://jolifantobambla.github.io/webgpu-sky-atmosphere/).
 
-Try it out [here](https://jolifantobambla.github.io/webgpu-sky-atmosphere/demo/).
+Try it out [here](https://jolifantobambla.github.io/webgpu-sky-atmosphere/demo/) (requires WebGPU support).
 
 
 ## Installation
@@ -315,6 +315,7 @@ Use the `Uniforms` to adjust the sun disk's appearance:
 ```js
 const uniforms = {
   sun: {
+    ...
     diskAngularDiameter: 0.0095, // angular diameter in radians
     diskLuminanceScale: 20.0, // make the disk appear brighter
   },
@@ -350,7 +351,7 @@ It should return a floating point value in the range [0, 1], where 1 implies tha
 The `light_index` parameter refers to the index of the atmosphere light, where `0` refers to the sun and `1` refers to the moon.
 Additionally, the WGSL code should also define all external bind groups required by the shadowing implementation.
 
-Except for the `get_shadow` interface, the `SkyAtmosphereLutRenderer` is agnostic to the shadowing technique used.
+Except for the `get_shadow` interface, the `SkyAtmosphereLutRenderer`s are agnostic to the shadowing technique used.
 
 For example, for a simple shadow map for just the sun, this could look like this:
 ```js
@@ -422,7 +423,7 @@ const config = {
 
 ### Lookup tables
 
-Both sky rendering methods depend on a couple of cheap-to-compute lookup tables:
+Both sky rendering methods depend on a couple of cheap-to-compute (see [demo with performance metrics (required WebGPU and 'timestamp-query' support)](https://jolifantobambla.github.io/webgpu-sky-atmosphere/demo/?timestamp_query)) lookup tables:
 
  * Transmittance LUT: stores the colored transmittance towards the top of the atmosphere parameterized by the sample height and direction
  * Multiple Scattering LUT: stores the contribution of multiple scattering parameterized by the sample height and sun direction
@@ -482,7 +483,7 @@ This library makes a couple of assumptions about the render engine that uses it.
 For a `SkyAtmosphereLutRenderer` to produce nice results, the render engine should...
 
  * ...use some kind of tone-mapping operator
- * ...use either dithering or temporal anti-aliasing to get rid of banding artefacts introduced by the use of compressed low-resolution lookup tables
+ * ...use either dithering or temporal anti-aliasing to get rid of banding artefacts introduced by the use of low-resolution lookup tables
  * ...use a bloom filter to give the sun disk a nicer look
  * ...use temporal anti-aliasing to get rid of the noise introduced by randomizing ray offsets for full-resolution ray marching
 

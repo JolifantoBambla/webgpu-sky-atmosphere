@@ -24,13 +24,26 @@
         const urlParams = new URLSearchParams(window.location.search);
         const useTimestampQuery = new URLSearchParams(window.location.search).has('timestamp_query');
 
+        const webgpuNotSupported = () => {
+            const dialogBox = document.createElement('dialog');
+            document.body.append(dialogBox);
+            const dialogText = document.createElement('pre');
+            dialogText.style.whiteSpace = 'pre-wrap';
+            dialogBox.append('WebGPU not supported by this browser');
+            dialogBox.showModal();
+        }
+
         async function main() {
-            const canvas = document.querySelector('canvas');
-            const resolution = [canvas.clientWidth, canvas.clientHeight].map(s => s * window.devicePixelRatio);
-            canvas.width = resolution[0];
-            canvas.height = resolution[1];
+            if (!('gpu' in navigator)) {
+                webgpuNotSupported();
+                return;
+            }
 
             const adapter = await navigator.gpu.requestAdapter();
+            if (!adapter) {
+                webgpuNotSupported();
+                return;
+            }
             console.info('Available adapter features', [...adapter.features]);
 
             const deviceFeatures = adapter.features.has('dual-source-blending') ? ['dual-source-blending'] : [];
@@ -40,7 +53,12 @@
 
             const device = await adapter.requestDevice({requiredFeatures: deviceFeatures});
             console.info('Enabled device features', [...device.features]);
-        
+
+            const canvas = document.querySelector('canvas');
+            const resolution = [canvas.clientWidth, canvas.clientHeight].map(s => s * window.devicePixelRatio);
+            canvas.width = resolution[0];
+            canvas.height = resolution[1];
+
             let useDualSourceBlending = device.features.has('dual-source-blending');
             if (useDualSourceBlending) {
                 // older chromium versions allow enabling dual source blending but don't allow use of 'src1' in blend state
@@ -289,7 +307,7 @@
                                             skyRenderer: {
                                                 ...renderPassConfigBase,
                                                 rayMarch: {
-                                                    useColoredTransmittance: colored === 1,
+                                                    useColoredTransmittance: colored === 1 && useDualSourceBlending,
                                                     rayMarchDistantSky: skyLut === 1,
                                                 },
                                             },
@@ -884,6 +902,7 @@
             };
             render();
         }
+
         main();
     </script>
 </body>
