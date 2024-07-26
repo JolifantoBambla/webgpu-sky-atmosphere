@@ -423,7 +423,7 @@ const config = {
 
 ### Lookup tables
 
-Both sky rendering methods depend on a couple of cheap-to-compute (see [demo with performance metrics (required WebGPU and 'timestamp-query' support)](https://jolifantobambla.github.io/webgpu-sky-atmosphere/demo/?timestamp_query)) lookup tables:
+Both sky rendering methods depend on a couple of cheap-to-compute (see [demo with performance metrics (requires WebGPU and 'timestamp-query' support)](https://jolifantobambla.github.io/webgpu-sky-atmosphere/demo/?timestamp_query)) lookup tables:
 
  * Transmittance LUT: stores the colored transmittance towards the top of the atmosphere parameterized by the sample height and direction
  * Multiple Scattering LUT: stores the contribution of multiple scattering parameterized by the sample height and sun direction
