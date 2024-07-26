@@ -36,6 +36,7 @@ export function makeUi(atmosphere, camera, showPerformanceGraph) {
             viewHeight: 1.0,
             inMeters: false,
             scale: '1 = 1km',
+            sceneAffectedByScale: true,
         },
         atmosphereHelper: {
             bottomRadius: 6360.0,
@@ -253,7 +254,7 @@ Escape: exit pointer lock on canvas`,
             const scale = params.renderSettings.inMeters ? 1000.0 : 1 / 1000.0;
 
             camera.position = params.renderSettings.inMeters ? cameraPositionMeters : cameraPositionKilometers;
-            camera.maxSpeed = params.renderSettings.inMeters ? 1.0 : 0.1;
+            //camera.maxSpeed = params.renderSettings.inMeters ? 1.0 : 0.1;
 
             params.atmosphere = {
                 center: params.atmosphere.center.map(c => c * scale),

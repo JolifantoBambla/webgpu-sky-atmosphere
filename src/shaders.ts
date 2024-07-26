@@ -36,7 +36,11 @@ export function makeMultiScatteringLutShaderCode(multiScatteringLutFormat: GPUTe
     return `${constantsWgsl}\n${intersectionWgsl}\n${mediumWgsl}\n${phaseWgsl}\n${uvWgsl}\n${renderMultiScatteringLutWgsl}`.replace('rgba16float', multiScatteringLutFormat);
 }
 
-export function makeSkyViewLutShaderCode(skyViewLutFormat: GPUTextureFormat = 'rgba16float', customUniforms?: string) {
+function makeShadowShaderCode(shadow?: string): string {
+    return `${shadow ?? 'fn get_shadow(p: vec3<f32>, i: u32) -> f32 { return 1.0; }'}`;
+}
+
+export function makeSkyViewLutShaderCode(skyViewLutFormat: GPUTextureFormat = 'rgba16float', shadow?: string, customUniforms?: string) {
     const base = `${constantsWgsl}\n${intersectionWgsl}\n${mediumWgsl}\n${phaseWgsl}\n${uvWgsl}\n${uniformsWgsl}\n${customUniforms ? `${customUniforms}\n${customUniformsWgsl}\n` : ''}${coordinateSystemWgsl}\n${multipleScatteringWgsl}\n`;
     let shader = renderSkyViewLutWgsl.replace('rgba16float', skyViewLutFormat);
     if (customUniforms) {
@@ -46,10 +50,10 @@ export function makeSkyViewLutShaderCode(skyViewLutFormat: GPUTextureFormat = 'r
             shader = shader.replace(`group(0) @binding(${i})`, `group(0) @binding(${i - 1})`);
         }
     }
-    return `${base}\n${shader}`;
+    return `${makeShadowShaderCode(shadow)}\n${base}\n${shader}`;
 }
 
-export function makeAerialPerspectiveLutShaderCode(aerialPerspectiveLutFormat: GPUTextureFormat = 'rgba16float', customUniforms?: string) {
+export function makeAerialPerspectiveLutShaderCode(aerialPerspectiveLutFormat: GPUTextureFormat = 'rgba16float', shadow?: string, customUniforms?: string) {
     const base = `${constantsWgsl}\n${intersectionWgsl}\n${mediumWgsl}\n${phaseWgsl}\n${uvWgsl}\n${uniformsWgsl}\n${customUniforms ? `${customUniforms}\n${customUniformsWgsl}\n` : ''}${coordinateSystemWgsl}\n${multipleScatteringWgsl}\n${aerialPerspectiveWgsl}\n${sampleSegmentWgsl}\n`;
     let shader = renderAerialPerspectiveWgsl.replace('rgba16float', aerialPerspectiveLutFormat);
     if (customUniforms) {
@@ -59,7 +63,7 @@ export function makeAerialPerspectiveLutShaderCode(aerialPerspectiveLutFormat: G
             shader = shader.replace(`group(0) @binding(${i})`, `group(0) @binding(${i - 1})`);
         }
     }
-    return `${base}\n${shader}`;
+    return `${makeShadowShaderCode(shadow)}\n${base}\n${shader}`;
 }
 
 export function makeRenderSkyWithLutsShaderCode(renderTargetFormat: GPUTextureFormat = 'rgba16float', customUniforms?: string) {
@@ -75,7 +79,7 @@ export function makeRenderSkyWithLutsShaderCode(renderTargetFormat: GPUTextureFo
     return `${base}\n${shader}`;
 }
 
-export function makeRenderSkyRaymarchingShaderCode(renderTargetFormat: GPUTextureFormat = 'rgba16float', customUniforms?: string) {
+export function makeRenderSkyRaymarchingShaderCode(renderTargetFormat: GPUTextureFormat = 'rgba16float', shadow?: string, customUniforms?: string) {
     const base = `${constantsWgsl}\n${intersectionWgsl}\n${mediumWgsl}\n${phaseWgsl}\n${uvWgsl}\n${uniformsWgsl}\n${customUniforms ? `${customUniforms}\n${customUniformsWgsl}\n` : ''}${coordinateSystemWgsl}\n${multipleScatteringWgsl}\n${blendWgsl}\n${sunDiskWgsl}\n${fullScreenVertexShaderWgsl}\n${sampleSegmentWgsl}\n`;
     let shader = renderSkyRaymarchingWgsl.replace('rgba16float', renderTargetFormat);
     if (customUniforms) {
@@ -85,10 +89,10 @@ export function makeRenderSkyRaymarchingShaderCode(renderTargetFormat: GPUTextur
             shader = shader.replace(`group(0) @binding(${i})`, `group(0) @binding(${i - 1})`);
         }
     }
-    return `${base}\n${shader}`;
+    return `${makeShadowShaderCode(shadow)}\n${base}\n${shader}`;
 }
 
-export function makeRenderSkyLutAndRaymarchingShaderCode(renderTargetFormat: GPUTextureFormat = 'rgba16float', customUniforms?: string) {
+export function makeRenderSkyLutAndRaymarchingShaderCode(renderTargetFormat: GPUTextureFormat = 'rgba16float', shadow?: string, customUniforms?: string) {
     const base = `${constantsWgsl}\n${intersectionWgsl}\n${mediumWgsl}\n${phaseWgsl}\n${uvWgsl}\n${uniformsWgsl}\n${customUniforms ? `${customUniforms}\n${customUniformsWgsl}\n` : ''}${coordinateSystemWgsl}\n${multipleScatteringWgsl}\n${skyViewWgsl}\n${blendWgsl}\n${sunDiskWgsl}\n${fullScreenVertexShaderWgsl}\n${sampleSegmentWgsl}\n`;
     let shader = renderSkyLutAndRaymarchingWgsl.replace('rgba16float', renderTargetFormat);
     if (customUniforms) {
@@ -98,5 +102,5 @@ export function makeRenderSkyLutAndRaymarchingShaderCode(renderTargetFormat: GPU
             shader = shader.replace(`group(0) @binding(${i})`, `group(0) @binding(${i - 1})`);
         }
     }
-    return `${base}\n${shader}`;
+    return `${makeShadowShaderCode(shadow)}\n${base}\n${shader}`;
 }

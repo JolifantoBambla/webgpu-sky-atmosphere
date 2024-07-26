@@ -20,13 +20,13 @@ npm install webgpu-sky-atmosphre
 ```
 
 ```js
-import { SkyAtmosphereRenderer } from 'webgpu-sky-atmosphere';
+import { SkyAtmosphereLutRenderer } from 'webgpu-sky-atmosphere';
 ```
 
 ### From GitHub
 
 ```js
-import { SkyAtmosphereRenderer } from 'https://jolifantobambla.github.io/webgpu-sky-atmosphere/dist/1.x/webgpu-sky-atmosphere.module.min.js';
+import { SkyAtmosphereLutRenderer } from 'https://jolifantobambla.github.io/webgpu-sky-atmosphere/dist/1.x/webgpu-sky-atmosphere.module.min.js';
 ```
 
 ## Usage
@@ -57,7 +57,7 @@ const skyRenderer = SkyAtmosphereComputeRenderer.create(device, {
   },
 });
 
-// or use the async version
+// or use the async version that initializes all pipelines asynchronously
 const skyRenderer = await SkyAtmosphereComputeRenderer.createAsync(device, { /* config */ });
 
 
@@ -74,7 +74,7 @@ const skyUniforms = {
   },
 };
 const skyPass = commandEncoder.beginComputePass();
-skyRenderer.renderSkyAtmosphere(skyPass, skyUniforms);
+skyRenderer.renderLutsAndSky(skyPass, skyUniforms);
 skyPass.end();
 
 
@@ -92,11 +92,12 @@ Or, if you prefer render passes / bundles, use a `SkyAtmosphereRasterRenderer`:
 import { SkyAtmosphereRasterRenderer } from 'webgpu-sky-atmosphere';
 
 // during setup
+const renderTargetFormat = 'rgba16float';
 const skyRenderer = SkyAtmosphereRasterRenderer.create(device, {
   // configurate the renderer here
   skyRenderer: {
     // the format of the render target at location 0
-    renderTargetFormat: 'rgba16float',
+    renderTargetFormat,
     // the depth buffer is used to limit the ray marching distance
     depthBuffer: {
       texture: depthBuffer,
@@ -104,7 +105,7 @@ const skyRenderer = SkyAtmosphereRasterRenderer.create(device, {
   },
 });
 
-// or use the async version
+// or use the async version that initializes all pipelines asynchronously
 const skyRenderer = await SkyAtmosphereRasterRenderer.createAsync(device, { /* config */ });
 
 
@@ -115,10 +116,10 @@ const skyUniforms = {
 
 // the lookup tables are rendered using a compute pass
 const lutsPass = commandEncoder.beginComputePass();
-skyRenderer.renderSkyAtmosphereLuts(lutsPass, skyUniforms);
+skyRenderer.renderLuts(lutsPass, skyUniforms);
 lutsPass.end();
 
-// the sky is then rendered using a render pass or render bundle
+// the sky is then rendered using a render pass
 const skyPass = commandEncoder.beginRenderPass({
   // configure target
 });
@@ -126,23 +127,37 @@ skyRenderer.renderSky(skyPass);
 skyPass.end();
 
 
+// alternatively prepare a render bundle ahead of time, possibly including more post-processes
+const postProcessEncoder = device.createRenderBundleEncoder({
+  colorFormats: [renderTargetFormat],
+});
+skyRenderer.renderSky(postProcessEncoder);
+// .. encode other post processes that match the bundle's layout
+const postProcessBundle = postProcessEncoder.finish();
+
+// and during render loop
+const postProcessPass = commandEncoder.beginRenderPass({ /* ... */ });
+postProcessPass.exectuteBundles([postProcessBundle]);
+postProcessPass.end();
+
+
 // and in case of a resolution change: 
 skyRenderer.onResize(depthBuffer);
 ```
 
 The sky rendering post process depends on a couple of internally managed lookup tables.
-If you only need the lookup tables and want to roll your own sky renderer, use a `SkyAtmosphereRenderer`:
+If you only need the lookup tables and want to roll your own sky renderer, use a `SkyAtmosphereLutRenderer`:
 
 ```js
-import { SkyAtmosphereRenderer } from 'webgpu-sky-atmosphere';
+import { SkyAtmosphereLutRenderer } from 'webgpu-sky-atmosphere';
 
 // during setup
-const skyRenderer = SkyAtmosphereRenderer.create(device, {
+const skyRenderer = SkyAtmosphereLutRenderer.create(device, {
   // configurate the renderer here or use the defaults
 });
 
-// or use the async version
-const skyRenderer = await SkyAtmosphereRenderer.createAsync(device, { /* config */ });
+// or use the async version that initializes all pipelines asynchronously
+const skyRenderer = await SkyAtmosphereLutRenderer.createAsync(device, { /* config */ });
 
 
 // during render loop
@@ -150,7 +165,7 @@ const skyUniforms = {
   // set camera paramters, etc.
 };
 const skyPass = commandEncoder.beginComputePass();
-skyRenderer.renderSkyAtmosphereLuts(skyPass, skyUniforms);
+skyRenderer.renderLuts(skyPass, skyUniforms);
 skyPass.end();
 ```
 
@@ -159,12 +174,12 @@ skyPass.end();
 The above renderers default to rendering the clear sky / atmosphere using low-resolution lookup tables. However, it can also be rendered by doing a full-resolution ray marching pass.
 While the former method is faster, full-resolution ray marching produces smoother volumetric shadows and allows for colored transmittance.
 It also produces a much smoother transition when moving from the top layers of the atmosphere to outer space
-A typical scenario would be to switch to full-resolution ray marching if the camera is above a certain altitude threshold by passing the corresponding flag to `renderSkyAtmosphere` / `renderSky`:
+A typical scenario would be to switch to full-resolution ray marching if the camera is above a certain altitude threshold by passing the corresponding flag to `renderLutsAndSky` / `renderSky`:
 
 ```js
 const useFullResolutionRayMarch = /* true if camera is above altitude threshold */;
 
-skyRenderer.renderSkyAtmosphere(computePass, config, null, useFullResolutionRayMarch);
+skyRenderer.renderLutsAndSky(computePass, config, null, useFullResolutionRayMarch);
 
 skyRenderer.renderSky(renderPass, useFullResolutionRayMarch);
 ```
@@ -204,7 +219,7 @@ The atmosphere of a telluric planet, i.e., a planet with a solid planetery surfa
  * Mie theory models how light is scattered around and absorbed by larger aerosols like dust or pollution. It is almost independent of wavelength and most of the incoming light is scattered in the forward direction. In Earth's atmosphere, it is responsible for the white glare around the sun.
  * Extra absorption layers: On Earth, light is also absorbed by the ozone in the atmosphere contributing to the sky's blue color when the sun is low.
 
-By default, a `SkyAtmosphereRenderer` will use an Earth-like atmosphere with the origin on the planet's top pole, scaled to 1 = 1 km and assuming the y axis is pointing up.
+By default, a `SkyAtmosphereLutRenderer` will use an Earth-like atmosphere with the origin on the planet's top pole, scaled to 1 = 1 km and assuming the y axis is pointing up.
 
 To adjust the scale of the atmosphere, e.g., 1 = 1m, set
 
@@ -251,8 +266,8 @@ const config = {
 Except for the distance scale used for an `Atmosphere`, all parameters can be updated at runtime:
 
 ```js
-// passing an atmosphere to renderSkyAtmosphere or renderSkyAtmosphereLuts will automatically update the atmosphere and corresponding lookup tables
-skyRenderer.renderSkyAtmosphere(passEncoder, uniforms, newAtmosphere);
+// passing an atmosphere to renderLutsAndSky or renderLuts will automatically update the atmosphere and corresponding lookup tables
+skyRenderer.renderLutsAndSky(passEncoder, uniforms, newAtmosphere);
 
 // alternatively, update the atmosphere parameters first and re-render the corresponding lookup tables later
 skyRenderer.updateAtmosphere(newAtmosphere);
@@ -277,7 +292,7 @@ const uniforms = {
   },
   ...
 };
-skyRenderer.renderSkyAtmosphere(passEncoder, uniforms);
+skyRenderer.renderLutsAndSky(passEncoder, uniforms);
 ```
 
 By default, only one light source is used. To also use the second one, use the `lights` property of the config:
@@ -322,7 +337,7 @@ const config = {
 
 #### Integrating shadows
 
-User-controlled shadowing can be integrated into a `SkyAtmosphereRenderer` by injecting bind groups and WGSL code into the sky / atmosphere rendering pipelines and shaders via the `shadow` property of the `SkyAtmosphereConfig` used to create the renderer.
+User-controlled shadowing can be integrated into a `SkyAtmosphereLutRenderer` by injecting bind groups and WGSL code into the sky / atmosphere rendering pipelines and shaders via the `shadow` property of the `SkyAtmosphereConfig` used to create the renderer.
 
 Most importantly, the WGSL code provided by the config must implement the following function:
 
@@ -335,7 +350,7 @@ It should return a floating point value in the range [0, 1], where 1 implies tha
 The `light_index` parameter refers to the index of the atmosphere light, where `0` refers to the sun and `1` refers to the moon.
 Additionally, the WGSL code should also define all external bind groups required by the shadowing implementation.
 
-Except for the `get_shadow` interface, the `SkyAtmosphereRenderer` is agnostic to the shadowing technique used.
+Except for the `get_shadow` interface, the `SkyAtmosphereLutRenderer` is agnostic to the shadowing technique used.
 
 For example, for a simple shadow map for just the sun, this could look like this:
 ```js
@@ -375,8 +390,8 @@ const config = {
 
 ### Custom uniform buffers
 
-It is likely that some or even all uniforms used by a `SkyAtmosphereRenderer` are already available on the GPU in some other buffer(s) in your engine.
-To replace the `SkyAtmosphereRenderer`'s internal uniform buffer by one or more user-controlled uniform buffers, configure the renderer to inject external bind groups and WGSL code, similar to how shadows are integrated into the renderer:
+It is likely that some or even all uniforms used by a `SkyAtmosphereLutRenderer` are already available on the GPU in some other buffer(s) in your engine.
+To replace the `SkyAtmosphereLutRenderer`'s internal uniform buffer by one or more user-controlled uniform buffers, configure the renderer to inject external bind groups and WGSL code, similar to how shadows are integrated into the renderer:
 
 ```js
 const config = {
@@ -432,7 +447,7 @@ const config = {
 
 For more information on the individual options, please refer to the [documentation](https://jolifantobambla.github.io/webgpu-sky-atmosphere/interfaces/SkyAtmosphereLutConfig).
 
-The transmittance and the multiple scattering lookup table are constant for a given atmosphere. This is why they are rendered during the `SkyAtmosphereRenderer`'s constructor by default and re-rendered by `renderSkyAtmosphere` / `renderSkyAtmosphereLuts` only if the optional `atmopshere` parameter is set.
+The transmittance and the multiple scattering lookup table are constant for a given atmosphere. This is why they are rendered during the `SkyAtmosphereLutRenderer`'s constructor by default and re-rendered by `renderLutsAndSky` / `renderLuts` only if the optional `atmopshere` parameter is set.
 To re-render the two lookup tables outside of these scenarios, call:
 
 ```js
@@ -445,7 +460,7 @@ skyRenderer.renderConstantLuts(
 ```
 
 While the constant lookup tables are used by both sky rendering methods, the sky view and aerial perspective lookup tables are not used by the full-resolution ray marching method.
-Since they are view dependent, they are re-rendered whenever new `Uniforms` are passed to `renderSkyAtmosphere` / `renderSkyAtmosphereLuts` and the lookup table based sky rendering technique is chosen.
+Since they are view dependent, they are re-rendered whenever new `Uniforms` are passed to `renderLutsAndSky` / `renderLuts` and the lookup table based sky rendering technique is chosen.
 To only update these two lookup tables, call:
 
 ```js
@@ -458,13 +473,13 @@ skyRenderer.renderDynamicLuts(
 ```
 
 Alternatively, each lookup table can be rendered individually.
-See the [documentation](https://jolifantobambla.github.io/webgpu-sky-atmosphere/classes/SkyAtmosphereRenderer) for more details.
+See the [documentation](https://jolifantobambla.github.io/webgpu-sky-atmosphere/classes/SkyAtmosphereLutRenderer) for more details.
 
 
 ## Integrating this library into a renderer
 
 This library makes a couple of assumptions about the render engine that uses it.
-For a `SkyAtmosphereRenderer` to produce nice results, the render engine should...
+For a `SkyAtmosphereLutRenderer` to produce nice results, the render engine should...
 
  * ...use some kind of tone-mapping operator
  * ...use either dithering or temporal anti-aliasing to get rid of banding artefacts introduced by the use of compressed low-resolution lookup tables

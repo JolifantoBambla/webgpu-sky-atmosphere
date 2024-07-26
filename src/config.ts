@@ -220,11 +220,11 @@ export interface ComputeRenderTargetConfig {
 }
 
 /**
- * External resources and settings required by a {@link SkyAtmosphereRenderer}.
+ * External resources and settings required by a {@link SkyAtmosphereLutRenderer}.
  */
 export interface SkyRendererConfigBase {
     /**
-     * If this is true, {@link SkyAtmosphereRasterRenderer.renderSky} / {@link SkyAtmosphereComputeRenderer.renderSkyAtmosphere} will default to full-screen ray marching to render the atmosphere.
+     * If this is true, {@link SkyAtmosphereRasterRenderer.renderSky} / {@link SkyAtmosphereComputeRenderer.renderLutsAndSky} will default to full-screen ray marching to render the atmosphere.
      *
      * Defaults to false.
      */
@@ -411,14 +411,14 @@ export interface AtmosphereLightsConfig {
 
 export interface CustomUniformsSourceConfig {
     /**
-     * A list of bind group layouts specifying all user-controlled resources containing the individual parts of the uniform values required by a {@link SkyAtmosphereRenderer}.
+     * A list of bind group layouts specifying all user-controlled resources containing the individual parts of the uniform values required by a {@link SkyAtmosphereLutRenderer}.
      *
      * This should not contain more than `maxBindGroups - 1` bind group layouts, where `maxBindGroups` is the maximum number of bind group layouts per pipeline layout supported by the device.
      */
     bindGroupLayouts: GPUBindGroupLayout[],
 
     /**
-     * A list of bind groups generated using the {@link bindGroupLayouts}, containing all user-controlled resources containing the individual parts of the uniform values required by a {@link SkyAtmosphereRenderer}.
+     * A list of bind groups generated using the {@link bindGroupLayouts}, containing all user-controlled resources containing the individual parts of the uniform values required by a {@link SkyAtmosphereLutRenderer}.
      */
     bindGroups: GPUBindGroup[],
 
@@ -491,7 +491,7 @@ export interface SkyAtmosphereRendererConfig {
     distanceScaleFactor?: number,
 
     /**
-     * The atmosphere parameters for this {@link SkyAtmosphereRenderer}.
+     * The atmosphere parameters for this {@link SkyAtmosphereLutRenderer}.
      * Defaults to: {@link makeEarthAtmosphere} with the scale parameter set to {@link SkyAtmosphereRendererConfig.distanceScaleFactor}.
      * @see {@link makeEarthAtmosphere}
      */
@@ -508,7 +508,7 @@ export interface SkyAtmosphereRendererConfig {
     lights?: AtmosphereLightsConfig,
 
     /**
-     * Config for external resources required by a {@link SkyAtmosphereRenderer} to integrate user-controlled shadow maps.
+     * Config for external resources required by a {@link SkyAtmosphereLutRenderer} to integrate user-controlled shadow maps.
      */
     shadow?: ShadowConfig,
 

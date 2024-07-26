@@ -584,15 +584,18 @@
                     depthBuffer: resolutionDependentStuff.depthBuffer,
                     renderTarget: resolutionDependentStuff.skyRenderTarget,
                 };
-                skyAtmosphereRenderer.onResize(resizeConfigCompute);
-                skyAtmosphereRendererGrayscale.onResize(resizeConfigCompute);
-                skyAtmosphereRendererMeters.onResize(resizeConfigCompute);
-                skyAtmosphereRendererMetersGrayscale.onResize(resizeConfigCompute);
 
-                skyAtmosphereRasterRenderer.onResize(resolutionDependentStuff.depthBuffer);
-                skyAtmosphereRasterRendererGrayscale.onResize(resolutionDependentStuff.depthBuffer);
-                skyAtmosphereRasterRendererMeters.onResize(resolutionDependentStuff.depthBuffer);
-                skyAtmosphereRasterRendererMetersGrayscale.onResize(resolutionDependentStuff.depthBuffer);
+                for (let inMeters = 0; inMeters < 2; ++inMeters) {
+                    for (let compute = 0; compute < 2; ++compute) {
+                        for (let colored = 0; colored < 2; ++colored) {
+                            for (let skyLut = 0; skyLut < 2; ++skyLut) {
+                                skyRenderers[inMeters][compute][colored][skyLut].onResize(
+                                    compute === 1 ? resizeConfigCompute : resolutionDependentStuff.depthBuffer
+                                );
+                            }
+                        }
+                    }
+                }
 
                 resizeInProgress = false;
             };
@@ -796,9 +799,9 @@
                 } else {
                     const computePass = encoder.beginComputePass();
                     if (params.renderSettings.compute) {
-                        skyRenderer.renderSkyAtmosphere(computePass, config, params.atmosphere, params.renderSettings.rayMarch);
+                        skyRenderer.renderLutsAndSky(computePass, config, params.atmosphere, params.renderSettings.rayMarch);
                     } else {
-                        skyRenderer.renderSkyAtmosphereLuts(computePass, config, params.atmosphere, params.renderSettings.rayMarch);
+                        skyRenderer.renderLuts(computePass, config, params.atmosphere, params.renderSettings.rayMarch);
                     }
                     computePass.end();
                 }

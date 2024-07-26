@@ -69,7 +69,7 @@ export interface Uniforms {
     /**
      * A directional lights that influences the atmosphere.
      *
-     * Ignored if {@link SkyAtmosphereRenderer} is not configured to render the moon.
+     * Ignored if {@link SkyAtmosphereLutRenderer} is not configured to render the moon.
      */
     moon?: AtmosphereLight,
 
