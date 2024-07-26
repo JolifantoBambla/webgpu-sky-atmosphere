@@ -3,8 +3,9 @@
   "version": "1.0.0",
   "description": "A WebGPU implementation of Hillaire's atmosphere model. Renders the sky as a post-process.",
   "type": "module",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "dist/1.x/webgpu-sky-atmosphere.module.js",
+  "module": "dist/1.x/webgpu-sky-atmosphere.module.js",
+  "types": "dist/1.x/webgpu-sky-atmosphere.d.ts",
   "files": [
     "/dist/**"
   ],
