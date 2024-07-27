@@ -219,37 +219,10 @@ The atmosphere of a telluric planet, i.e., a planet with a solid planetery surfa
  * Mie theory models how light is scattered around and absorbed by larger aerosols like dust or pollution. It is almost independent of wavelength and most of the incoming light is scattered in the forward direction. In Earth's atmosphere, it is responsible for the white glare around the sun.
  * Extra absorption layers: On Earth, light is also absorbed by the ozone in the atmosphere contributing to the sky's blue color when the sun is low.
 
-By default, a `SkyAtmosphereLutRenderer` will use an Earth-like atmosphere with the origin on the planet's top pole, scaled to 1 = 1 km and assuming the y axis is pointing up.
-
-To adjust the scale of the atmosphere, e.g., 1 = 1m, set
+By default, the sky renderers will use an Earth-like atmosphere with the origin on the planet's top pole, created with...
 
 ```js
-const config = {
-  distanceScaleFactor: 1000.0,
-  ...
-};
-```
-
-Note that the `config.distanceScaleFactor` is also used to set compile-time constants in the renderer's shaders. I.e., to render an atmosphere at a different scale, a new renderer instance must be created.
-
-To initialize an Earth-like atmosphere to use a different origin, use 
-
-```js
-const distanceScale = 1.0; // 1 = 1km
-
-// using a specific center
-const center = [ /* world space position of the planet's center */ ];
-const config = {
-  atmosphere: makeEarthAtmosphere(distanceScale, center),
-  ...
-};
-
-// using the default center (origin is on the top pole) but with the z axis pointing up
-const yUp = false;
-const config = {
-  atmosphere: makeEarthAtmosphere(distanceScale, null, yUp),
-  ...
-};
+const atmosphere = makeEarthAtmosphere();
 ```
 
 To create a custom atmosphere, adjust the parameters to your liking (read the [docs](https://jolifantobambla.github.io/webgpu-sky-atmosphere/interfaces/Atmosphere) for more information on the indivdual parameters of an `Atmosphere`):
@@ -257,22 +230,60 @@ To create a custom atmosphere, adjust the parameters to your liking (read the [d
 ```js
 const config = {
   atmosphere: {
-    // ...
+    rayleigh: { /* ... */ },
+    mie: { /* ... */ },
+    absorption: { /* ... */ },
+    ...
   },
   ...
 };
 ```
 
-Except for the distance scale used for an `Atmosphere`, all parameters can be updated at runtime:
+All atmosphere parameters can be updated at runtime:
 
 ```js
 // passing an atmosphere to renderLutsAndSky or renderLuts will automatically update the atmosphere and corresponding lookup tables
 skyRenderer.renderLutsAndSky(passEncoder, uniforms, newAtmosphere);
 
+skyRenderer.renderLuts(passEnoder, uniforms, newAtmosphere);
+
+
 // alternatively, update the atmosphere parameters first and re-render the corresponding lookup tables later
 skyRenderer.updateAtmosphere(newAtmosphere);
 // ... later
 skyRenderer.renderConstantLuts(passEncoder);
+```
+
+#### Scale
+All sky renderers use the distance scale 1 = 1km.
+
+To adjust the scale of the atmosphere to correspond your engine's scale, e.g., 1 = 1m, set
+
+```js
+const config = {
+  fromKilometersScale: 1000.0,
+  ...
+};
+```
+
+#### Positioning the atmosphere
+
+To initialize an Earth-like atmosphere to use a different origin, use 
+
+```js
+// using a specific center
+const center = [ /* world space position of the planet's center */ ];
+const config = {
+  atmosphere: makeEarthAtmosphere(center),
+  ...
+};
+
+// using the default center (origin is on the top pole) but with the z axis pointing up
+const yUp = false;
+const config = {
+  atmosphere: makeEarthAtmosphere(null, yUp),
+  ...
+};
 ```
 
 ### Light sources

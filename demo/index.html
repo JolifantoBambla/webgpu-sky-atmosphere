@@ -274,7 +274,7 @@
             const skyRenderers = [];
             for (let inMeters = 0; inMeters < 2; ++inMeters) {
                 if (inMeters === 1) {
-                    skyAtmosphereConfigBase.distanceScaleFactor = 1000.0;
+                    skyAtmosphereConfigBase.fromKilometersScale = 1000.0;
                 }
                 skyRenderers.push([]);
                 for (let compute = 0; compute < 2; ++compute) {

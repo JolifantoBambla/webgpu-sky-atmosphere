@@ -39,8 +39,8 @@ export declare class SkyViewLutPipeline {
     private constructor();
     private static makeBindGroupLayout;
     private static makePipelineDescriptor;
-    static createAsync(device: GPUDevice, skyViewLutFormat: GPUTextureFormat, skyViewLutSize: [number, number], multiscatteringLutSize: [number, number], distanceToMaxSampleCount: number, useMoon: boolean, shadowConfig?: ShadowConfig, customUniformsConfig?: CustomUniformsSourceConfig): Promise<SkyViewLutPipeline>;
-    static create(device: GPUDevice, skyViewLutFormat: GPUTextureFormat, skyViewLutSize: [number, number], multiscatteringLutSize: [number, number], distanceToMaxSampleCount: number, useMoon: boolean, shadowConfig?: ShadowConfig, customUniformsConfig?: CustomUniformsSourceConfig): SkyViewLutPipeline;
+    static createAsync(device: GPUDevice, skyViewLutFormat: GPUTextureFormat, skyViewLutSize: [number, number], multiscatteringLutSize: [number, number], distanceToMaxSampleCount: number, fromKilometersScaleFactor: number, useMoon: boolean, shadowConfig?: ShadowConfig, customUniformsConfig?: CustomUniformsSourceConfig): Promise<SkyViewLutPipeline>;
+    static create(device: GPUDevice, skyViewLutFormat: GPUTextureFormat, skyViewLutSize: [number, number], multiscatteringLutSize: [number, number], distanceToMaxSampleCount: number, fromKilometersScaleFactor: number, useMoon: boolean, shadowConfig?: ShadowConfig, customUniformsConfig?: CustomUniformsSourceConfig): SkyViewLutPipeline;
     makeComputePass(resources: SkyAtmosphereResources, shadowBindGroups?: GPUBindGroup[], customUniformsBindGroups?: GPUBindGroup[]): ComputePass;
 }
 export declare class AerialPerspectiveLutPipeline {
@@ -54,8 +54,8 @@ export declare class AerialPerspectiveLutPipeline {
     private constructor();
     private static makeBindGroupLayout;
     private static makePipelineDescriptor;
-    static createAsync(device: GPUDevice, aerialPerspectiveLutFormat: GPUTextureFormat, aerialPerspectiveSliceCount: number, aerialPerspectiveDistancePerSlice: number, multiscatteringLutSize: [number, number], randomizeSampleOffsets: boolean, useMoon: boolean, shadowConfig?: ShadowConfig, customUniformsConfig?: CustomUniformsSourceConfig): Promise<AerialPerspectiveLutPipeline>;
-    static create(device: GPUDevice, aerialPerspectiveLutFormat: GPUTextureFormat, aerialPerspectiveSliceCount: number, aerialPerspectiveDistancePerSlice: number, multiscatteringLutSize: [number, number], randomizeSampleOffsets: boolean, useMoon: boolean, shadowConfig?: ShadowConfig, customUniformsConfig?: CustomUniformsSourceConfig): AerialPerspectiveLutPipeline;
+    static createAsync(device: GPUDevice, aerialPerspectiveLutFormat: GPUTextureFormat, aerialPerspectiveSliceCount: number, aerialPerspectiveDistancePerSlice: number, multiscatteringLutSize: [number, number], fromKilometersScaleFactor: number, randomizeSampleOffsets: boolean, useMoon: boolean, shadowConfig?: ShadowConfig, customUniformsConfig?: CustomUniformsSourceConfig): Promise<AerialPerspectiveLutPipeline>;
+    static create(device: GPUDevice, aerialPerspectiveLutFormat: GPUTextureFormat, aerialPerspectiveSliceCount: number, aerialPerspectiveDistancePerSlice: number, multiscatteringLutSize: [number, number], fromKilometersScaleFactor: number, randomizeSampleOffsets: boolean, useMoon: boolean, shadowConfig?: ShadowConfig, customUniformsConfig?: CustomUniformsSourceConfig): AerialPerspectiveLutPipeline;
     makeComputePass(resources: SkyAtmosphereResources, shadowBindGroups?: GPUBindGroup[], customUniformsBindGroups?: GPUBindGroup[]): ComputePass;
     get aerialPerspectiveInvDistancePerSlice(): number;
 }

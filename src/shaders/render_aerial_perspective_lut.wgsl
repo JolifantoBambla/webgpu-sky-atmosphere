@@ -16,10 +16,6 @@ override WORKGROUP_SIZE_Y: u32 = 16;
 @group(0) @binding(4) var multi_scattering_lut: texture_2d<f32>;
 @group(0) @binding(5) var aerial_perspective_lut: texture_storage_3d<rgba16float, write>;
 
-fn get_sample_shadow(atmosphere: Atmosphere, sample_position: vec3<f32>, light_index: u32) -> f32 {
-	return get_shadow(sample_position + atmosphere.planet_center, light_index);
-}
-
 struct SingleScatteringResult {
 	luminance: vec3<f32>,				// Scattered light (luminance)
 	transmittance: vec3<f32>,			// Transmittance in [0,1] (unitless)
@@ -126,7 +122,7 @@ fn render_aerial_perspective_lut(@builtin(global_invocation_id) global_id: vec3<
 	let uv = pix / vec2<f32>(output_size.xy);
 
 	var world_dir = uv_to_world_dir(uv, config.inverse_projection, config.inverse_view);
-	let cam_pos = config.camera_world_position - atmosphere.planet_center;
+	let cam_pos = (config.camera_world_position * TO_KM_SCALE) - atmosphere.planet_center;
 
 	var world_pos = cam_pos;
 

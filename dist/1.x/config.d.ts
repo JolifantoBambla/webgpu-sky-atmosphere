@@ -94,11 +94,9 @@ export interface AerialPerspectiveLutConfig {
      */
     format?: GPUTextureFormat;
     /**
-     * The distance each slice of the areal perspective lookup table covers.
+     * The distance each slice of the areal perspective lookup table covers in kilometers.
      *
-     * This distance should be measured in the same units as {@link Atmosphere} parameters (e.g., {@link Atmosphere.bottomRadius}).
-     *
-     * Defaults to 4 * {@link SkyAtmosphereRendererConfig.distanceScaleFactor}.
+     * Defaults to 4 km.
      */
     distancePerSlice?: number;
     /**
@@ -200,11 +198,9 @@ export interface SkyRendererConfigBase {
      */
     defaultToPerPixelRayMarch?: boolean;
     /**
-     * Distance at which the maximum number of sampler per ray is used when ray marching the sky (either when rendering the sky view lookup table or when ray marching the sky per pixel).
+     * Distance in kilometers at which the maximum number of sampler per ray is used when ray marching the sky (either when rendering the sky view lookup table or when ray marching the sky per pixel).
      *
-     * Should be in the same distance unit used for the {@link Atmosphere} parameters.
-     *
-     * Defaults to 100 * {@link SkyAtmosphereRendererConfig.distanceScaleFactor}.
+     * Defaults to 100 km.
      */
     distanceToMaxSampleCount?: number;
 }
@@ -426,14 +422,16 @@ export interface SkyAtmosphereRendererConfig {
      */
     initializeConstantLuts?: boolean;
     /**
-     * A scale factor to apply to all distance-related parameters that are not explicitly set (e.g., {@link Atmosphere} or {@link AerialPerspectiveLutConfig.distancePerSlice}).
+     * The scale factor to scale points in the scale 1 = 1km to a different scale, e.g., for 1 = 1m set this to 1000.
+     *
+     * The distance scale used by {@link SkyAtmosphereLutRenderer}s is 1 = 1km. This is used to correctly render the sky / atmosphere in scenes with a different scale.
      *
      * Defaults to 1.0.
      */
-    distanceScaleFactor?: number;
+    fromKilometersScale?: number;
     /**
      * The atmosphere parameters for this {@link SkyAtmosphereLutRenderer}.
-     * Defaults to: {@link makeEarthAtmosphere} with the scale parameter set to {@link SkyAtmosphereRendererConfig.distanceScaleFactor}.
+     * Defaults to: {@link makeEarthAtmosphere} with the scale parameter set to {@link SkyAtmosphereRendererConfig.fromKilometersScale}.
      * @see {@link makeEarthAtmosphere}
      */
     atmosphere?: Atmosphere;

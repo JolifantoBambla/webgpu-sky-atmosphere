@@ -3,11 +3,11 @@
  */
 export interface Rayleigh {
     /**
-     * Rayleigh scattering exponential distribution scale in the atmosphere in `u^-1`, where `u` is the distance unit used.
+     * Rayleigh scattering exponential distribution scale in the atmosphere in `km^-1`.
      */
     densityExpScale: number;
     /**
-     * Rayleigh scattering coefficients in `u^-1`, where `u` is the distance unit used.
+     * Rayleigh scattering coefficients in `km^-1`.
      */
     scattering: [number, number, number];
 }
@@ -18,15 +18,15 @@ export interface Rayleigh {
  */
 export interface Mie {
     /**
-     * Mie scattering exponential distribution scale in the atmosphere in `u^-1`, where `u` is the distance unit used.
+     * Mie scattering exponential distribution scale in the atmosphere in `km^-1`.
      */
     densityExpScale: number;
     /**
-     * Mie scattering coefficients in `u^-1`, where `u` is the distance unit used.
+     * Mie scattering coefficients in `km^-1`.
      */
     scattering: [number, number, number];
     /**
-     * Mie extinction coefficients in `u^-1`, where `u` is the distance unit used.
+     * Mie extinction coefficients in `km^-1`.
      */
     extinction: [number, number, number];
     /**
@@ -36,7 +36,7 @@ export interface Mie {
 }
 export interface AbsorptionLayer0 {
     /**
-     * The height of the first layer of the absorption component in `u`, where `u` is the distance unit used.
+     * The height of the first layer of the absorption component in kilometers.
      */
     height: number;
     /**
@@ -46,7 +46,7 @@ export interface AbsorptionLayer0 {
      */
     constantTerm: number;
     /**
-     * The linear term of the absorption component's first layer in `u^-1`, where `u` is the distance unit used.
+     * The linear term of the absorption component's first layer in `km^-1`.
      */
     linearTerm: number;
 }
@@ -58,7 +58,7 @@ export interface AbsorptionLayer1 {
      */
     constantTerm: number;
     /**
-     * The linear term of the absorption component's second layer in `u^-1`, where `u` is the distance unit used.
+     * The linear term of the absorption component's second layer in `km^-1`.
      */
     linearTerm: number;
 }
@@ -83,7 +83,7 @@ export interface Absorption {
      */
     layer1: AbsorptionLayer1;
     /**
-    * The extinction coefficients of the absorption component in `u^-1`, where `u` is the distance unit used.
+    * The extinction coefficients of the absorption component in `km^-1`.
     */
     extinction: [number, number, number];
 }
@@ -91,8 +91,6 @@ export interface Absorption {
  * Atmosphere parameters.
  *
  * The atmosphere is modelled as a sphere around a spherical planet.
- *
- * All parameters as well as the {@link AerialPerspectiveLutConfig.distancePerSlice} parameter are expected to be with respect to the same distance unit (e.g., kilometers).
  */
 export interface Atmosphere {
     /**
@@ -100,11 +98,11 @@ export interface Atmosphere {
      */
     center: [number, number, number];
     /**
-     * Radius of the planet (center to ground) in `u`, where `u` is the distance unit used.
+     * Radius of the planet (center to ground) in kilometers.
      */
     bottomRadius: number;
     /**
-     * Height of atmosphere (distance from {@link bottomRadius} to atmosphere top) in `u`, where `u` is the distance unit used.
+     * Height of atmosphere (distance from {@link bottomRadius} to atmosphere top) in kilometers.
      *
      * Clamped to `max(height, 0)`
      */
@@ -133,10 +131,9 @@ export interface Atmosphere {
 /**
  * Create a default atmosphere that corresponds to earth's atmosphere.
  *
- * @param scale Scalar to scale all parameters by. Defaults to 1.0, corresponding to all parameters being in kilometers. If this is not 1.0, make sure to scale {@link AerialPerspectiveLutConfig.distancePerSlice} accordingly.
  * @param center The center of the atmosphere. Defaults to `upDirection * -{@link Atmosphere.bottomRadius}` (`upDirection` depends on `yUp`).
  * @param yUp If true, the up direction for the default center will be `[0, 1, 0]`, otherwise `[0, 0, 1]` will be used.
  *
  * @returns Atmosphere parameters corresponding to earth's atmosphere.
  */
-export declare function makeEarthAtmosphere(scale?: number, center?: [number, number, number], yUp?: boolean): Atmosphere;
+export declare function makeEarthAtmosphere(center?: [number, number, number], yUp?: boolean): Atmosphere;

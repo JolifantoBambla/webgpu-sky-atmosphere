@@ -38,10 +38,6 @@ fn use_sky_view_lut(view_height: f32, world_pos: vec3<f32>, world_dir: vec3<f32>
 	return vec4(sky_view.rgb + get_sun_luminance(world_pos, world_dir, atmosphere, config), sky_view.a);
 }
 
-fn get_sample_shadow(atmosphere: Atmosphere, sample_position: vec3<f32>, light_index: u32) -> f32 {
-	return get_shadow(sample_position + atmosphere.planet_center, light_index);
-}
-
 struct SingleScatteringResult {
 	luminance: vec3<f32>,				// Scattered light (luminance)
 	transmittance: vec3<f32>,			// transmittance in [0,1] (unitless)
@@ -156,7 +152,7 @@ fn render_sky(pix: vec2<u32>) -> RenderSkyResult {
 	let uv = (vec2<f32>(pix) + 0.5) / vec2<f32>(config.screen_resolution);
 
 	let world_dir = uv_to_world_dir(uv, config.inverse_projection, config.inverse_view);
-	var world_pos = config.camera_world_position - atmosphere.planet_center;
+	var world_pos = (config.camera_world_position * TO_KM_SCALE)- atmosphere.planet_center;
 	let sun_dir = normalize(config.sun.direction);
 
 	let view_height = length(world_pos);

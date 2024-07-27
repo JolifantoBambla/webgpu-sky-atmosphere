@@ -20,10 +20,6 @@ override WORKGROUP_SIZE_Y: u32 = 16;
 @group(0) @binding(6) var backbuffer: texture_2d<f32>;
 @group(0) @binding(7) var render_target: texture_storage_2d<rgba16float, write>;
 
-fn get_sample_shadow(atmosphere: Atmosphere, sample_position: vec3<f32>, light_index: u32) -> f32 {
-	return get_shadow(sample_position + atmosphere.planet_center, light_index);
-}
-
 struct SingleScatteringResult {
 	luminance: vec3<f32>,				// Scattered light (luminance)
 	transmittance: vec3<f32>,			// transmittance in [0,1] (unitless)
@@ -138,7 +134,7 @@ fn render_sky(pix: vec2<u32>) -> RenderSkyResult {
 	let uv = (vec2<f32>(pix) + 0.5) / vec2<f32>(config.screen_resolution);
 
 	let world_dir = uv_to_world_dir(uv, config.inverse_projection, config.inverse_view);
-	var world_pos = config.camera_world_position - atmosphere.planet_center;
+	var world_pos = (config.camera_world_position * TO_KM_SCALE) - atmosphere.planet_center;
 	let sun_dir = normalize(config.sun.direction);
 
 	let view_height = length(world_pos);

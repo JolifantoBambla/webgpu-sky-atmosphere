@@ -84,8 +84,6 @@ export class SkyAtmosphereResources {
     /**
      * {@link Atmosphere} parameters.
      *
-     * Defaults to {@link makeEarthAtmosphere} using {@link SkyAtmosphereRendererConfig.distanceScaleFactor} as {@link makeEarthAtmosphere}'s `scale` parameter.
-     *
      * Set using {@link updateAtmosphere}.
      *
      * @see {@link updateAtmosphere}
@@ -96,7 +94,7 @@ export class SkyAtmosphereResources {
         this.label = config.label ?? 'atmosphere';
         this.device = device;
 
-        this.#atmosphere = config.atmosphere ?? makeEarthAtmosphere(config.distanceScaleFactor ?? 1.0);
+        this.#atmosphere = config.atmosphere ?? makeEarthAtmosphere();
 
         this.atmosphereBuffer = device.createBuffer({
             label: `atmosphere buffer [${this.label}]`,

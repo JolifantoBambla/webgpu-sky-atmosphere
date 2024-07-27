@@ -592,6 +592,7 @@ function makeWithLutsConstants(config: SkyAtmosphereComputeRendererConfig | SkyA
         SKY_VIEW_LUT_RES_X: lutRenderer.resources.skyViewLut.texture.width,
         SKY_VIEW_LUT_RES_Y: lutRenderer.resources.skyViewLut.texture.height,
         IS_REVERSE_Z: Number(config.skyRenderer.depthBuffer.reverseZ ?? false),
+        FROM_KM_SCALE: config.fromKilometersScale ?? 1.0,
         RENDER_SUN_DISK: Number(config.lights?.renderSunDisk ?? true),
         RENDER_MOON_DISK: Number(config.lights?.renderMoonDisk ?? (config.lights?.useMoon ?? false)),
         LIMB_DARKENING_ON_SUN: Number(config.lights?.applyLimbDarkeningOnSun ?? true),
@@ -602,11 +603,12 @@ function makeWithLutsConstants(config: SkyAtmosphereComputeRendererConfig | SkyA
 
 function makeRayMarchConstantsBase(config: SkyAtmosphereComputeRendererConfig | SkyAtmosphereRasterRendererConfig, lutRenderer: SkyAtmosphereLutRenderer, rayMarchDistantSky: boolean): Record<string, GPUPipelineConstantValue> {
     const constants: Record<string, GPUPipelineConstantValue> = {
-        INV_DISTANCE_TO_MAX_SAMPLE_COUNT: 1.0 / (config.skyRenderer.distanceToMaxSampleCount ?? (100.0 * (config.distanceScaleFactor ?? 1.0))),
+        INV_DISTANCE_TO_MAX_SAMPLE_COUNT: 1.0 / (config.skyRenderer.distanceToMaxSampleCount ?? 100.0),
         RANDOMIZE_SAMPLE_OFFSET: Number(config.skyRenderer.rayMarch?.randomizeRayOffsets ?? true),
         MULTI_SCATTERING_LUT_RES_X: lutRenderer.resources.multiScatteringLut.texture.width,
         MULTI_SCATTERING_LUT_RES_Y: lutRenderer.resources.multiScatteringLut.texture.height,
         IS_REVERSE_Z: Number(config.skyRenderer.depthBuffer.reverseZ ?? false),
+        FROM_KM_SCALE: config.fromKilometersScale ?? 1.0,
         RENDER_SUN_DISK: Number(config.lights?.renderSunDisk ?? true),
         RENDER_MOON_DISK: Number(config.lights?.renderMoonDisk ?? (config.lights?.useMoon ?? false)),
         LIMB_DARKENING_ON_SUN: Number(config.lights?.applyLimbDarkeningOnSun ?? true),

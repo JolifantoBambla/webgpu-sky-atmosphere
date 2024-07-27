@@ -21,10 +21,6 @@ override WORKGROUP_SIZE_Y: u32 = 16;
 @group(0) @binding(4) var multi_scattering_lut: texture_2d<f32>;
 @group(0) @binding(5) var sky_view_lut : texture_storage_2d<rgba16float, write>;
 
-fn get_sample_shadow(atmosphere: Atmosphere, sample_position: vec3<f32>, light_index: u32) -> f32 {
-	return get_shadow(sample_position + atmosphere.planet_center, light_index);
-}
-
 struct SingleScatteringResult {
 	luminance: vec3<f32>,				// Scattered light (luminance)
 	transmittance: vec3<f32>,			// transmittance in [0,1] (unitless)
@@ -168,7 +164,7 @@ fn render_sky_view_lut(@builtin(global_invocation_id) global_id: vec3<u32>) {
 	let atmosphere = atmosphere_buffer;
 	let config = config_buffer;
 
-	let view_world_pos = config.camera_world_position - atmosphere.planet_center;
+	let view_world_pos = (config.camera_world_position * TO_KM_SCALE) - atmosphere.planet_center;
 	let world_sun_dir = normalize(config.sun.direction);
 	let world_moon_dir = normalize(config.moon.direction);
 

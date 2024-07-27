@@ -9,12 +9,12 @@
  */
 export interface Rayleigh {
 	/**
-     * Rayleigh scattering exponential distribution scale in the atmosphere in `u^-1`, where `u` is the distance unit used.
+     * Rayleigh scattering exponential distribution scale in the atmosphere in `km^-1`.
      */
 	densityExpScale: number,
 
     /**
-     * Rayleigh scattering coefficients in `u^-1`, where `u` is the distance unit used.
+     * Rayleigh scattering coefficients in `km^-1`.
      */
 	scattering: [number, number, number],
 }
@@ -26,17 +26,17 @@ export interface Rayleigh {
  */
 export interface Mie {
 	/**
-     * Mie scattering exponential distribution scale in the atmosphere in `u^-1`, where `u` is the distance unit used.
+     * Mie scattering exponential distribution scale in the atmosphere in `km^-1`.
      */
 	densityExpScale: number,
 
     /**
-     * Mie scattering coefficients in `u^-1`, where `u` is the distance unit used.
+     * Mie scattering coefficients in `km^-1`.
      */
 	scattering: [number, number, number],
 
     /**
-     * Mie extinction coefficients in `u^-1`, where `u` is the distance unit used.
+     * Mie extinction coefficients in `km^-1`.
      */
 	extinction: [number, number, number],
 
@@ -48,7 +48,7 @@ export interface Mie {
 
 export interface AbsorptionLayer0 {
     /**
-     * The height of the first layer of the absorption component in `u`, where `u` is the distance unit used.
+     * The height of the first layer of the absorption component in kilometers.
      */
     height: number,
 
@@ -60,7 +60,7 @@ export interface AbsorptionLayer0 {
     constantTerm: number,
 
     /**
-     * The linear term of the absorption component's first layer in `u^-1`, where `u` is the distance unit used.
+     * The linear term of the absorption component's first layer in `km^-1`.
      */
     linearTerm: number,
 }
@@ -74,7 +74,7 @@ export interface AbsorptionLayer1 {
     constantTerm: number,
 
     /**
-     * The linear term of the absorption component's second layer in `u^-1`, where `u` is the distance unit used.
+     * The linear term of the absorption component's second layer in `km^-1`.
      */
     linearTerm: number,
 }
@@ -102,7 +102,7 @@ export interface Absorption {
     layer1: AbsorptionLayer1,
 
     /**
-    * The extinction coefficients of the absorption component in `u^-1`, where `u` is the distance unit used.
+    * The extinction coefficients of the absorption component in `km^-1`.
     */
    extinction: [number, number, number],
 }
@@ -111,8 +111,6 @@ export interface Absorption {
  * Atmosphere parameters.
  *
  * The atmosphere is modelled as a sphere around a spherical planet.
- *
- * All parameters as well as the {@link AerialPerspectiveLutConfig.distancePerSlice} parameter are expected to be with respect to the same distance unit (e.g., kilometers).
  */
 export interface Atmosphere {
     /**
@@ -121,12 +119,12 @@ export interface Atmosphere {
     center: [number, number, number],
 
     /**
-     * Radius of the planet (center to ground) in `u`, where `u` is the distance unit used.
+     * Radius of the planet (center to ground) in kilometers.
      */
 	bottomRadius: number,
 
     /**
-     * Height of atmosphere (distance from {@link bottomRadius} to atmosphere top) in `u`, where `u` is the distance unit used.
+     * Height of atmosphere (distance from {@link bottomRadius} to atmosphere top) in kilometers.
      *
      * Clamped to `max(height, 0)`
      */
@@ -161,41 +159,40 @@ export interface Atmosphere {
 /**
  * Create a default atmosphere that corresponds to earth's atmosphere.
  *
- * @param scale Scalar to scale all parameters by. Defaults to 1.0, corresponding to all parameters being in kilometers. If this is not 1.0, make sure to scale {@link AerialPerspectiveLutConfig.distancePerSlice} accordingly.
  * @param center The center of the atmosphere. Defaults to `upDirection * -{@link Atmosphere.bottomRadius}` (`upDirection` depends on `yUp`).
  * @param yUp If true, the up direction for the default center will be `[0, 1, 0]`, otherwise `[0, 0, 1]` will be used.
  *
  * @returns Atmosphere parameters corresponding to earth's atmosphere.
  */
-export function makeEarthAtmosphere(scale = 1.0, center?: [number, number, number], yUp = true): Atmosphere {
-    const rayleighScaleHeight = 8.0 * scale;
-    const mieScaleHeight = 1.2 * scale;
-    const bottomRadius = 6360.0 * scale;
+export function makeEarthAtmosphere(center?: [number, number, number], yUp = true): Atmosphere {
+    const rayleighScaleHeight = 8.0;
+    const mieScaleHeight = 1.2;
+    const bottomRadius = 6360.0;
     return {
         center: center ?? [0.0, yUp ? -bottomRadius : 0.0, yUp ? 0.0 : -bottomRadius],
         bottomRadius,
-        height: 100.0 * scale,
+        height: 100.0,
         rayleigh: {
             densityExpScale: -1.0 / rayleighScaleHeight,
-            scattering: [0.005802, 0.013558, 0.033100].map(c => c / scale) as [number, number, number],
+            scattering: [0.005802, 0.013558, 0.033100],
         },
         mie: {
             densityExpScale: -1.0 / mieScaleHeight,
-            scattering: [0.003996, 0.003996, 0.003996].map(c => c / scale) as [number, number, number],
-            extinction: [0.004440, 0.004440, 0.004440].map(c => c / scale) as [number, number, number],
-            phaseG: 0.8 * scale,
+            scattering: [0.003996, 0.003996, 0.003996],
+            extinction: [0.004440, 0.004440, 0.004440],
+            phaseG: 0.8,
         },
         absorption: {
             layer0: {
-                height: 25.0 * scale,
+                height: 25.0,
                 constantTerm: -2.0 / 3.0,
-                linearTerm: 1.0 / (15.0 * scale),
+                linearTerm: 1.0 / 15.0,
             },
             layer1: {
                 constantTerm: 8.0 / 3.0,
-                linearTerm: -1.0 / (15.0 * scale),
+                linearTerm: -1.0 / 15.0,
             },
-            extinction: [0.000650, 0.001881, 0.000085].map(c => c / scale) as [number, number, number],
+            extinction: [0.000650, 0.001881, 0.000085],
         },
         groundAlbedo: [0.4, 0.4, 0.4],
         multipleScatteringFactor: 1.0,

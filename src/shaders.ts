@@ -14,6 +14,7 @@ import mediumWgsl from './shaders/common/medium.wgsl';
 import multipleScatteringWgsl from './shaders/common/multiple_scattering.wgsl';
 import phaseWgsl from './shaders/common/phase.wgsl';
 import sampleSegmentWgsl from './shaders/common/sample_sagment_t.wgsl';
+import shadowBaseWgsl from './shaders/common/shadow_base.wgsl';
 import skyViewWgsl from './shaders/common/sky_view.wgsl';
 import sunDiskWgsl from './shaders/common/sun_disk.wgsl';
 import uniformsWgsl from './shaders/common/uniforms.wgsl';
@@ -37,7 +38,7 @@ export function makeMultiScatteringLutShaderCode(multiScatteringLutFormat: GPUTe
 }
 
 function makeShadowShaderCode(shadow?: string): string {
-    return `${shadow ?? 'fn get_shadow(p: vec3<f32>, i: u32) -> f32 { return 1.0; }'}`;
+    return `${shadow ?? 'fn get_shadow(p: vec3<f32>, i: u32) -> f32 { return 1.0; }'}\n${shadowBaseWgsl}`;
 }
 
 export function makeSkyViewLutShaderCode(skyViewLutFormat: GPUTextureFormat = 'rgba16float', shadow?: string, customUniforms?: string) {
