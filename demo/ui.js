@@ -250,8 +250,6 @@ Escape: exit pointer lock on canvas`,
             if (old === params.renderSettings.inMeters) {
                 return;
             }
-            
-            const scale = params.renderSettings.inMeters ? 1000.0 : 1 / 1000.0;
 
             camera.position = params.renderSettings.inMeters ? cameraPositionMeters : cameraPositionKilometers;
             //camera.maxSpeed = params.renderSettings.inMeters ? 1.0 : 0.1;
@@ -272,7 +270,7 @@ Escape: exit pointer lock on canvas`,
         title: 'Atmosphere',
         expanded: !showPerformanceGraph,
     });
-    atmosphereFolder.addBinding(params.atmosphere, 'bottomRadius', {min: 100.0, max: 10000.0, step: 10.0, label: 'ground radius (in km)'});
+    atmosphereFolder.addBinding(params.atmosphere, 'bottomRadius', {min: 100.0, max: params.atmosphere.bottomRadius, step: 10.0, label: 'ground radius (in km)'});
     atmosphereFolder.addBinding(params.atmosphere, 'height', {min: 10.0, max: 500.0, step: 1.0, label: 'height (in km)'});
     atmosphereFolder.addBinding(params.atmosphere, 'multipleScatteringFactor', {min: 0.0, max: 1.0, step: 0.1, label: 'Multi-scattering factor'});
     atmosphereFolder.addBinding(params.atmosphereHelper, 'groundAlbedo', {color: {type: 'float'}, label: 'Ground albedo'})

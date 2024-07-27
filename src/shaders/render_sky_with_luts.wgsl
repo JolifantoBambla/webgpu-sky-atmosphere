@@ -67,7 +67,7 @@ fn render_sky(pix: vec2<u32>) -> vec4<f32> {
 
 	let aerial_perspective = textureSampleLevel(aerial_perspective_lut, lut_sampler, vec3<f32>(uv, w), 0);
 
-	if t_depth > (AP_SLICE_COUNT * AP_DISTANCE_PER_SLICE) && all(aerial_perspective == vec4<f32>(0, 0, 0, 1)) {
+	if all(aerial_perspective.rgb == vec3())  {
 		return vec4();
 	}
 
