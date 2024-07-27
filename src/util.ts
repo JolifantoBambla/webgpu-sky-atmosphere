@@ -12,7 +12,9 @@ export class LookUpTable {
 
     constructor(texture: GPUTexture) {
         this.texture = texture;
-        this.view = texture.createView();
+        this.view = texture.createView({
+            label: texture.label,
+        });
     }
 }
 

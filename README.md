@@ -211,6 +211,19 @@ const config = {
 };
 ```
 
+#### Single-pipeline renderers
+
+Both `SkyAtmosphereComputeRenderer` and `SkyAtmosphereRasterRenderer` internally manage two sky rendering pipelines, one for each sky rendering method.
+To create a renderer with only one pipeline, use the following variants:
+
+```js
+const skyRenderer = SkyRayMarchComputeRenderer.create(device, { /* config */ });
+const skyRenderer = SkyWithLutsComputeRenderer.create(device, { /* config */ });
+
+const skyRenderer = SkyRayMarchRasterRenderer.create(device, { /* config */ });
+const skyRenderer = SkyWithLutsRasterRenderer.create(device, { /* config */ });
+```
+
 ### Atmosphere model
 
 The atmosphere of a telluric planet, i.e., a planet with a solid planetery surface, is modelled by three components:

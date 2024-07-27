@@ -99,7 +99,7 @@ export class TransmittanceLutPipeline {
                 },
                 {
                     binding: 1,
-                    resource: resources.transmittanceLut.texture.createView(),
+                    resource: resources.transmittanceLut.view,
                 },
             ],
         });
@@ -222,7 +222,7 @@ export class MultiScatteringLutPipeline {
                 },
                 {
                     binding: 3,
-                    resource: resources.multiScatteringLut.texture.createView(),
+                    resource: resources.multiScatteringLut.view,
                 },
             ],
         });
@@ -395,7 +395,7 @@ export class SkyViewLutPipeline {
                 },
                 {
                     binding: 5,
-                    resource: resources.skyViewLut.texture.createView(),
+                    resource: resources.skyViewLut.view,
                 },
             ].filter(e => e !== undefined) as GPUBindGroupEntry[])
             .map((e, i) => {
@@ -573,7 +573,7 @@ export class AerialPerspectiveLutPipeline {
                 },
                 {
                     binding: 5,
-                    resource: resources.aerialPerspectiveLut.texture.createView(),
+                    resource: resources.aerialPerspectiveLut.view,
                 },
             ].filter(e => e !== undefined) as GPUBindGroupEntry[])
             .map((e, i) => {
