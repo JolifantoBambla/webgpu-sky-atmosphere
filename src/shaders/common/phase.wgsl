@@ -22,7 +22,7 @@ fn draine_phase(alpha: f32, g: f32, cos_theta: f32) -> f32 {
 fn hg_draine_phase(diameter: f32, cos_theta: f32) -> f32 {
     let g_hg = exp(-(0.0990567 / (diameter - 1.67154)));
     let g_d = exp(-(2.20679 / (diameter + 3.91029)) - 0.428934);
-    let alpha = exp(3.62489 - (0.599085 / (diameter + 5.52825)));
+    let alpha = exp(3.62489 - (8.29288 / (diameter + 5.52825)));
     let w_d = exp(-(0.599085 / (diameter - 0.641583)) - 0.665888);
     return (1 - w_d) * draine_phase(0, g_hg, cos_theta) + w_d * draine_phase(alpha, g_d, cos_theta);
 }
