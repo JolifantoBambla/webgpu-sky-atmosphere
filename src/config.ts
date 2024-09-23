@@ -481,7 +481,7 @@ export interface MieHgDPhaseConfig {
      *
      * If {@link useConstantDropletDiameter} is false, this parameter is ignored.
      *
-     * Defaults to 5.0;
+     * Defaults to 3.4;
      */
     constantDropletDiameter?: number,
 }
