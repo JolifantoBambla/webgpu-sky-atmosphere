@@ -1,12 +1,12 @@
 /// <reference types="dist" />
 import { Absorption, AbsorptionLayer0, AbsorptionLayer1, Atmosphere, makeEarthAtmosphere, Mie, Rayleigh } from './atmosphere.js';
-import { AerialPerspectiveLutConfig, AtmosphereLightsConfig, ComputeBackBufferConfig, ComputeRenderTargetConfig, CustomUniformsSourceConfig, DepthBufferConfig, FullResolutionRayMarchConfig, MultiScatteringLutConfig, ShadowConfig, SkyRendererComputeConfig, SkyAtmosphereLutConfig, SkyAtmosphereRendererConfig, SkyAtmosphereComputeRendererConfig, SkyRendererConfigBase, SkyRendererRasterConfig, SkyAtmosphereRasterRendererConfig, SkyViewLutConfig, TransmittanceLutConfig } from './config.js';
+import { AerialPerspectiveLutConfig, AtmosphereLightsConfig, ComputeBackBufferConfig, ComputeRenderTargetConfig, CustomUniformsSourceConfig, DepthBufferConfig, FullResolutionRayMarchConfig, MieHgDPhaseConfig, MultiScatteringLutConfig, ShadowConfig, SkyRendererComputeConfig, SkyAtmosphereLutConfig, SkyAtmosphereRendererConfig, SkyAtmosphereComputeRendererConfig, SkyRendererConfigBase, SkyRendererRasterConfig, SkyAtmosphereRasterRendererConfig, SkyViewLutConfig, TransmittanceLutConfig } from './config.js';
 import { Camera, AtmosphereLight, Uniforms } from './uniforms.js';
 import { atmosphereToFloatArray, ATMOSPHERE_BUFFER_SIZE, uniformsToFloatArray, UNIFORMS_BUFFER_SIZE, SkyAtmosphereResources } from './resources.js';
 import { SkyAtmospherePipelines as SkyAtmosphereLutPipelines } from './pipelines.js';
 import { ComputePass, LookUpTable, RenderPass } from './util.js';
 export { Absorption, AbsorptionLayer0, AbsorptionLayer1, Atmosphere, makeEarthAtmosphere, Mie, Rayleigh, };
-export { AerialPerspectiveLutConfig, AtmosphereLightsConfig, ComputeBackBufferConfig, ComputeRenderTargetConfig, CustomUniformsSourceConfig, DepthBufferConfig, FullResolutionRayMarchConfig, MultiScatteringLutConfig, ShadowConfig, SkyRendererComputeConfig, SkyAtmosphereLutConfig, SkyAtmosphereRendererConfig, SkyAtmosphereComputeRendererConfig, SkyRendererConfigBase, SkyRendererRasterConfig, SkyAtmosphereRasterRendererConfig, SkyViewLutConfig, TransmittanceLutConfig, };
+export { AerialPerspectiveLutConfig, AtmosphereLightsConfig, ComputeBackBufferConfig, ComputeRenderTargetConfig, CustomUniformsSourceConfig, DepthBufferConfig, FullResolutionRayMarchConfig, MieHgDPhaseConfig, MultiScatteringLutConfig, ShadowConfig, SkyRendererComputeConfig, SkyAtmosphereLutConfig, SkyAtmosphereRendererConfig, SkyAtmosphereComputeRendererConfig, SkyRendererConfigBase, SkyRendererRasterConfig, SkyAtmosphereRasterRendererConfig, SkyViewLutConfig, TransmittanceLutConfig, };
 export { Camera, AtmosphereLight, Uniforms, };
 export { atmosphereToFloatArray, ATMOSPHERE_BUFFER_SIZE, uniformsToFloatArray, UNIFORMS_BUFFER_SIZE, SkyAtmosphereResources, };
 export { ComputePass, LookUpTable, RenderPass, };
