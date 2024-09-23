@@ -4,9 +4,13 @@
  * SPDX-License-Identifier: MIT
  */
 
+
+override MIE_USE_HG_DRAINE: bool = false;
+override MIE_USE_HG_DRAINE_DYNAMIC: bool = false;
+
 // https://research.nvidia.com/labs/rtr/approximate-mie/publications/approximate-mie.pdf
 // cloud water droplet diameter in µm (should be 5 µm < d < 50 µm)
-override HG_DRAINE_DROPLET_DIAMETER: f32 = 3.6; // thanks Matěj :)
+override HG_DRAINE_DROPLET_DIAMETER: f32 = 3.4;
 override HG_DRAINE_G_HG = exp(-(0.0990567 / (HG_DRAINE_DROPLET_DIAMETER - 1.67154)));
 override HG_DRAINE_G_D = exp(-(2.20679 / (HG_DRAINE_DROPLET_DIAMETER + 3.91029)) - 0.428934);
 override HG_DRAINE_W_D = exp(-(0.599085 / (HG_DRAINE_DROPLET_DIAMETER - 0.641583)) - 0.665888);
@@ -54,6 +58,18 @@ fn hg_draine_phase_dynamic(cos_theta: f32, diameter: f32) -> f32 {
 fn cornette_shanks_phase(g: f32, cos_theta: f32) -> f32 {
 	let k: f32 = 3.0 / (8.0 * pi) * (1.0 - g * g) / (2.0 + g * g);
 	return k * (1.0 + cos_theta * cos_theta) / pow(1.0 + g * g - 2.0 * g * -cos_theta, 1.5);
+}
+
+fn mie_phase(cos_theta: f32, g_or_d: f32) -> f32 {
+    if MIE_USE_HG_DRAINE {
+        if MIE_USE_HG_DRAINE_DYNAMIC {
+            return hg_draine_phase_dynamic(cos_theta, g_or_d);
+        } else {
+            return hg_draine_phase(cos_theta);
+        }
+    } else {
+        return cornette_shanks_phase(-cos_theta, g_or_d);
+    }
 }
 
 fn rayleigh_phase(cos_theta: f32) -> f32 {

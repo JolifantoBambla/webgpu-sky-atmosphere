@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-import { SkyAtmosphereRendererConfig, ShadowConfig, CustomUniformsSourceConfig } from './config.js';
+import { SkyAtmosphereRendererConfig, ShadowConfig, CustomUniformsSourceConfig, MieHgDPhaseConfig } from './config.js';
 import { AERIAL_PERSPECTIVE_LUT_FORMAT, ATMOSPHERE_BUFFER_SIZE, UNIFORMS_BUFFER_SIZE, DEFAULT_AERIAL_PERSPECTIVE_LUT_SIZE, DEFAULT_MULTISCATTERING_LUT_SIZE, DEFAULT_SKY_VIEW_LUT_SIZE, MULTI_SCATTERING_LUT_FORMAT, SKY_VIEW_LUT_FORMAT, SkyAtmosphereResources, TRANSMITTANCE_LUT_FORMAT } from './resources.js';
 import { makeAerialPerspectiveLutShaderCode, makeMultiScatteringLutShaderCode, makeSkyViewLutShaderCode, makeTransmittanceLutShaderCode } from './shaders.js';
 import { ComputePass } from './util.js';
@@ -234,6 +234,22 @@ export class MultiScatteringLutPipeline {
     }
 }
 
+export function makeMiePhaseOverrides(miePhaseConfig?: MieHgDPhaseConfig): Record<string, GPUPipelineConstantValue> {
+    if (!miePhaseConfig) {
+        return {};
+    } else {
+        const mieOverrides: Record<string, GPUPipelineConstantValue> = {
+            MIE_USE_HG_DRAINE: Number(true),
+        };
+        if (!(miePhaseConfig.useConstantDropletDiameter ?? true)) {
+            mieOverrides['MIE_USE_HG_DRAINE_DYNAMIC'] = Number(true);
+        } else if (miePhaseConfig.constantDropletDiameter) {
+            mieOverrides['HG_DRAINE_DROPLET_DIAMETER'] = miePhaseConfig.constantDropletDiameter;
+        }
+        return mieOverrides;
+    }
+}
+
 export class SkyViewLutPipeline {
     private constructor(
         readonly device: GPUDevice,
@@ -308,7 +324,7 @@ export class SkyViewLutPipeline {
         });
     }
 
-    private static makePipelineDescriptor(device: GPUDevice, bindGroupLayout: GPUBindGroupLayout, skyViewLutFormat: GPUTextureFormat, skyViewLutSize: [number, number], multiscatteringLutSize: [number, number], distanceToMaxSampleCount: number, fromKilometersScaleFactor: number, useMoon: boolean, shadowConfig?: ShadowConfig, customUniformsConfig?: CustomUniformsSourceConfig): GPUComputePipelineDescriptor {
+    private static makePipelineDescriptor(device: GPUDevice, bindGroupLayout: GPUBindGroupLayout, skyViewLutFormat: GPUTextureFormat, skyViewLutSize: [number, number], multiscatteringLutSize: [number, number], distanceToMaxSampleCount: number, fromKilometersScaleFactor: number, useMoon: boolean, shadowConfig?: ShadowConfig, customUniformsConfig?: CustomUniformsSourceConfig, miePhaseConfig?: MieHgDPhaseConfig): GPUComputePipelineDescriptor {
         return {
             label: 'sky view LUT pass',
             layout: device.createPipelineLayout({
@@ -329,20 +345,21 @@ export class SkyViewLutPipeline {
                     MULTI_SCATTERING_LUT_RES_Y: multiscatteringLutSize[1],
                     FROM_KM_SCALE: fromKilometersScaleFactor,
                     USE_MOON: Number(useMoon),
+                    ...makeMiePhaseOverrides(miePhaseConfig),
                 },
             },
         };
     }
 
-    static async createAsync(device: GPUDevice, skyViewLutFormat: GPUTextureFormat, skyViewLutSize: [number, number], multiscatteringLutSize: [number, number], distanceToMaxSampleCount: number, fromKilometersScaleFactor: number, useMoon: boolean, shadowConfig?: ShadowConfig, customUniformsConfig?: CustomUniformsSourceConfig): Promise<SkyViewLutPipeline> {
+    static async createAsync(device: GPUDevice, skyViewLutFormat: GPUTextureFormat, skyViewLutSize: [number, number], multiscatteringLutSize: [number, number], distanceToMaxSampleCount: number, fromKilometersScaleFactor: number, useMoon: boolean, shadowConfig?: ShadowConfig, customUniformsConfig?: CustomUniformsSourceConfig, miePhaseConfig?: MieHgDPhaseConfig): Promise<SkyViewLutPipeline> {
         const bindGroupLayout = this.makeBindGroupLayout(device, skyViewLutFormat, customUniformsConfig);
-        const pipeline = await device.createComputePipelineAsync(this.makePipelineDescriptor(device, bindGroupLayout, skyViewLutFormat, skyViewLutSize, multiscatteringLutSize, distanceToMaxSampleCount, fromKilometersScaleFactor, useMoon, shadowConfig, customUniformsConfig));
+        const pipeline = await device.createComputePipelineAsync(this.makePipelineDescriptor(device, bindGroupLayout, skyViewLutFormat, skyViewLutSize, multiscatteringLutSize, distanceToMaxSampleCount, fromKilometersScaleFactor, useMoon, shadowConfig, customUniformsConfig, miePhaseConfig));
         return new SkyViewLutPipeline(device, pipeline, bindGroupLayout, skyViewLutFormat, skyViewLutSize, multiscatteringLutSize);
     }
 
-    static create(device: GPUDevice, skyViewLutFormat: GPUTextureFormat, skyViewLutSize: [number, number], multiscatteringLutSize: [number, number], distanceToMaxSampleCount: number, fromKilometersScaleFactor: number, useMoon: boolean, shadowConfig?: ShadowConfig, customUniformsConfig?: CustomUniformsSourceConfig): SkyViewLutPipeline {
+    static create(device: GPUDevice, skyViewLutFormat: GPUTextureFormat, skyViewLutSize: [number, number], multiscatteringLutSize: [number, number], distanceToMaxSampleCount: number, fromKilometersScaleFactor: number, useMoon: boolean, shadowConfig?: ShadowConfig, customUniformsConfig?: CustomUniformsSourceConfig, miePhaseConfig?: MieHgDPhaseConfig): SkyViewLutPipeline {
         const bindGroupLayout = this.makeBindGroupLayout(device, skyViewLutFormat, customUniformsConfig);
-        const pipeline = device.createComputePipeline(this.makePipelineDescriptor(device, bindGroupLayout, skyViewLutFormat, skyViewLutSize, multiscatteringLutSize, distanceToMaxSampleCount, fromKilometersScaleFactor, useMoon, shadowConfig, customUniformsConfig));
+        const pipeline = device.createComputePipeline(this.makePipelineDescriptor(device, bindGroupLayout, skyViewLutFormat, skyViewLutSize, multiscatteringLutSize, distanceToMaxSampleCount, fromKilometersScaleFactor, useMoon, shadowConfig, customUniformsConfig, miePhaseConfig));
         return new SkyViewLutPipeline(device, pipeline, bindGroupLayout, skyViewLutFormat, skyViewLutSize, multiscatteringLutSize);
     }
 
@@ -486,7 +503,7 @@ export class AerialPerspectiveLutPipeline {
         });
     }
 
-    private static makePipelineDescriptor(device: GPUDevice, bindGroupLayout: GPUBindGroupLayout, aerialPerspectiveLutFormat: GPUTextureFormat, aerialPerspectiveSliceCount: number, aerialPerspectiveDistancePerSlice: number, multiscatteringLutSize: [number, number], fromKilometersScaleFactor: number, randomizeSampleOffsets: boolean, useMoon: boolean, shadowConfig?: ShadowConfig, customUniformsConfig?: CustomUniformsSourceConfig): GPUComputePipelineDescriptor {
+    private static makePipelineDescriptor(device: GPUDevice, bindGroupLayout: GPUBindGroupLayout, aerialPerspectiveLutFormat: GPUTextureFormat, aerialPerspectiveSliceCount: number, aerialPerspectiveDistancePerSlice: number, multiscatteringLutSize: [number, number], fromKilometersScaleFactor: number, randomizeSampleOffsets: boolean, useMoon: boolean, shadowConfig?: ShadowConfig, customUniformsConfig?: CustomUniformsSourceConfig, miePhaseConfig?: MieHgDPhaseConfig): GPUComputePipelineDescriptor {
         return {
             label: 'aerial perspective LUT pass',
             layout: device.createPipelineLayout({
@@ -507,20 +524,21 @@ export class AerialPerspectiveLutPipeline {
                     FROM_KM_SCALE: fromKilometersScaleFactor,
                     RANDOMIZE_SAMPLE_OFFSET: Number(randomizeSampleOffsets),
                     USE_MOON: Number(useMoon),
+                    ...makeMiePhaseOverrides(miePhaseConfig),
                 },
             },
         };
     }
 
-    static async createAsync(device: GPUDevice, aerialPerspectiveLutFormat: GPUTextureFormat, aerialPerspectiveSliceCount: number, aerialPerspectiveDistancePerSlice: number, multiscatteringLutSize: [number, number], fromKilometersScaleFactor: number, randomizeSampleOffsets: boolean, useMoon: boolean, shadowConfig?: ShadowConfig, customUniformsConfig?: CustomUniformsSourceConfig): Promise<AerialPerspectiveLutPipeline> {
+    static async createAsync(device: GPUDevice, aerialPerspectiveLutFormat: GPUTextureFormat, aerialPerspectiveSliceCount: number, aerialPerspectiveDistancePerSlice: number, multiscatteringLutSize: [number, number], fromKilometersScaleFactor: number, randomizeSampleOffsets: boolean, useMoon: boolean, shadowConfig?: ShadowConfig, customUniformsConfig?: CustomUniformsSourceConfig, miePhaseConfig?: MieHgDPhaseConfig): Promise<AerialPerspectiveLutPipeline> {
         const bindGroupLayout = this.makeBindGroupLayout(device, aerialPerspectiveLutFormat, customUniformsConfig);
-        const pipeline = await device.createComputePipelineAsync(this.makePipelineDescriptor(device, bindGroupLayout, aerialPerspectiveLutFormat, aerialPerspectiveSliceCount, aerialPerspectiveDistancePerSlice, multiscatteringLutSize, fromKilometersScaleFactor, randomizeSampleOffsets, useMoon, shadowConfig, customUniformsConfig));
+        const pipeline = await device.createComputePipelineAsync(this.makePipelineDescriptor(device, bindGroupLayout, aerialPerspectiveLutFormat, aerialPerspectiveSliceCount, aerialPerspectiveDistancePerSlice, multiscatteringLutSize, fromKilometersScaleFactor, randomizeSampleOffsets, useMoon, shadowConfig, customUniformsConfig, miePhaseConfig));
         return new AerialPerspectiveLutPipeline(device, pipeline, bindGroupLayout, aerialPerspectiveLutFormat, aerialPerspectiveSliceCount, aerialPerspectiveDistancePerSlice, multiscatteringLutSize);
     }
 
-    static create(device: GPUDevice, aerialPerspectiveLutFormat: GPUTextureFormat, aerialPerspectiveSliceCount: number, aerialPerspectiveDistancePerSlice: number, multiscatteringLutSize: [number, number], fromKilometersScaleFactor: number, randomizeSampleOffsets: boolean, useMoon: boolean, shadowConfig?: ShadowConfig, customUniformsConfig?: CustomUniformsSourceConfig): AerialPerspectiveLutPipeline {
+    static create(device: GPUDevice, aerialPerspectiveLutFormat: GPUTextureFormat, aerialPerspectiveSliceCount: number, aerialPerspectiveDistancePerSlice: number, multiscatteringLutSize: [number, number], fromKilometersScaleFactor: number, randomizeSampleOffsets: boolean, useMoon: boolean, shadowConfig?: ShadowConfig, customUniformsConfig?: CustomUniformsSourceConfig, miePhaseConfig?: MieHgDPhaseConfig): AerialPerspectiveLutPipeline {
         const bindGroupLayout = this.makeBindGroupLayout(device, aerialPerspectiveLutFormat, customUniformsConfig);
-        const pipeline = device.createComputePipeline(this.makePipelineDescriptor(device, bindGroupLayout, aerialPerspectiveLutFormat, aerialPerspectiveSliceCount, aerialPerspectiveDistancePerSlice, multiscatteringLutSize, fromKilometersScaleFactor, randomizeSampleOffsets, useMoon, shadowConfig, customUniformsConfig));
+        const pipeline = device.createComputePipeline(this.makePipelineDescriptor(device, bindGroupLayout, aerialPerspectiveLutFormat, aerialPerspectiveSliceCount, aerialPerspectiveDistancePerSlice, multiscatteringLutSize, fromKilometersScaleFactor, randomizeSampleOffsets, useMoon, shadowConfig, customUniformsConfig, miePhaseConfig));
         return new AerialPerspectiveLutPipeline(device, pipeline, bindGroupLayout, aerialPerspectiveLutFormat, aerialPerspectiveSliceCount, aerialPerspectiveDistancePerSlice, multiscatteringLutSize);
     }
 
@@ -619,7 +637,7 @@ export class SkyAtmospherePipelines {
         ];
     }
 
-    private static getSkyViewLutArgs(config: SkyAtmosphereRendererConfig): [GPUTextureFormat, [number, number], [number, number], number, number, boolean, ShadowConfig | undefined, CustomUniformsSourceConfig | undefined] {
+    private static getSkyViewLutArgs(config: SkyAtmosphereRendererConfig): [GPUTextureFormat, [number, number], [number, number], number, number, boolean, ShadowConfig | undefined, CustomUniformsSourceConfig | undefined, MieHgDPhaseConfig | undefined] {
         return [
             config.lookUpTables?.skyViewLut?.format ?? SKY_VIEW_LUT_FORMAT,
             config.lookUpTables?.skyViewLut?.size ?? DEFAULT_SKY_VIEW_LUT_SIZE,
@@ -629,10 +647,11 @@ export class SkyAtmospherePipelines {
             config.lights?.useMoon ?? false,
             (config.lookUpTables?.skyViewLut?.affectedByShadow ?? true) ? config.shadow : undefined,
             config.customUniformsSource,
+            config.mieHgDrainePhase,
         ];
     }
 
-    private static getAerialPerspectiveLutArgs(config: SkyAtmosphereRendererConfig): [GPUTextureFormat, number, number, [number, number], number, boolean, boolean, ShadowConfig | undefined, CustomUniformsSourceConfig | undefined] {
+    private static getAerialPerspectiveLutArgs(config: SkyAtmosphereRendererConfig): [GPUTextureFormat, number, number, [number, number], number, boolean, boolean, ShadowConfig | undefined, CustomUniformsSourceConfig | undefined, MieHgDPhaseConfig | undefined] {
         return [
             config.lookUpTables?.aerialPerspectiveLut?.format ?? AERIAL_PERSPECTIVE_LUT_FORMAT,
             (config.lookUpTables?.aerialPerspectiveLut?.size ?? DEFAULT_AERIAL_PERSPECTIVE_LUT_SIZE)[2],
@@ -643,6 +662,7 @@ export class SkyAtmospherePipelines {
             config.lights?.useMoon ?? false,
             (config.lookUpTables?.aerialPerspectiveLut?.affectedByShadow ?? true) ? config.shadow : undefined,
             config.customUniformsSource,
+            config.mieHgDrainePhase,
         ];
     }
 
@@ -671,6 +691,7 @@ export class SkyAtmospherePipelines {
             skyViewLutArgs[5],
             skyViewLutArgs[6],
             skyViewLutArgs[7],
+            skyViewLutArgs[8],
         );
         const aerialPerspectiveLutPipeline = AerialPerspectiveLutPipeline.createAsync(
             device,
@@ -683,6 +704,7 @@ export class SkyAtmospherePipelines {
             aerialPerspectiveLutArgs[6],
             aerialPerspectiveLutArgs[7],
             aerialPerspectiveLutArgs[8],
+            aerialPerspectiveLutArgs[9],
         );
         return new SkyAtmospherePipelines(
             await transmittanceLutPipeline,
@@ -717,6 +739,7 @@ export class SkyAtmospherePipelines {
             skyViewLutArgs[5],
             skyViewLutArgs[6],
             skyViewLutArgs[7],
+            skyViewLutArgs[8],
         );
         const aerialPerspectiveLutPipeline = AerialPerspectiveLutPipeline.create(
             device,
@@ -729,6 +752,7 @@ export class SkyAtmospherePipelines {
             aerialPerspectiveLutArgs[6],
             aerialPerspectiveLutArgs[7],
             aerialPerspectiveLutArgs[8],
+            aerialPerspectiveLutArgs[9],
         );
         return new SkyAtmospherePipelines(
             transmittanceLutPipeline,

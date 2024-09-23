@@ -48,7 +48,7 @@ import {
     makeRenderSkyRaymarchingShaderCode,
     makeRenderSkyLutAndRaymarchingShaderCode,
 } from './shaders.js';
-import { SkyAtmospherePipelines as SkyAtmosphereLutPipelines } from './pipelines.js';
+import { SkyAtmospherePipelines as SkyAtmosphereLutPipelines, makeMiePhaseOverrides } from './pipelines.js';
 import { ComputePass, LookUpTable, RenderPass } from './util.js';
 
 export {
@@ -614,6 +614,7 @@ function makeRayMarchConstantsBase(config: SkyAtmosphereComputeRendererConfig | 
         LIMB_DARKENING_ON_SUN: Number(config.lights?.applyLimbDarkeningOnSun ?? true),
         LIMB_DARKENING_ON_MOON: Number(config.lights?.applyLimbDarkeningOnMoon ?? false),
         USE_MOON: Number(config.lights?.useMoon ?? false),
+        ...makeMiePhaseOverrides(config.mieHgDrainePhase),
     };
     if (!rayMarchDistantSky) {
         constants['SKY_VIEW_LUT_RES_X'] = lutRenderer.resources.skyViewLut.texture.width;

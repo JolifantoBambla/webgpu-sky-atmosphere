@@ -52,7 +52,7 @@ export function makeUi(atmosphere, camera, showPerformanceGraph) {
             },
             mie: {
                 scaleHeight: 1.2,
-                phaseG: 0.8,
+                phaseParam: 5.0,
                 // per 10 m
                 scattering: {
                     r: 0.3996,
@@ -309,7 +309,7 @@ Escape: exit pointer lock on canvas`,
         .on('change', e => {
             params.atmosphere.mie.extinction = [e.value.r, e.value.g, e.value.b].map(c => c / 100.0);
         });            
-    mieFolder.addBinding(params.atmosphere.mie, 'phaseG', {min: 0.0, max: 1.0, step: 0.1, label: 'phase g'});
+    mieFolder.addBinding(params.atmosphere.mie, 'phaseParam', {min: 2.0, max: 20.0, step: 0.1, label: 'Droplet diameter'});
 
     const absorptionFolder = atmosphereFolder.addFolder({
         title: 'Ozone',

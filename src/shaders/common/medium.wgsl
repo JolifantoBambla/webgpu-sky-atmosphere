@@ -16,8 +16,8 @@ struct Atmosphere {
 	mie_density_exp_scale: f32,
 	// Mie extinction coefficients
 	mie_extinction: vec3<f32>,
-	// Mie phase function excentricity
-	mie_phase_g: f32,
+	// Mie phase parameter (Cornette-Shanks excentricity or Henyey-Greenstein-Draine droplet diameter)
+	mie_phase_param: f32,
 	// Mie absorption coefficients
 	mie_absorption: vec3<f32>,
 	
@@ -46,7 +46,7 @@ struct Atmosphere {
 	multi_scattering_factor: f32,
 }
 
-fn make_earth_atmosphere() -> Atmosphere {
+fn make_earth_atmosphere(use_henyey_greenstein: bool) -> Atmosphere {
 	let earth_rayleigh_scale_height = 8.0;
 	let earth_mie_scale_height = 1.2;
 
@@ -62,7 +62,11 @@ fn make_earth_atmosphere() -> Atmosphere {
 	atmosphere.mie_scattering = vec3(0.003996, 0.003996, 0.003996);			// 1/km
 	atmosphere.mie_extinction = vec3(0.004440, 0.004440, 0.004440);			// 1/km
 	atmosphere.mie_absorption = max(atmosphere.mie_extinction - atmosphere.mie_scattering, vec3());
-	atmosphere.mie_phase_g = 0.8;
+	if use_henyey_greenstein {
+		atmosphere.mie_phase_param = 0.8;
+	} else {
+		atmosphere.mie_phase_param = 5.0;
+	}
 	
 	atmosphere.absorption_extinction = vec3(0.000650, 0.001881, 0.000085);	// 1/km
 	atmosphere.absorption_density_0_layer_height = 25.0;
