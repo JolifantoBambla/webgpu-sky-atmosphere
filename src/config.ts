@@ -464,6 +464,28 @@ export interface CustomUniformsSourceConfig {
     wgslCode: string,
 }
 
+/**
+ * Parameters for the Henyey-Greenstein + Draine ({@link https://research.nvidia.com/labs/rtr/approximate-mie/}) approximation of the Mie phase function
+ */
+export interface MieHgDPhaseConfig {
+    /**
+     * If this is true, a constant droplet diameter will be used throughout the atmosphere renderer's lifetime.
+     * Otherwise, the diameter is set dynamically each frame using {@link Mie.phaseParam}.
+     *
+     * Defaults to true.
+     */
+    useConstantDropletDiameter?: boolean,
+
+    /**
+     * The constant water droplet diameter for the Henyey-Greenstein + Draine phase function.
+     *
+     * If {@link useConstantDropletDiameter} is false, this parameter is ignored.
+     *
+     * Defaults to 3.4;
+     */
+    constantDropletDiameter?: number,
+}
+
 export interface SkyAtmosphereRendererConfig {
     /**
      * A name used to lable internal resources and pipelines.
@@ -521,6 +543,15 @@ export interface SkyAtmosphereRendererConfig {
      * Config for internally used lookup tables.
      */
     lookUpTables?: SkyAtmosphereLutConfig,
+
+    /**
+     * Config for the Henyey-Greenstein + Draine ({@link https://research.nvidia.com/labs/rtr/approximate-mie/}) approximation of the Mie phase function.
+     *
+     * If this is set, the renderer uses the Henyey-Greenstein + Draine approximation instead of the Cornette-Shanks approximation.
+     *
+     * Defaults to undefined.
+     */
+    mieHgDrainePhase?: MieHgDPhaseConfig,
 }
 
 export interface SkyAtmosphereComputeRendererConfig extends SkyAtmosphereRendererConfig {

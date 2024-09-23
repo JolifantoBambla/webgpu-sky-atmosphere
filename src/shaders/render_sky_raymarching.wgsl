@@ -50,7 +50,7 @@ fn integrate_scattered_luminance(uv: vec2<f32>, world_pos: vec3<f32>, world_dir:
 	let sun_illuminance = config.sun.illuminance;
 
 	let cos_theta = dot(sun_direction, world_dir);
-	let mie_phase_val = cornette_shanks_phase(atmosphere.mie_phase_g, -cos_theta);
+	let mie_phase_val = mie_phase(cos_theta, atmosphere.mie_phase_param);
 	let rayleigh_phase_val = rayleigh_phase(cos_theta);
 
 	var moon_direction = config.moon.direction;
@@ -65,7 +65,7 @@ fn integrate_scattered_luminance(uv: vec2<f32>, world_pos: vec3<f32>, world_dir:
 		moon_illuminance = config.moon.illuminance;
 
 		cos_theta_moon = dot(moon_direction, world_dir);
-		mie_phase_val_moon = cornette_shanks_phase(atmosphere.mie_phase_g, -cos_theta_moon);
+		mie_phase_val_moon = mie_phase(cos_theta_moon, atmosphere.mie_phase_param);
 		rayleigh_phase_val_moon = rayleigh_phase(cos_theta_moon);
 	}
 

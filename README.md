@@ -267,6 +267,43 @@ skyRenderer.updateAtmosphere(newAtmosphere);
 skyRenderer.renderConstantLuts(passEncoder);
 ```
 
+#### Mie phase approximation
+
+Two approximations of the Mie phase function are supported:
+ - Cornette-Shanks (default)
+ - Henyey-Greenstein + Draine as published by [Jendersie and d'Eon](https://research.nvidia.com/labs/rtr/approximate-mie/)
+
+Generally, the latter produces a stronger glare around the sun but also stronger banding artifacts when rendering the sky with lookup tables.
+
+To switch to the Henyey-Greenstein + Draine approximation use the `mieHgDrainePhase` config parameter:
+
+```js
+// use the default constant droplet diameter for the Mie phase approximation
+// in this case, the atmosphere's `mie.phaseParam` is ignored
+const config = {
+  mieHgDrainePhase: {},
+  ...
+};
+
+// or: override the constant droplet diameter
+// in this case, the atmosphere's `mie.phaseParam` is ignored
+const config = {
+  mieHgDrainePhase: {
+    constantDropletDiameter: 3.6,
+  },
+  ...
+};
+
+// or: allow changing the droplet diameter at runtime
+// in this case, the atmosphere's `mie.phaseParam` is interpreted as the droplet diameter size
+const config = {
+  mieHgDrainePhase: {
+    useConstantDropletDiameter: true,
+  },
+  ...
+};
+```
+
 #### Scale
 All sky renderers use the distance scale 1 = 1km.
 

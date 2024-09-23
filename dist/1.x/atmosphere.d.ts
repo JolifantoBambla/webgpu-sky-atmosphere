@@ -30,9 +30,14 @@ export interface Mie {
      */
     extinction: [number, number, number];
     /**
-     * Mie phase function excentricity, i.e., the asymmetry paraemter of the Cornette-Shanks phase function in range ]-1, 1[.
+     * Mie phase function parameter.
+     *
+     * For Cornette-Shanks, this is the excentricity, i.e., the asymmetry paraemter of the phase function in range ]-1, 1[.
+     *
+     * For Henyey-Greenstein + Draine, this is the droplet diameter in µm. This should be in range ]2, 20[ (according to the paper, the lower bound for plausible fog particle sizes is 5 µm).
+     * For Henyey-Greenstein + Draine using a constant droplet diameter, this parameter has no effect.
      */
-    phaseG: number;
+    phaseParam: number;
 }
 export interface AbsorptionLayer0 {
     /**
@@ -133,7 +138,8 @@ export interface Atmosphere {
  *
  * @param center The center of the atmosphere. Defaults to `upDirection * -{@link Atmosphere.bottomRadius}` (`upDirection` depends on `yUp`).
  * @param yUp If true, the up direction for the default center will be `[0, 1, 0]`, otherwise `[0, 0, 1]` will be used.
+ * @param useHenyeyGreenstein If this is true, {@link Mie.phaseParam} will be set to a value suitable for the Cornette-Shanks approximation (`0.8`), otherwise it is set to `3.4` for use with the Henyey-Greenstein + Draine approximation.
  *
  * @returns Atmosphere parameters corresponding to earth's atmosphere.
  */
-export declare function makeEarthAtmosphere(center?: [number, number, number], yUp?: boolean): Atmosphere;
+export declare function makeEarthAtmosphere(center?: [number, number, number], yUp?: boolean, useHenyeyGreenstein?: boolean): Atmosphere;

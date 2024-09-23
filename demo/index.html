@@ -19,7 +19,7 @@
         import { makeDragonRenderer } from './stanford-dragon.js';
         import { makeUi } from './ui.js';
 
-        import { SkyAtmosphereComputeRenderer, SkyAtmosphereRasterRenderer } from '../dist/1.x/webgpu-sky-atmosphere.module.min.js';
+        import { SkyAtmosphereComputeRenderer, SkyAtmosphereRasterRenderer, makeEarthAtmosphere } from '../dist/1.x/webgpu-sky-atmosphere.module.min.js';
 
         const urlParams = new URLSearchParams(window.location.search);
         const useTimestampQuery = new URLSearchParams(window.location.search).has('timestamp_query');
@@ -212,6 +212,7 @@
             const distanceScaleFactor = 1.0;
             const skyAtmosphereConfigBase = {
                 distanceScaleFactor,
+                atmosphere: makeEarthAtmosphere(undefined, true, false),
                 shadow: {
                     bindGroupLayouts: [shadowBindGroupLayout],
                     bindGroups: [device.createBindGroup({
@@ -239,6 +240,9 @@
                             return 1.0;
                         }
                     `
+                },
+                mieHgDrainePhase: {
+                    useConstantDropletDiameter: false,
                 },
             };
             const computePassConfigBase = {

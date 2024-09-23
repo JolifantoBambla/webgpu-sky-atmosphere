@@ -192,7 +192,7 @@ export function atmosphereToFloatArray(atmosphere: Atmosphere): Float32Array {
         atmosphere.mie.extinction[0],
         atmosphere.mie.extinction[1],
         atmosphere.mie.extinction[2],
-        atmosphere.mie.phaseG,
+        atmosphere.mie.phaseParam,
         Math.max(atmosphere.mie.extinction[0] - atmosphere.mie.scattering[0], 0.0),
         Math.max(atmosphere.mie.extinction[1] - atmosphere.mie.scattering[1], 0.0),
         Math.max(atmosphere.mie.extinction[2] - atmosphere.mie.scattering[2], 0.0),
