@@ -301,8 +301,7 @@
                                                 },
                                             },
                                         },
-                                        (existing ? existing.skyAtmospherePipelines : undefined),
-                                        (existing ? existing.resources : undefined),
+                                        (existing ? existing.lutRenderer : undefined),
                                     ) :
                                     SkyAtmosphereRasterRenderer.create(
                                         device,
@@ -316,8 +315,7 @@
                                                 },
                                             },
                                         },
-                                        (existing ? existing.skyAtmospherePipelines : undefined),
-                                        (existing ? existing.resources : undefined),
+                                        (existing ? existing.lutRenderer : undefined),
                                     )
                                 )
                             );
