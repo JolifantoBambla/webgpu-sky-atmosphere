@@ -352,7 +352,7 @@ export class SkyRayMarchComputeRenderer extends SkyComputeRenderer {
         };
 
         const module = device.createShaderModule({
-            code: (rayMarchDistantSky ? makeRenderSkyRaymarchingShaderCode : makeRenderSkyLutAndRaymarchingShaderCode)(config.skyRenderer.renderTarget.texture.format, config.shadow?.wgslCode, config.customUniformsSource?.wgslCode),
+            code: (rayMarchDistantSky ? makeRenderSkyRaymarchingShaderCode : makeRenderSkyLutAndRaymarchingShaderCode)(config.skyRenderer.renderTarget.texture.format, config.shadow?.wgslCode, config.customUniformsSource?.wgslCode, config.mieHgDrainePhase?.constantDropletDiameter),
         });
 
         return {

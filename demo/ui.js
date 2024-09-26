@@ -307,7 +307,7 @@ Escape: exit pointer lock on canvas`,
         .on('change', e => {
             params.atmosphere.mie.extinction = [e.value.r, e.value.g, e.value.b].map(c => c / 100.0);
         });            
-    mieFolder.addBinding(params.atmosphere.mie, 'phaseParam', {min: 2.0, max: 20.0, step: 0.1, label: 'Droplet diameter'});
+    mieFolder.addBinding(params.atmosphere.mie, 'phaseParam', {min: 0.01, max: 20.0, step: 0.01, label: 'Droplet diameter'});
 
     const absorptionFolder = atmosphereFolder.addFolder({
         title: 'Ozone',

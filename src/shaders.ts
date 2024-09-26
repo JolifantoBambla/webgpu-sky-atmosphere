@@ -9,6 +9,11 @@ import constantsWgsl from './shaders/common/constants.wgsl';
 import customUniformsWgsl from './shaders/common/custom_uniforms.wgsl';
 import coordinateSystemWgsl from './shaders/common/coordinate_system.wgsl';
 import fullScreenVertexShaderWgsl from './shaders/common/vertex_full_screen.wgsl';
+import hgDraineConstWgsl from './shaders/common/hg_draine_phase_const.wgsl';
+import hgDraineLargeWgsl from './shaders/common/hg_draine_large.wgsl';
+import hgDraineMid2Wgsl from './shaders/common/hg_draine_mid2.wgsl';
+import hgDraineMid1Wgsl from './shaders/common/hg_draine_mid1.wgsl';
+import hgDraineSmallWgsl from './shaders/common/hg_draine_small.wgsl';
 import intersectionWgsl from './shaders/common/intersection.wgsl';
 import mediumWgsl from './shaders/common/medium.wgsl';
 import multipleScatteringWgsl from './shaders/common/multiple_scattering.wgsl';
@@ -29,20 +34,33 @@ import renderSkyWithLutsWgsl from './shaders/render_sky_with_luts.wgsl';
 import renderSkyRaymarchingWgsl from './shaders/render_sky_raymarching.wgsl';
 import renderSkyLutAndRaymarchingWgsl from './shaders/render_sky_luts_and_raymarch.wgsl';
 
+function makePhaseShaderCode(constDropletDiameter?: number): string {
+    const base = phaseWgsl.replace('// include hg_draine_const', hgDraineConstWgsl);
+    if (!constDropletDiameter || constDropletDiameter >= 5.0) {
+        return base.replace('// include hg_draine_size', hgDraineLargeWgsl);
+    } else if (constDropletDiameter >= 1.5) {
+        return base.replace('// include hg_draine_size', hgDraineMid2Wgsl);
+    } else if (constDropletDiameter > 0.1) {
+        return base.replace('// include hg_draine_size', hgDraineMid1Wgsl);
+    } else {
+        return base.replace('// include hg_draine_size', hgDraineSmallWgsl);
+    }
+}
+
 export function makeTransmittanceLutShaderCode(transmittanceLutFormat: GPUTextureFormat = 'rgba16float') {
     return `${constantsWgsl}\n${intersectionWgsl}\n${mediumWgsl}\n${renderTransmittanceLutWgsl}`.replace('rgba16float', transmittanceLutFormat);
 }
 
 export function makeMultiScatteringLutShaderCode(multiScatteringLutFormat: GPUTextureFormat = 'rgba16float') {
-    return `${constantsWgsl}\n${intersectionWgsl}\n${mediumWgsl}\n${phaseWgsl}\n${uvWgsl}\n${renderMultiScatteringLutWgsl}`.replace('rgba16float', multiScatteringLutFormat);
+    return `${constantsWgsl}\n${intersectionWgsl}\n${mediumWgsl}\n${makePhaseShaderCode()}\n${uvWgsl}\n${renderMultiScatteringLutWgsl}`.replace('rgba16float', multiScatteringLutFormat);
 }
 
 function makeShadowShaderCode(shadow?: string): string {
     return `${shadow ?? 'fn get_shadow(p: vec3<f32>, i: u32) -> f32 { return 1.0; }'}\n${shadowBaseWgsl}`;
 }
 
-export function makeSkyViewLutShaderCode(skyViewLutFormat: GPUTextureFormat = 'rgba16float', shadow?: string, customUniforms?: string) {
-    const base = `${constantsWgsl}\n${intersectionWgsl}\n${mediumWgsl}\n${phaseWgsl}\n${uvWgsl}\n${uniformsWgsl}\n${customUniforms ? `${customUniforms}\n${customUniformsWgsl}\n` : ''}${coordinateSystemWgsl}\n${multipleScatteringWgsl}\n`;
+export function makeSkyViewLutShaderCode(skyViewLutFormat: GPUTextureFormat = 'rgba16float', shadow?: string, customUniforms?: string, constDropletDiameter?: number): string {
+    const base = `${constantsWgsl}\n${intersectionWgsl}\n${mediumWgsl}\n${makePhaseShaderCode(constDropletDiameter)}\n${uvWgsl}\n${uniformsWgsl}\n${customUniforms ? `${customUniforms}\n${customUniformsWgsl}\n` : ''}${coordinateSystemWgsl}\n${multipleScatteringWgsl}\n`;
     let shader = renderSkyViewLutWgsl.replace('rgba16float', skyViewLutFormat);
     if (customUniforms) {
         shader = shader.replace('let config = config_buffer', 'let config = get_uniforms()');
@@ -54,8 +72,8 @@ export function makeSkyViewLutShaderCode(skyViewLutFormat: GPUTextureFormat = 'r
     return `${makeShadowShaderCode(shadow)}\n${base}\n${shader}`;
 }
 
-export function makeAerialPerspectiveLutShaderCode(aerialPerspectiveLutFormat: GPUTextureFormat = 'rgba16float', shadow?: string, customUniforms?: string) {
-    const base = `${constantsWgsl}\n${intersectionWgsl}\n${mediumWgsl}\n${phaseWgsl}\n${uvWgsl}\n${uniformsWgsl}\n${customUniforms ? `${customUniforms}\n${customUniformsWgsl}\n` : ''}${coordinateSystemWgsl}\n${multipleScatteringWgsl}\n${aerialPerspectiveWgsl}\n${sampleSegmentWgsl}\n`;
+export function makeAerialPerspectiveLutShaderCode(aerialPerspectiveLutFormat: GPUTextureFormat = 'rgba16float', shadow?: string, customUniforms?: string, constDropletDiameter?: number) {
+    const base = `${constantsWgsl}\n${intersectionWgsl}\n${mediumWgsl}\n${makePhaseShaderCode(constDropletDiameter)}\n${uvWgsl}\n${uniformsWgsl}\n${customUniforms ? `${customUniforms}\n${customUniformsWgsl}\n` : ''}${coordinateSystemWgsl}\n${multipleScatteringWgsl}\n${aerialPerspectiveWgsl}\n${sampleSegmentWgsl}\n`;
     let shader = renderAerialPerspectiveWgsl.replace('rgba16float', aerialPerspectiveLutFormat);
     if (customUniforms) {
         shader = shader.replace('let config = config_buffer', 'let config = get_uniforms()');
@@ -68,7 +86,7 @@ export function makeAerialPerspectiveLutShaderCode(aerialPerspectiveLutFormat: G
 }
 
 export function makeRenderSkyWithLutsShaderCode(renderTargetFormat: GPUTextureFormat = 'rgba16float', customUniforms?: string) {
-    const base = `${constantsWgsl}\n${intersectionWgsl}\n${mediumWgsl}\n${phaseWgsl}\n${uvWgsl}\n${uniformsWgsl}\n${customUniforms ? `${customUniforms}\n${customUniformsWgsl}\n` : ''}${coordinateSystemWgsl}\n${aerialPerspectiveWgsl}\n${skyViewWgsl}\n${blendWgsl}\n${sunDiskWgsl}\n${fullScreenVertexShaderWgsl}\n${sampleSegmentWgsl}\n`;
+    const base = `${constantsWgsl}\n${intersectionWgsl}\n${mediumWgsl}\n${uvWgsl}\n${uniformsWgsl}\n${customUniforms ? `${customUniforms}\n${customUniformsWgsl}\n` : ''}${coordinateSystemWgsl}\n${aerialPerspectiveWgsl}\n${skyViewWgsl}\n${blendWgsl}\n${sunDiskWgsl}\n${fullScreenVertexShaderWgsl}\n${sampleSegmentWgsl}\n`;
     let shader = renderSkyWithLutsWgsl.replace('rgba16float', renderTargetFormat);
     if (customUniforms) {
         shader = shader.replace('let config = config_buffer', 'let config = get_uniforms()');
@@ -80,8 +98,8 @@ export function makeRenderSkyWithLutsShaderCode(renderTargetFormat: GPUTextureFo
     return `${base}\n${shader}`;
 }
 
-export function makeRenderSkyRaymarchingShaderCode(renderTargetFormat: GPUTextureFormat = 'rgba16float', shadow?: string, customUniforms?: string) {
-    const base = `${constantsWgsl}\n${intersectionWgsl}\n${mediumWgsl}\n${phaseWgsl}\n${uvWgsl}\n${uniformsWgsl}\n${customUniforms ? `${customUniforms}\n${customUniformsWgsl}\n` : ''}${coordinateSystemWgsl}\n${multipleScatteringWgsl}\n${blendWgsl}\n${sunDiskWgsl}\n${fullScreenVertexShaderWgsl}\n${sampleSegmentWgsl}\n`;
+export function makeRenderSkyRaymarchingShaderCode(renderTargetFormat: GPUTextureFormat = 'rgba16float', shadow?: string, customUniforms?: string, constDropletDiameter?: number) {
+    const base = `${constantsWgsl}\n${intersectionWgsl}\n${mediumWgsl}\n${makePhaseShaderCode(constDropletDiameter)}\n${uvWgsl}\n${uniformsWgsl}\n${customUniforms ? `${customUniforms}\n${customUniformsWgsl}\n` : ''}${coordinateSystemWgsl}\n${multipleScatteringWgsl}\n${blendWgsl}\n${sunDiskWgsl}\n${fullScreenVertexShaderWgsl}\n${sampleSegmentWgsl}\n`;
     let shader = renderSkyRaymarchingWgsl.replace('rgba16float', renderTargetFormat);
     if (customUniforms) {
         shader = shader.replace('let config = config_buffer', 'let config = get_uniforms()');
@@ -93,8 +111,8 @@ export function makeRenderSkyRaymarchingShaderCode(renderTargetFormat: GPUTextur
     return `${makeShadowShaderCode(shadow)}\n${base}\n${shader}`;
 }
 
-export function makeRenderSkyLutAndRaymarchingShaderCode(renderTargetFormat: GPUTextureFormat = 'rgba16float', shadow?: string, customUniforms?: string) {
-    const base = `${constantsWgsl}\n${intersectionWgsl}\n${mediumWgsl}\n${phaseWgsl}\n${uvWgsl}\n${uniformsWgsl}\n${customUniforms ? `${customUniforms}\n${customUniformsWgsl}\n` : ''}${coordinateSystemWgsl}\n${multipleScatteringWgsl}\n${skyViewWgsl}\n${blendWgsl}\n${sunDiskWgsl}\n${fullScreenVertexShaderWgsl}\n${sampleSegmentWgsl}\n`;
+export function makeRenderSkyLutAndRaymarchingShaderCode(renderTargetFormat: GPUTextureFormat = 'rgba16float', shadow?: string, customUniforms?: string, constDropletDiameter?: number) {
+    const base = `${constantsWgsl}\n${intersectionWgsl}\n${mediumWgsl}\n${makePhaseShaderCode(constDropletDiameter)}\n${uvWgsl}\n${uniformsWgsl}\n${customUniforms ? `${customUniforms}\n${customUniformsWgsl}\n` : ''}${coordinateSystemWgsl}\n${multipleScatteringWgsl}\n${skyViewWgsl}\n${blendWgsl}\n${sunDiskWgsl}\n${fullScreenVertexShaderWgsl}\n${sampleSegmentWgsl}\n`;
     let shader = renderSkyLutAndRaymarchingWgsl.replace('rgba16float', renderTargetFormat);
     if (customUniforms) {
         shader = shader.replace('let config = config_buffer', 'let config = get_uniforms()');

@@ -353,7 +353,7 @@ export class SkyRayMarchRasterRenderer extends SkyRasterRenderer {
                 targets[0].blend = useDualSourceBlending ? dualBlendState : blendState;
             }
 
-            let code = (rayMarchDistantSky ? makeRenderSkyRaymarchingShaderCode : makeRenderSkyLutAndRaymarchingShaderCode)('rgba16float', config.shadow?.wgslCode, config.customUniformsSource?.wgslCode);
+            let code = (rayMarchDistantSky ? makeRenderSkyRaymarchingShaderCode : makeRenderSkyLutAndRaymarchingShaderCode)('rgba16float', config.shadow?.wgslCode, config.customUniformsSource?.wgslCode, config.mieHgDrainePhase?.constantDropletDiameter);
             if (useDualSourceBlending) {
                 code = code.replace('@location(0)', '@location(0) @blend_src(0)');
                 code = code.replace('@location(1)', '@location(0) @blend_src(1)');
