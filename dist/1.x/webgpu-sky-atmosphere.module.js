@@ -1,4 +1,4 @@
-/* webgpu-sky-atmosphere@1.0.1, license MIT */
+/* webgpu-sky-atmosphere@1.1.0, license MIT */
 /*
  * Copyright (c) 2024 Lukas Herzberger
  * Copyright (c) 2020 Epic Games, Inc.
