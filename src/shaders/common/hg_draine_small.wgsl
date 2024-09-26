@@ -1,0 +1,10 @@
+/*
+ * Copyright (c) 2024 Lukas Herzberger
+ * SPDX-License-Identifier: MIT
+ */
+
+// 𝑑 <= 0.1 µm
+override HG_DRAINE_G_HG = 13.8 * HG_DRAINE_DROPLET_DIAMETER * HG_DRAINE_DROPLET_DIAMETER;
+override HG_DRAINE_G_D = 1.1456 * HG_DRAINE_DROPLET_DIAMETER * sin(9.29044 * HG_DRAINE_DROPLET_DIAMETER);
+override HG_DRAINE_ALPHA = 250.0;
+override HG_DRAINE_W_D = 0.252977 - pow(312.983 * HG_DRAINE_DROPLET_DIAMETER, 4.3);

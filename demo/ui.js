@@ -1,7 +1,7 @@
 import { makeEarthAtmosphere } from '../dist/1.x/webgpu-sky-atmosphere.module.min.js';
 import { Pane } from 'https://cdn.jsdelivr.net/npm/tweakpane@4.0.3/dist/tweakpane.min.js';
 
-export function makeUi(atmosphere, camera, showPerformanceGraph) {
+export function makeUi(atmosphere, camera, showPerformanceGraph, useHgDrainePhase) {
     const cameraPositionKilometers = [0, 1, 100];
     const cameraPositionMeters = [0, 50, 100000];
 
@@ -52,7 +52,6 @@ export function makeUi(atmosphere, camera, showPerformanceGraph) {
             },
             mie: {
                 scaleHeight: 1.2,
-                phaseParam: 5.0,
                 // per 10 m
                 scattering: {
                     r: 0.3996,
@@ -306,8 +305,13 @@ Escape: exit pointer lock on canvas`,
     mieFolder.addBinding(params.atmosphereHelper.mie, 'extinction', {color: {type: 'float'}, label: 'extinction (per 10 m)'})
         .on('change', e => {
             params.atmosphere.mie.extinction = [e.value.r, e.value.g, e.value.b].map(c => c / 100.0);
-        });            
-    mieFolder.addBinding(params.atmosphere.mie, 'phaseParam', {min: 2.0, max: 20.0, step: 0.1, label: 'Droplet diameter'});
+        });
+    if (useHgDrainePhase) {
+        mieFolder.addBinding(params.atmosphere.mie, 'phaseParam', {min: 0.01, max: 20.0, step: 0.01, label: 'Droplet diameter'});
+    } else {
+        mieFolder.addBinding(params.atmosphere.mie, 'phaseParam', {min: 0.0, max: 1.0, step: 0.01, label: 'Eccentricity (g)'});
+    }
+
 
     const absorptionFolder = atmosphereFolder.addFolder({
         title: 'Ozone',

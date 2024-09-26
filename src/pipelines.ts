@@ -334,7 +334,7 @@ export class SkyViewLutPipeline {
             compute: {
                 module: device.createShaderModule({
                     label: 'sky view LUT',
-                    code: makeSkyViewLutShaderCode(skyViewLutFormat, shadowConfig?.wgslCode, customUniformsConfig?.wgslCode),
+                    code: makeSkyViewLutShaderCode(skyViewLutFormat, shadowConfig?.wgslCode, customUniformsConfig?.wgslCode, miePhaseConfig?.constantDropletDiameter),
                 }),
                 entryPoint: 'render_sky_view_lut',
                 constants: {
@@ -513,7 +513,7 @@ export class AerialPerspectiveLutPipeline {
             compute: {
                 module: device.createShaderModule({
                     label: 'aerial perspective LUT',
-                    code: makeAerialPerspectiveLutShaderCode(aerialPerspectiveLutFormat, shadowConfig?.wgslCode, customUniformsConfig?.wgslCode),
+                    code: makeAerialPerspectiveLutShaderCode(aerialPerspectiveLutFormat, shadowConfig?.wgslCode, customUniformsConfig?.wgslCode, miePhaseConfig?.constantDropletDiameter),
                 }),
                 entryPoint: 'render_aerial_perspective_lut',
                 constants: {
