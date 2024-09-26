@@ -8,7 +8,12 @@ Renders the clear sky / atmosphere for both ground and space views as a post pro
 
 Find the docs [here](https://jolifantobambla.github.io/webgpu-sky-atmosphere/).
 
-Try it out [here](https://jolifantobambla.github.io/webgpu-sky-atmosphere/demo/) (requires WebGPU support).
+Or try the [demo](https://jolifantobambla.github.io/webgpu-sky-atmosphere/demo/) (requires WebGPU support).
+It comes in multiple flavors:
+ - [Cornette-Shanks for Mie scattering](https://jolifantobambla.github.io/webgpu-sky-atmosphere/demo/)
+ - [Henyey-Greenstein + Draine for Mie scattering](https://jolifantobambla.github.io/webgpu-sky-atmosphere/demo/?hg_draine)
+ - [Timings, Cornette-Shanks](https://jolifantobambla.github.io/webgpu-sky-atmosphere/demo/?timestamp_query)
+ - [Timings, Henyey-Greenstein + Draine](https://jolifantobambla.github.io/webgpu-sky-atmosphere/demo/?timestamp_query&hg_draine)
 
 
 ## Installation
@@ -270,10 +275,8 @@ skyRenderer.renderConstantLuts(passEncoder);
 #### Mie phase approximation
 
 Two approximations of the Mie phase function are supported:
- - Cornette-Shanks (default)
- - Henyey-Greenstein + Draine as published by [Jendersie and d'Eon](https://research.nvidia.com/labs/rtr/approximate-mie/)
-
-Generally, the latter produces a stronger glare around the sun but also stronger banding artifacts when rendering the sky with lookup tables.
+ - Cornette-Shanks (default) (see it [live](https://jolifantobambla.github.io/webgpu-sky-atmosphere/demo/))
+ - Henyey-Greenstein + Draine as published by [Jendersie and d'Eon](https://research.nvidia.com/labs/rtr/approximate-mie/) (see it [live](https://jolifantobambla.github.io/webgpu-sky-atmosphere/demo/?hg_draine))
 
 To switch to the Henyey-Greenstein + Draine approximation use the `mieHgDrainePhase` config parameter:
 
