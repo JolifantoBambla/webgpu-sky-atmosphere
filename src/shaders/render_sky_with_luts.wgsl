@@ -25,15 +25,15 @@ fn use_sky_view_lut(view_height: f32, world_pos: vec3<f32>, world_dir: vec3<f32>
 
 	let side = normalize(cross(zenith, world_dir));	// assumes non parallel vectors
 	let forward = normalize(cross(side, zenith));	// aligns toward the sun light but perpendicular to up vector
-	let cos_light_view = normalize(vec2(dot(sun_dir, forward), dot(sun_dir, side))).x;
+	let cos_light_view = normalize(vec2<f32>(dot(sun_dir, forward), dot(sun_dir, side))).x;
 
-	let intersects_ground = ray_intersects_sphere(world_pos, world_dir, vec3(), atmosphere.bottom_radius);
+	let intersects_ground = ray_intersects_sphere(world_pos, world_dir, vec3<f32>(), atmosphere.bottom_radius);
 
 	let uv = sky_view_lut_params_to_uv(atmosphere, intersects_ground, cos_view_zenith, cos_light_view, view_height);
 
 	let sky_view = textureSampleLevel(sky_view_lut, lut_sampler, uv, 0);
 
-	return vec4(sky_view.rgb + get_sun_luminance(world_pos, world_dir, atmosphere, config), sky_view.a);
+	return vec4<f32>(sky_view.rgb + get_sun_luminance(world_pos, world_dir, atmosphere, config), sky_view.a);
 }
 
 fn render_sky(pix: vec2<u32>) -> vec4<f32> {
@@ -67,8 +67,8 @@ fn render_sky(pix: vec2<u32>) -> vec4<f32> {
 
 	let aerial_perspective = textureSampleLevel(aerial_perspective_lut, lut_sampler, vec3<f32>(uv, w), 0);
 
-	if all(aerial_perspective.rgb == vec3())  {
-		return vec4();
+	if all(aerial_perspective.rgb == vec3<f32>())  {
+		return vec4<f32>();
 	}
 
 	return weight * aerial_perspective;
@@ -82,7 +82,7 @@ struct RenderSkyFragment {
 @fragment
 fn fragment(@builtin(position) coord: vec4<f32>) -> RenderSkyFragment {
 	let result = render_sky(vec2<u32>(floor(coord.xy)));
-	return RenderSkyFragment(vec4(result.rgb, 1.0), vec4(vec3(result.a), 1.0));
+	return RenderSkyFragment(vec4<f32>(result.rgb, 1.0), vec4<f32>(vec3<f32>(result.a), 1.0));
 }
 
 @compute

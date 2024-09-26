@@ -46,42 +46,6 @@ struct Atmosphere {
 	multi_scattering_factor: f32,
 }
 
-fn make_earth_atmosphere(use_henyey_greenstein: bool) -> Atmosphere {
-	let earth_rayleigh_scale_height = 8.0;
-	let earth_mie_scale_height = 1.2;
-
-	var atmosphere: Atmosphere;
-
-	atmosphere.bottom_radius = 6360.0;
-	atmosphere.top_radius = 6460.0;
-
-	atmosphere.rayleigh_density_exp_scale = -1.0 / earth_rayleigh_scale_height;
-	atmosphere.rayleigh_scattering = vec3(0.005802, 0.013558, 0.033100);    // 1/km
-
-	atmosphere.mie_density_exp_scale = -1.0 / earth_mie_scale_height;
-	atmosphere.mie_scattering = vec3(0.003996, 0.003996, 0.003996);			// 1/km
-	atmosphere.mie_extinction = vec3(0.004440, 0.004440, 0.004440);			// 1/km
-	atmosphere.mie_absorption = max(atmosphere.mie_extinction - atmosphere.mie_scattering, vec3());
-	if use_henyey_greenstein {
-		atmosphere.mie_phase_param = 0.8;
-	} else {
-		atmosphere.mie_phase_param = 5.0;
-	}
-	
-	atmosphere.absorption_extinction = vec3(0.000650, 0.001881, 0.000085);	// 1/km
-	atmosphere.absorption_density_0_layer_height = 25.0;
-	atmosphere.absorption_density_0_constant_term = -2.0 / 3.0;
-	atmosphere.absorption_density_0_linear_term = 1.0 / 15.0;
-	atmosphere.absorption_density_1_constant_term = 8.0 / 3.0;
-	atmosphere.absorption_density_1_linear_term = -1.0 / 15.0;
-
-	atmosphere.ground_albedo = vec3(0.0, 0.0, 0.0);
-
-	atmosphere.multi_scattering_factor = 1.0;
-	
-	return atmosphere;
-}
-
 struct MediumSample {
 	scattering: vec3<f32>,
 	extinction: vec3<f32>,

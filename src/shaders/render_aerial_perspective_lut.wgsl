@@ -57,8 +57,8 @@ fn integrate_scattered_luminance(uv: vec2<f32>, world_pos: vec3<f32>, world_dir:
 		rayleigh_phase_val_moon = rayleigh_phase(cos_theta_moon);
 	}
 
-	result.luminance = vec3(0.0);
-	result.transmittance = vec3(1.0);
+	result.luminance = vec3<f32>(0.0);
+	result.transmittance = vec3<f32>(1.0);
 	var t = 0.0;
 	var dt_exact = 0.0;
 	for (var s = 0.0; s < sample_count; s += 1.0) {
@@ -140,12 +140,12 @@ fn render_aerial_perspective_lut(@builtin(global_invocation_id) global_id: vec3<
 	if view_height >= atmosphere.top_radius {
 		let prev_world_pos = world_pos;
 		if !move_to_atmosphere_top(&world_pos, world_dir, atmosphere.top_radius) {
-			textureStore(aerial_perspective_lut, global_id, vec4(0.0, 0.0, 0.0, 1.0));
+			textureStore(aerial_perspective_lut, global_id, vec4<f32>(0.0, 0.0, 0.0, 1.0));
 			return;
 		}
 		let distance_to_atmosphere = length(prev_world_pos - world_pos);
 		if t_max < distance_to_atmosphere {
-			textureStore(aerial_perspective_lut, global_id, vec4(0.0, 0.0, 0.0, 1.0));
+			textureStore(aerial_perspective_lut, global_id, vec4<f32>(0.0, 0.0, 0.0, 1.0));
 			return;
 		}
 		t_max = max(0.0, t_max - distance_to_atmosphere);
@@ -154,6 +154,6 @@ fn render_aerial_perspective_lut(@builtin(global_invocation_id) global_id: vec3<
 	let sample_count = max(1.0, f32(global_id.z + 1) * 2.0);
 	let ss = integrate_scattered_luminance(uv, world_pos, world_dir, atmosphere, config, sample_count, t_max);
 
-	let transmittance = dot(ss.transmittance, vec3(1.0 / 3.0));
-	textureStore(aerial_perspective_lut, global_id, vec4(ss.luminance, 1.0 - transmittance));
+	let transmittance = dot(ss.transmittance, vec3<f32>(1.0 / 3.0));
+	textureStore(aerial_perspective_lut, global_id, vec4<f32>(ss.luminance, 1.0 - transmittance));
 }

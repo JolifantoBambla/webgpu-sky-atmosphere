@@ -22,5 +22,5 @@ fn sky_view_lut_params_to_uv(atmosphere: Atmosphere, intersects_ground: bool, co
 	}
 	uv.x = sqrt(-cos_light_view * 0.5 + 0.5);
 
-	return vec2(from_unit_to_sub_uvs(uv.x, SKY_VIEW_LUT_RES_X), from_unit_to_sub_uvs(uv.y, SKY_VIEW_LUT_RES_Y));
+	return vec2<f32>(from_unit_to_sub_uvs(uv.x, SKY_VIEW_LUT_RES_X), from_unit_to_sub_uvs(uv.y, SKY_VIEW_LUT_RES_Y));
 }

@@ -220,7 +220,7 @@ export class SkyWithLutsRasterRenderer extends SkyRasterRenderer {
         } else if (targets.length !== 2) {
             code = code.replace('@location(1) transmittance: vec4<f32>,', '');
             code = code.replace(
-                'RenderSkyFragment(vec4(result.rgb, 1.0), vec4(vec3(result.a), 1.0))',
+                'RenderSkyFragment(vec4<f32>(result.rgb, 1.0), vec4<f32>(vec3<f32>(result.a), 1.0))',
                 'RenderSkyFragment(result)',
             );
         }
@@ -361,7 +361,7 @@ export class SkyRayMarchRasterRenderer extends SkyRasterRenderer {
                 code = code.replace('@location(1) transmittance: vec4<f32>,', '');
                 code = code.replace(
                     'RenderSkyFragment(result.luminance, result.transmittance)',
-                    'RenderSkyFragment(vec4(result.luminance.rgb, 1.0 - dot(result.transmittance.rgb, vec3(1.0 / 3.0))))',
+                    'RenderSkyFragment(vec4<f32>(result.luminance.rgb, 1.0 - dot(result.transmittance.rgb, vec3<f32>(1.0 / 3.0))))',
                 );
             }
             const module = device.createShaderModule({

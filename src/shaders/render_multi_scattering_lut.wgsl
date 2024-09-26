@@ -93,7 +93,7 @@ fn compute_sample_direction(direction_index: u32) -> vec3<f32> {
 	let sin_phi = sin(phi);
 	let cos_theta = cos(theta);
 	let sin_theta = sin(theta);
-	return vec3(
+	return vec3<f32>(
 		cos_theta * sin_phi,
 		sin_theta * sin_phi,
 		cos_phi

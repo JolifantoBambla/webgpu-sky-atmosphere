@@ -65,8 +65,8 @@ fn integrate_scattered_luminance(world_pos: vec3<f32>, world_dir: vec3<f32>, sun
 		rayleigh_phase_val_moon = rayleigh_phase(cos_theta_moon);
 	}
 
-	result.luminance = vec3(0.0);
-	result.transmittance = vec3(1.0);
+	result.luminance = vec3<f32>(0.0);
+	result.transmittance = vec3<f32>(1.0);
 	var t = 0.0;
 	var dt = t_max / sample_count;
 	for (var s = 0.0; s < sample_count; s += 1.0) {
@@ -120,11 +120,11 @@ fn integrate_scattered_luminance(world_pos: vec3<f32>, world_dir: vec3<f32>, sun
 
 fn compute_sun_dir(sun_dir: vec3<f32>, zenith: vec3<f32>) -> vec3<f32> {
 	let cos_sun_zenith = dot(zenith, sun_dir);
-	return normalize(vec3(sqrt(max(1.0 - cos_sun_zenith * cos_sun_zenith, 0.0)), 0.0, cos_sun_zenith));
+	return normalize(vec3<f32>(sqrt(max(1.0 - cos_sun_zenith * cos_sun_zenith, 0.0)), 0.0, cos_sun_zenith));
 }
 
 fn compute_world_dir(uv_in: vec2<f32>, sky_view_res: vec2<f32>, view_height: f32, atmosphere: Atmosphere) -> vec3<f32> {
-	let uv = vec2(from_sub_uvs_to_unit(uv_in.x, sky_view_res.x), from_sub_uvs_to_unit(uv_in.y, sky_view_res.y));
+	let uv = vec2<f32>(from_sub_uvs_to_unit(uv_in.x, sky_view_res.x), from_sub_uvs_to_unit(uv_in.y, sky_view_res.y));
 
 	let v_horizon = sqrt(max(view_height * view_height - atmosphere.bottom_radius * atmosphere.bottom_radius, 0.0));
 	let ground_to_horizon_angle = acos(v_horizon / view_height);
@@ -141,7 +141,7 @@ fn compute_world_dir(uv_in: vec2<f32>, sky_view_res: vec2<f32>, view_height: f32
 	let cos_light_view = -((uv.x * uv.x) * 2.0 - 1.0);
 	let sin_view_zenith = sqrt(max(1.0 - cos_view_zenith * cos_view_zenith, 0.0));
 
-	return vec3(
+	return vec3<f32>(
 		sin_view_zenith * cos_light_view,
 		sin_view_zenith * sqrt(max(1.0 - cos_light_view * cos_light_view, 0.0)),
 		cos_view_zenith
@@ -184,5 +184,5 @@ fn render_sky_view_lut(@builtin(global_invocation_id) global_id: vec3<u32>) {
 
 	let ss = integrate_scattered_luminance(world_pos, world_dir, sun_dir, moon_dir, atmosphere, config);
 
-	textureStore(sky_view_lut, global_id.xy, vec4<f32>(ss.luminance, 1.0 - dot(ss.transmittance, vec3(1.0 / 3.0))));
+	textureStore(sky_view_lut, global_id.xy, vec4<f32>(ss.luminance, 1.0 - dot(ss.transmittance, vec3<f32>(1.0 / 3.0))));
 }

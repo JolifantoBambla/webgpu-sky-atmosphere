@@ -69,8 +69,8 @@ fn integrate_scattered_luminance(uv: vec2<f32>, world_pos: vec3<f32>, world_dir:
 		rayleigh_phase_val_moon = rayleigh_phase(cos_theta_moon);
 	}
 
-	result.luminance = vec3(0.0);
-	result.transmittance = vec3(1.0);
+	result.luminance = vec3<f32>(0.0);
+	result.transmittance = vec3<f32>(1.0);
 	var t = 0.0;
 	var dt = 0.0;
 	for (var s = 0.0; s < sample_count; s += 1.0) {
@@ -148,13 +148,13 @@ fn render_sky(pix: vec2<u32>) -> RenderSkyResult {
 
 	if !move_to_atmosphere_top(&world_pos, world_dir, atmosphere.top_radius) {
 		luminance = get_sun_luminance(world_pos, world_dir, atmosphere, config);
-		return RenderSkyResult(max(vec4(luminance, 1.0), vec4()), max(vec4(0.0, 0.0, 0.0, 1.0), vec4()));
+		return RenderSkyResult(max(vec4<f32>(luminance, 1.0), vec4<f32>()), max(vec4<f32>(0.0, 0.0, 0.0, 1.0), vec4<f32>()));
 	}
 	
 	let ss = integrate_scattered_luminance(uv, world_pos, world_dir, atmosphere, depth, config);
 	luminance += ss.luminance;
 
-	return RenderSkyResult(max(vec4(luminance, 1.0), vec4()), max(vec4(ss.transmittance, 1.0), vec4()));
+	return RenderSkyResult(max(vec4<f32>(luminance, 1.0), vec4<f32>()), max(vec4<f32>(ss.transmittance, 1.0), vec4<f32>()));
 }
 
 struct RenderSkyFragment {
@@ -179,7 +179,7 @@ fn render_sky_atmosphere(@builtin(global_invocation_id) global_id: vec3<u32>) {
 	if USE_COLORED_TRANSMISSION {
 		dual_source_blend(global_id.xy, result.luminance, result.transmittance);
 	} else {
-		blend(global_id.xy, vec4(result.luminance.rgb, 1.0 - dot(result.transmittance.rgb, vec3(1.0 / 3.0))));
+		blend(global_id.xy, vec4<f32>(result.luminance.rgb, 1.0 - dot(result.transmittance.rgb, vec3<f32>(1.0 / 3.0))));
 	}
 }
 
