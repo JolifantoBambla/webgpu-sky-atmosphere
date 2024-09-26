@@ -22,7 +22,8 @@
         import { SkyAtmosphereComputeRenderer, SkyAtmosphereRasterRenderer, makeEarthAtmosphere } from '../dist/1.x/webgpu-sky-atmosphere.module.min.js';
 
         const urlParams = new URLSearchParams(window.location.search);
-        const useTimestampQuery = new URLSearchParams(window.location.search).has('timestamp_query');
+        const useTimestampQuery = urlParams.has('timestamp_query');
+        const useHgDrainePhase = urlParams.has('hg_draine');
 
         const webgpuNotSupported = () => {
             const dialogBox = document.createElement('dialog');
@@ -212,7 +213,7 @@
             const distanceScaleFactor = 1.0;
             const skyAtmosphereConfigBase = {
                 distanceScaleFactor,
-                atmosphere: makeEarthAtmosphere(undefined, true, false),
+                atmosphere: makeEarthAtmosphere(undefined, true, !useHgDrainePhase),
                 shadow: {
                     bindGroupLayouts: [shadowBindGroupLayout],
                     bindGroups: [device.createBindGroup({
@@ -241,10 +242,12 @@
                         }
                     `
                 },
-                mieHgDrainePhase: {
-                    useConstantDropletDiameter: false,
-                },
             };
+            if (useHgDrainePhase) {
+                skyAtmosphereConfigBase.mieHgDrainePhase = {
+                    useConstantDropletDiameter: false,
+                };
+            }
             const computePassConfigBase = {
                 backBuffer: {
                     texture: backBuffer,
@@ -493,7 +496,7 @@
 
             const sunProjectionMeters = mat4n.ortho(-80000, 80000, -80000, 80000, -200000, 300000);
 
-            const params = makeUi(skyAtmosphereRenderer.resources.atmosphere, cameraController, timeStampQuery !== null);
+            const params = makeUi(skyAtmosphereRenderer.resources.atmosphere, cameraController, timeStampQuery !== null, useHgDrainePhase);
 
             const resolutionDependentStuff = {
                 projection,

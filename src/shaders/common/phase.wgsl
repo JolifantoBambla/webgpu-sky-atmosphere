@@ -64,7 +64,7 @@ fn hg_draine_phase_dynamic_dispatch(cos_theta: f32, diameter: f32) -> f32 {
     }
 }
 
-fn cornette_shanks_phase(g: f32, cos_theta: f32) -> f32 {
+fn cornette_shanks_phase(cos_theta: f32, g: f32) -> f32 {
 	let k: f32 = 3.0 / (8.0 * pi) * (1.0 - g * g) / (2.0 + g * g);
 	return k * (1.0 + cos_theta * cos_theta) / pow(1.0 + g * g - 2.0 * g * -cos_theta, 1.5);
 }
