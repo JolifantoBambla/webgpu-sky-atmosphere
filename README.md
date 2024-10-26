@@ -21,7 +21,7 @@ It comes in multiple flavors:
 ### NPM
 
 ```bash
-npm install webgpu-sky-atmosphre
+npm install webgpu-sky-atmosphere
 ```
 
 ```js
