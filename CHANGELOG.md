@@ -1,5 +1,12 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+ - Fix typo in installation steps.
+
+
 ## [1.1.0] - 2024-09-26
 
 ### Added
