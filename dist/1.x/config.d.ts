@@ -52,6 +52,22 @@ export interface MultiScatteringLutConfig {
      */
     sampleCount?: number;
 }
+export interface SkyViewUniformParameterizationConfig {
+    /**
+     * If this is true, user-defined directions are assumed to be in a Y-up system.
+     * This affects how incoming light directions are treated when rendering the sky view lookup table and how uv coordinates are computed from view directions when reading the lookup table.
+     *
+     * Defaults to true.
+     */
+    isYUp?: boolean;
+    /**
+     * If this is true, user-defined directions are assumed to be in a right-handed system.
+     * This affects how incoming light directions are treated when rendering the sky view lookup table and how uv coordinates are computed from view directions when reading the lookup table.
+     *
+     * Defaults to true.
+     */
+    isRightHanded?: boolean;
+}
 export interface SkyViewLutConfig {
     /**
      * The size of the sky view lookup table.
@@ -75,6 +91,20 @@ export interface SkyViewLutConfig {
      * Defaults to true.
      */
     affectedByShadow?: boolean;
+    /**
+     * If defined, the sky view lookup table uses a uniform longitude parameterization around the zenith.
+     * This provides equal angular resolution across the entire azimuthal range, enabling representation of multiple light sources
+     * in the same lookup table. However, it reduces the angular resolution for individual light sources.
+     *
+     * If undefined, the lookup table defaults to a sun-centric longitude mapping.
+     * This focuses angular resolution near the primary light source, offering better quality for single-light scenarios.
+     * If only one light source is used, this parameterization is recommended.
+     *
+     * See {@link SkyAtmosphereResources.skyViewLut} for more details on the LUT's parameterization.
+     *
+     * Defaults to undefined.
+     */
+    uniformParameterizationConfig?: SkyViewUniformParameterizationConfig;
 }
 export interface AerialPerspectiveLutConfig {
     /**
@@ -106,7 +136,7 @@ export interface AerialPerspectiveLutConfig {
      */
     affectedByShadow?: boolean;
     /**
-     * Might results in smoother volumetric shadows but introduces visible noise.
+     * Might result in smoother volumetric shadows but introduces visible noise.
      *
      * Defaults to false.
      */
@@ -134,7 +164,7 @@ export interface SkyAtmosphereLutConfig {
     aerialPerspectiveLut: AerialPerspectiveLutConfig;
 }
 /**
- * The back buffer texture to use as back ground when rendering the sky / atmosphere using a GPUComputePipeline.
+ * The back buffer texture to use as background when rendering the sky / atmosphere using a GPUComputePipeline.
  */
 export interface ComputeBackBufferConfig {
     /**
@@ -236,7 +266,7 @@ export interface SkyRendererComputeConfig extends SkyRendererConfigBase {
      */
     depthBuffer: DepthBufferConfig;
     /**
-     * The back buffer texture to use as back ground for rendering the sky / atmosphere.
+     * The back buffer texture to use as background for rendering the sky / atmosphere.
      */
     backBuffer: ComputeBackBufferConfig;
     /**

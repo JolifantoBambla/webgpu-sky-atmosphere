@@ -77,7 +77,7 @@ fn render_transmittance_lut(@builtin(global_invocation_id) global_id: vec3<u32>)
 	let view_height = lut_params.x;
 	let cos_view_zenith = lut_params.y;
 	let world_pos = vec2<f32>(0.0, view_height);
-	let world_dir = vec2<f32>(sqrt(1.0 - cos_view_zenith * cos_view_zenith), cos_view_zenith);
+	let world_dir = vec2<f32>(sqrt(max(1.0 - cos_view_zenith * cos_view_zenith, 0.0)), cos_view_zenith);
 
 	var transmittance = vec3<f32>();
 

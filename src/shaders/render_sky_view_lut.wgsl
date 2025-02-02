@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Lukas Herzberger
+ * Copyright (c) 2024-2025 Lukas Herzberger
  * Copyright (c) 2020 Epic Games, Inc.
  * SPDX-License-Identifier: MIT
  */
@@ -9,6 +9,7 @@ override SKY_VIEW_LUT_RES_Y: f32 = 108.0;
 
 override INV_DISTANCE_TO_MAX_SAMPLE_COUNT: f32 = 1.0 / 100.0;
 
+override USE_UNIFORM_LONGITUDE_PARAMETERIZATION: bool = false;
 override USE_MOON: bool = false;
 
 override WORKGROUP_SIZE_X: u32 = 16;
@@ -28,7 +29,7 @@ struct SingleScatteringResult {
 
 fn integrate_scattered_luminance(world_pos: vec3<f32>, world_dir: vec3<f32>, sun_dir: vec3<f32>, moon_dir: vec3<f32>, atmosphere: Atmosphere, config: Uniforms) -> SingleScatteringResult {
 	var result = SingleScatteringResult();
-	
+
 	let planet_center = vec3<f32>();
 	var t_max: f32 = 0.0;
 	if !find_atmosphere_t_max(&t_max, world_pos, world_dir, planet_center, atmosphere.bottom_radius, atmosphere.top_radius) {
@@ -48,7 +49,7 @@ fn integrate_scattered_luminance(world_pos: vec3<f32>, world_dir: vec3<f32>, sun
 	let cos_theta = dot(sun_dir, world_dir);
 	let mie_phase_val = mie_phase(cos_theta, atmosphere.mie_phase_param);
 	let rayleigh_phase_val = rayleigh_phase(cos_theta);
-	
+
 	var moon_direction = moon_dir;
 	var moon_illuminance = config.moon.illuminance;
 
@@ -89,7 +90,7 @@ fn integrate_scattered_luminance(world_pos: vec3<f32>, world_dir: vec3<f32>, sun
 		let sample_transmittance = exp(-medium.extinction * dt);
 
 		let zenith = sample_pos / sample_height;
- 
+
 		let cos_sun_zenith = dot(sun_direction, zenith);
 		let transmittance_to_sun = textureSampleLevel(transmittance_lut, lut_sampler, transmittance_lut_params_to_uv(atmosphere, sample_height, cos_sun_zenith), 0).rgb;
 		let phase_times_scattering = medium.mie_scattering * mie_phase_val + medium.rayleigh_scattering * rayleigh_phase_val;
@@ -114,13 +115,8 @@ fn integrate_scattered_luminance(world_pos: vec3<f32>, world_dir: vec3<f32>, sun
 		result.luminance += result.transmittance * intergrated_luminance;
 		result.transmittance *= sample_transmittance;
 	}
-	
-	return result;
-}
 
-fn compute_sun_dir(sun_dir: vec3<f32>, zenith: vec3<f32>) -> vec3<f32> {
-	let cos_sun_zenith = dot(zenith, sun_dir);
-	return normalize(vec3<f32>(sqrt(max(1.0 - cos_sun_zenith * cos_sun_zenith, 0.0)), 0.0, cos_sun_zenith));
+	return result;
 }
 
 fn compute_world_dir(uv_in: vec2<f32>, sky_view_res: vec2<f32>, view_height: f32, atmosphere: Atmosphere) -> vec3<f32> {
@@ -138,14 +134,46 @@ fn compute_world_dir(uv_in: vec2<f32>, sky_view_res: vec2<f32>, view_height: f32
 		let coord = (uv.y * 2.0) - 1.0;
 		cos_view_zenith = cos(zenith_horizon_angle + ground_to_horizon_angle * (coord * coord));
 	}
-	let cos_light_view = -((uv.x * uv.x) * 2.0 - 1.0);
 	let sin_view_zenith = sqrt(max(1.0 - cos_view_zenith * cos_view_zenith, 0.0));
 
-	return vec3<f32>(
-		sin_view_zenith * cos_light_view,
-		sin_view_zenith * sqrt(max(1.0 - cos_light_view * cos_light_view, 0.0)),
-		cos_view_zenith
-	);
+    if USE_UNIFORM_LONGITUDE_PARAMETERIZATION {
+    	let azimuth = fract(uv.x + 0.25) * tau;
+    	return vec3<f32>(
+    		sin_view_zenith * cos(azimuth),
+    		sin_view_zenith * sin(azimuth),
+    		cos_view_zenith
+    	);
+    } else {
+        let cos_light_view = -((uv.x * uv.x) * 2.0 - 1.0);
+        return vec3<f32>(
+            sin_view_zenith * cos_light_view,
+            sin_view_zenith * sqrt(max(1.0 - cos_light_view * cos_light_view, 0.0)),
+            cos_view_zenith
+        );
+    }
+}
+
+fn compute_sun_dir(sun_dir: vec3<f32>, zenith: vec3<f32>) -> vec3<f32> {
+    if USE_UNIFORM_LONGITUDE_PARAMETERIZATION {
+        let zenith_fixed = to_z_up_left_handed(zenith);
+        let sun_dir_fixed = to_z_up_left_handed(sun_dir);
+
+        let cos_sun_zenith = dot(sun_dir_fixed, zenith_fixed);
+        let sin_sun_zenith = sqrt(max(1.0 - cos_sun_zenith * cos_sun_zenith, 0.0));
+
+        let side = normalize(cross(zenith_fixed, vec3<f32>(1, 0, 0)));
+        let forward = normalize(cross(side, zenith_fixed));
+        let azimuth = atan2(dot(sun_dir_fixed, side), dot(sun_dir_fixed, forward));
+
+        return vec3<f32>(
+            sin_sun_zenith * cos(azimuth),
+            sin_sun_zenith * sin(azimuth),
+            cos_sun_zenith,
+        );
+    } else {
+        let cos_sun_zenith = dot(zenith, sun_dir);
+        return normalize(vec3<f32>(sqrt(max(1.0 - cos_sun_zenith * cos_sun_zenith, 0.0)), 0.0, cos_sun_zenith));
+	}
 }
 
 @compute
@@ -165,17 +193,13 @@ fn render_sky_view_lut(@builtin(global_invocation_id) global_id: vec3<u32>) {
 	let config = config_buffer;
 
 	let view_world_pos = (config.camera_world_position * TO_KM_SCALE) - atmosphere.planet_center;
-	let world_sun_dir = normalize(config.sun.direction);
-	let world_moon_dir = normalize(config.moon.direction);
-
 	let view_height = length(view_world_pos);
-
-	let zenith = view_world_pos / view_height;
-	let sun_dir = compute_sun_dir(world_sun_dir, zenith);
-	let moon_dir = compute_sun_dir(world_moon_dir, zenith);
-
 	var world_pos = vec3<f32>(0.0, 0.0, view_height);
 	let world_dir = compute_world_dir(uv, sky_view_lut_res, view_height, atmosphere);
+
+    let zenith = view_world_pos / view_height;
+    let sun_dir = compute_sun_dir(normalize(config.sun.direction), zenith);
+    let moon_dir = compute_sun_dir(normalize(config.moon.direction), zenith);
 
 	if !move_to_atmosphere_top(&world_pos, world_dir, atmosphere.top_radius) {
 		textureStore(sky_view_lut, global_id.xy, vec4<f32>(0, 0, 0, 1));

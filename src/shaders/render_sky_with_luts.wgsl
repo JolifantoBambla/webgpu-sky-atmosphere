@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Lukas Herzberger
+ * Copyright (c) 2024-2025 Lukas Herzberger
  * Copyright (c) 2020 Epic Games, Inc.
  * SPDX-License-Identifier: MIT
  */
@@ -20,19 +20,8 @@ override WORKGROUP_SIZE_Y: u32 = 16;
 @group(0) @binding(8) var render_target: texture_storage_2d<rgba16float, write>;
 
 fn use_sky_view_lut(view_height: f32, world_pos: vec3<f32>, world_dir: vec3<f32>, sun_dir: vec3<f32>, atmosphere: Atmosphere, config: Uniforms) -> vec4<f32> {
-	let zenith = normalize(world_pos);
-	let cos_view_zenith = dot(world_dir, zenith);
-
-	let side = normalize(cross(zenith, world_dir));	// assumes non parallel vectors
-	let forward = normalize(cross(side, zenith));	// aligns toward the sun light but perpendicular to up vector
-	let cos_light_view = normalize(vec2<f32>(dot(sun_dir, forward), dot(sun_dir, side))).x;
-
-	let intersects_ground = ray_intersects_sphere(world_pos, world_dir, vec3<f32>(), atmosphere.bottom_radius);
-
-	let uv = sky_view_lut_params_to_uv(atmosphere, intersects_ground, cos_view_zenith, cos_light_view, view_height);
-
+	let uv = compute_sky_view_lut_uv(view_height, world_pos, world_dir, sun_dir, atmosphere, config);
 	let sky_view = textureSampleLevel(sky_view_lut, lut_sampler, uv, 0);
-
 	return vec4<f32>(sky_view.rgb + get_sun_luminance(world_pos, world_dir, atmosphere, config), sky_view.a);
 }
 
@@ -47,7 +36,7 @@ fn render_sky(pix: vec2<u32>) -> vec4<f32> {
 	let sun_dir = normalize(config.sun.direction);
 
 	let view_height = length(world_pos);
-	
+
 	let depth = textureLoad(depth_buffer, pix, 0).r;
 	if !is_valid_depth(depth) {
 		return use_sky_view_lut(view_height, world_pos, world_dir, sun_dir, atmosphere, config);

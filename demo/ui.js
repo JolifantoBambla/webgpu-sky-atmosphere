@@ -1,20 +1,20 @@
 import { makeEarthAtmosphere } from '../dist/1.x/webgpu-sky-atmosphere.module.min.js';
 import { Pane } from 'https://cdn.jsdelivr.net/npm/tweakpane@4.0.3/dist/tweakpane.min.js';
 
-export function makeUi(atmosphere, camera, showPerformanceGraph, useHgDrainePhase) {
+export function makeUi(atmosphere, camera, showPerformanceGraph, useHgDrainePhase, useMoon) {
     const cameraPositionKilometers = [0, 1, 100];
     const cameraPositionMeters = [0, 50, 100000];
 
     const params = {
         debugViews: {
             showTransmittanceLut: false,
-    
+
             showMultiScatteringLut: false,
             multiScatteringLutFactor: 50,
-            
+
             showSkyViewLut: false,
             skyViewLutFactor: 50,
-            
+
             showAerialPerspectiveLut: false,
             aerialPerspectiveLutFactor: 50,
             aerialPerspectiveSlice: 0,
@@ -23,7 +23,14 @@ export function makeUi(atmosphere, camera, showPerformanceGraph, useHgDrainePhas
             sun: {
                 illuminance: {r: 1.0, g: 1.0, b: 1.0},
                 illuminanceFactor: 1.0,
-                direction: {x: 0.0, y: 1.0},
+                direction: {x: -0.76, y: 0.0, azimuth: 0.0},//{x: 0.0, y: 1.0, azimuth: 0.0},
+                diskDiameter: 2.3,
+                diskIlluminance: 65.0,
+            },
+            moon: {
+                illuminance: {r: 1.0, g: 1.0, b: 1.0},
+                illuminanceFactor: 1.0,
+                direction: {x: 0.0, y: 1.0, azimuth: 0.0},
                 diskDiameter: 2.3,
                 diskIlluminance: 65.0,
             },
@@ -94,6 +101,13 @@ export function makeUi(atmosphere, camera, showPerformanceGraph, useHgDrainePhas
     params.scaleFromKilometers = _ => params.renderSettings.inMeters ? 1000.0 : 1.0;
 
     params.atmosphere = atmosphere || makeEarthAtmosphere();
+
+    if (useMoon) {
+        params.renderSettings.sun.direction = {x: -0.54, y: 0.32, azimuth: 328.7};
+        params.renderSettings.moon.direction = {x: -0.9, y: 0.01, azimuth: 15.05};
+        params.renderSettings.sun.diskDiameter = 1.2;
+        params.renderSettings.moon.diskDiameter = 1.2;
+    }
 
     const pane = new Pane({
         title: 'WebGPU Sky / Atmosphere',
@@ -245,7 +259,7 @@ Escape: exit pointer lock on canvas`,
         .on('change', e => {
             const old = params.renderSettings.inMeters;
             params.renderSettings.inMeters = e.value === '1 = 1m';
-            
+
             if (old === params.renderSettings.inMeters) {
                 return;
             }
@@ -261,9 +275,22 @@ Escape: exit pointer lock on canvas`,
     sunFolder.addBinding(params.renderSettings.sun, 'illuminance', {color: {type: 'float'}, label: 'Illuminance (outer space)'});
     sunFolder.addBinding(params.renderSettings.sun, 'illuminanceFactor', {min: 0.1, max: 10.0, step: 0.1, label: 'Illuminance scale'});
     sunFolder.addBinding(params.renderSettings.sun, 'direction', {picker: 'inline', expanded: true, y: {inverted: true, min: -1.0, max: 1.0}, x: {min: -1.0, max: 1.0}, label: 'Direction'});
+    sunFolder.addBinding(params.renderSettings.sun.direction, 'azimuth', {min: 0.0, max: 360.0, label: 'Azimuth'});
     sunFolder.addBinding(params.renderSettings.sun, 'diskDiameter', {min: 0.1, max: 100.0, step: 0.1, label: 'Sun disk angular diameter (deg)'});
     sunFolder.addBinding(params.renderSettings.sun, 'diskIlluminance', {min: 1.0, max: 100.0, step: 1, label: 'Sun disk luminance scale'});
-    
+
+    if (useMoon) {
+        const moonFolder = pane.addFolder({
+            title: 'Moon',
+            expanded: !showPerformanceGraph,
+        });
+        moonFolder.addBinding(params.renderSettings.moon, 'illuminance', {color: {type: 'float'}, label: 'Illuminance (outer space)'});
+        moonFolder.addBinding(params.renderSettings.moon, 'illuminanceFactor', {min: 0.1, max: 10.0, step: 0.1, label: 'Illuminance scale'});
+        moonFolder.addBinding(params.renderSettings.moon, 'direction', {picker: 'inline', expanded: true, y: {inverted: true, min: -1.0, max: 1.0}, x: {min: -1.0, max: 1.0}, label: 'Direction'});
+        moonFolder.addBinding(params.renderSettings.moon.direction, 'azimuth', {min: 0.0, max: 360.0, label: 'Azimuth'});
+        moonFolder.addBinding(params.renderSettings.moon, 'diskDiameter', {min: 0.1, max: 100.0, step: 0.1, label: 'Moon disk angular diameter (deg)'});
+        moonFolder.addBinding(params.renderSettings.moon, 'diskIlluminance', {min: 1.0, max: 100.0, step: 1, label: 'Moon disk luminance scale'});
+    }
 
     const atmosphereFolder = pane.addFolder({
         title: 'Atmosphere',
@@ -330,10 +357,10 @@ Escape: exit pointer lock on canvas`,
 
     debugViewFolder.addBinding(params.debugViews, 'showMultiScatteringLut', {label: 'Show multi. scat. LUT'});
     debugViewFolder.addBinding(params.debugViews, 'multiScatteringLutFactor', {min: 1, max: 100, step: 1, label: 'Multi. scat. scale'});
-    
+
     debugViewFolder.addBinding(params.debugViews, 'showSkyViewLut', {label: 'Show sky view LUT'});
     debugViewFolder.addBinding(params.debugViews, 'skyViewLutFactor', {min: 1, max: 100, step: 1, label: 'Sky view scale'});
-    
+
     debugViewFolder.addBinding(params.debugViews, 'showAerialPerspectiveLut', {label: 'Show aerial persp. LUT'});
     debugViewFolder.addBinding(params.debugViews, 'aerialPerspectiveLutFactor', {min: 1, max: 100, step: 1, label: 'Aerial persp. scale'});
     debugViewFolder.addBinding(params.debugViews, 'aerialPerspectiveSlice', {min: 0, max: 31, step: 1, label: 'Aerial persp. slice'});

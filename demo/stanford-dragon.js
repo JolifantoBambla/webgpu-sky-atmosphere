@@ -17,19 +17,25 @@ struct Model {
     model: mat4x4<f32>,
     normal: mat4x4<f32>,
 }
-struct Sun {
+struct Lights {
     direction: vec3<f32>,
-    pad0: f32,
+    num_lights: u32,
     illuminance: vec3<f32>,
-    pad1: f32,
+    pad0: f32,
     light_view_projection: mat4x4<f32>,
+    direction2: vec3<f32>,
+    pad1: f32,
+    illuminance2: vec3<f32>,
+    pad2: f32,
+    light_view_projection2: mat4x4<f32>,
 }
 
 @group(0) @binding(0) var<uniform> camera: Camera;
 @group(0) @binding(1) var<uniform> model: Model;
-@group(0) @binding(2) var<uniform> sun: Sun;
+@group(0) @binding(2) var<uniform> lights: Lights;
 @group(0) @binding(3) var shadow_sampler: sampler_comparison;
 @group(0) @binding(4) var shadow_map: texture_depth_2d;
+@group(0) @binding(5) var shadow_map2: texture_depth_2d;
 
 struct VertexOut {
     @builtin(position) position: vec4<f32>,
@@ -58,22 +64,42 @@ fn fragment(frag_in: VertexOut) -> @location(0) vec4<f32> {
     let uv = floor(30.0 * frag_in.uv);
     let albedo = vec3(0.2 + 0.5 * ((uv.x + uv.y) - 2.0 * floor((uv.x + uv.y) / 2.0)));
 
-    let shadow_pos = (sun.light_view_projection * vec4(frag_in.world_pos, 1.0)).xyz;
+    let shadow_pos = (lights.light_view_projection * vec4(frag_in.world_pos, 1.0)).xyz;
 
     var shadow = 0.0;
     let inv_shadow_map_size = 1.0 / shadow_map_size;
     for (var y = -1; y <= 1; y++) {
         for (var x = -1; x <= 1; x++) {
-        let offset = vec2f(vec2(x, y)) * inv_shadow_map_size;
-        shadow += textureSampleCompareLevel(
-            shadow_map, shadow_sampler,
-            shadow_pos.xy * vec2(0.5, -0.5) + vec2(0.5) + offset, shadow_pos.z - 0.007
-        );
+            let offset = vec2f(vec2(x, y)) * inv_shadow_map_size;
+            shadow += textureSampleCompareLevel(
+                shadow_map, shadow_sampler,
+                shadow_pos.xy * vec2(0.5, -0.5) + vec2(0.5) + offset, shadow_pos.z - 0.007
+            );
         }
     }
     shadow /= 9.0;
+    
+    var diffuse = shadow * saturate(dot(normalize(lights.direction), normalize(frag_in.normal))) * lights.illuminance;
+    
+    if lights.num_lights > 1 {
+        let shadow_pos2 = (lights.light_view_projection2 * vec4(frag_in.world_pos, 1.0)).xyz;
 
-    return vec4((ambient + shadow * saturate(dot(normalize(sun.direction), normalize(frag_in.normal))) * sun.illuminance) * albedo , 1.0);
+        var shadow = 0.0;
+        for (var y = -1; y <= 1; y++) {
+            for (var x = -1; x <= 1; x++) {
+                let offset = vec2f(vec2(x, y)) * inv_shadow_map_size;
+                shadow += textureSampleCompareLevel(
+                    shadow_map2, shadow_sampler,
+                    shadow_pos2.xy * vec2(0.5, -0.5) + vec2(0.5) + offset, shadow_pos2.z - 0.007
+                );
+            }
+        }
+        shadow /= 9.0;
+        
+        diffuse += shadow * saturate(dot(normalize(lights.direction2), normalize(frag_in.normal))) * lights.illuminance2;
+    }
+
+    return vec4((ambient + diffuse) * albedo , 1.0);
 }
 `;
 
@@ -166,7 +192,7 @@ function makeRenderPipeline(device, colorFormat, depthFormat, reverseZ, shadowMa
     };
 }
 
-export function makeDragonRenderer(device, colorFormat = 'rgba16float', depthFormat = 'depth24plus', reverseZ = true, shadowMap) {
+export function makeDragonRenderer(device, colorFormat = 'rgba16float', depthFormat = 'depth24plus', reverseZ = true, shadowMap, shadowMap2) {
     const vertexBuffer = makeVertexBuffer(device);
     const indexBuffer = makeIndexBuffer(device);
     const {
@@ -182,12 +208,16 @@ export function makeDragonRenderer(device, colorFormat = 'rgba16float', depthFor
         size: Float32Array.BYTES_PER_ELEMENT * 16 * 2,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
+    const sun2CameraBuffer = device.createBuffer({
+        size: Float32Array.BYTES_PER_ELEMENT * 16 * 2,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
     const modelBuffer = device.createBuffer({
         size: Float32Array.BYTES_PER_ELEMENT * 16 * 2,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
     const sunBuffer = device.createBuffer({
-        size: Float32Array.BYTES_PER_ELEMENT * (4 * 2 + 16),
+        size: Float32Array.BYTES_PER_ELEMENT * (4 * 2 + 16) * 2,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
@@ -199,6 +229,7 @@ export function makeDragonRenderer(device, colorFormat = 'rgba16float', depthFor
             {binding: 2, resource: {buffer: sunBuffer}},
             {binding: 3, resource: device.createSampler({compare: 'less'})},
             {binding: 4, resource: shadowMap.createView()},
+            {binding: 5, resource: shadowMap2.createView()},
         ],
     });
     const shadowBindGroup = device.createBindGroup({
@@ -208,13 +239,24 @@ export function makeDragonRenderer(device, colorFormat = 'rgba16float', depthFor
             {binding: 1, resource: {buffer: modelBuffer}},
         ],
     });
+    const shadow2BindGroup = device.createBindGroup({
+        layout: shadowPipeline.getBindGroupLayout(0),
+        entries: [
+            {binding: 0, resource: {buffer: sun2CameraBuffer}},
+            {binding: 1, resource: {buffer: modelBuffer}},
+        ],
+    });
 
     return {
-        update({view, projection}, {model, normal}, {direction, illuminance, lightViewProjection}, {sunView, sunProjection}) {
+        update({view, projection}, {model, normal}, {direction, illuminance, lightViewProjection, direction2, illuminance2, lightViewProjection2, numLights}, {sunView, sunProjection, sun2View, sun2Projection}) {
             device.queue.writeBuffer(sunCameraBuffer, 0, new Float32Array([...sunView, ...sunProjection]));
+            device.queue.writeBuffer(sun2CameraBuffer, 0, new Float32Array([...sun2View, ...sun2Projection]));
             device.queue.writeBuffer(cameraBuffer, 0, new Float32Array([...view, ...projection]));
             device.queue.writeBuffer(modelBuffer, 0, new Float32Array([...model, ...normal]));
-            device.queue.writeBuffer(sunBuffer, 0, new Float32Array([...direction, 0.0, ...illuminance, 0.0, ...lightViewProjection]));
+            device.queue.writeBuffer(sunBuffer, 0, new Float32Array([
+                ...direction, numLights, ...illuminance, 0.0, ...lightViewProjection,
+                ...direction2, 0.0, ...illuminance2, 0.0, ...lightViewProjection2
+            ]));
         },
         encode(passEncoder) {
             passEncoder.setPipeline(pipeline);
@@ -226,6 +268,13 @@ export function makeDragonRenderer(device, colorFormat = 'rgba16float', depthFor
         encodeShadow(passEncoder) {
             passEncoder.setPipeline(shadowPipeline);
             passEncoder.setBindGroup(0, shadowBindGroup);
+            passEncoder.setVertexBuffer(0, vertexBuffer);
+            passEncoder.setIndexBuffer(indexBuffer, 'uint16');
+            passEncoder.drawIndexed(mesh.index.length);
+        },
+        encodeShadow2(passEncoder) {
+            passEncoder.setPipeline(shadowPipeline);
+            passEncoder.setBindGroup(0, shadow2BindGroup);
             passEncoder.setVertexBuffer(0, vertexBuffer);
             passEncoder.setIndexBuffer(indexBuffer, 'uint16');
             passEncoder.drawIndexed(mesh.index.length);

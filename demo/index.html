@@ -24,6 +24,8 @@
         const urlParams = new URLSearchParams(window.location.search);
         const useTimestampQuery = urlParams.has('timestamp_query');
         const useHgDrainePhase = urlParams.has('hg_draine');
+        const useMoon = urlParams.has('two_suns');
+        const useUniformParameterization = urlParams.has('uniform_sky_view');
 
         const webgpuNotSupported = () => {
             const dialogBox = document.createElement('dialog');
@@ -170,6 +172,12 @@
                 format: 'depth32float',
             });
             const shadowMapView = shadowMap.createView();
+            const shadowMap2 = device.createTexture({
+                size: [shadowMapSize, shadowMapSize, 1],
+                usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+                format: 'depth32float',
+            });
+            const shadowMap2View = shadowMap2.createView();
 
             const skyRenderTarget = device.createTexture({
                 size: resolution,
@@ -185,7 +193,7 @@
                         visibility: GPUShaderStage.COMPUTE | GPUShaderStage.FRAGMENT,
                         buffer: {
                             type: 'uniform',
-                            minBindingSize: 16 * Float32Array.BYTES_PER_ELEMENT,
+                            minBindingSize: 16 * Float32Array.BYTES_PER_ELEMENT * 2,
                         },
                     },
                     {
@@ -203,10 +211,18 @@
                             viewDimension: '2d',
                         },
                     },
+                    {
+                        binding: 3,
+                        visibility: GPUShaderStage.COMPUTE | GPUShaderStage.FRAGMENT,
+                        texture: {
+                            sampleType: 'depth',
+                            viewDimension: '2d',
+                        },
+                    },
                 ],
             });
             const shadowBuffer = device.createBuffer({
-                size: Float32Array.BYTES_PER_ELEMENT * 16,
+                size: Float32Array.BYTES_PER_ELEMENT * 16 * 2,
                 usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
             });
 
@@ -214,6 +230,7 @@
             const skyAtmosphereConfigBase = {
                 distanceScaleFactor,
                 atmosphere: makeEarthAtmosphere(undefined, true, !useHgDrainePhase),
+                lights: {useMoon},
                 shadow: {
                     bindGroupLayouts: [shadowBindGroupLayout],
                     bindGroups: [device.createBindGroup({
@@ -223,19 +240,28 @@
                             {binding: 0, resource: {buffer: shadowBuffer}},
                             {binding: 1, resource: device.createSampler({compare: 'less'})},
                             {binding: 2, resource: shadowMapView},
+                            {binding: 3, resource: shadowMap2View},
                         ],
                     })],
                     wgslCode: `
-                        @group(1) @binding(0) var<uniform> sun_view_projection: mat4x4<f32>;
+                        @group(1) @binding(0) var<uniform> sun_view_projection: array<mat4x4<f32>, 2>;
                         @group(1) @binding(1) var shadow_sampler: sampler_comparison;
                         @group(1) @binding(2) var shadow_map: texture_depth_2d;
-                        
+                        @group(1) @binding(3) var shadow_map2: texture_depth_2d;
+
                         fn get_shadow(p: vec3<f32>, light_index: u32) -> f32 {
                             if light_index == 0 {
-                                var shadow_pos = (sun_view_projection * vec4(p, 1.0)).xyz;
+                                var shadow_pos = (sun_view_projection[0] * vec4(p, 1.0)).xyz;
                                 shadow_pos = vec3(shadow_pos.xy * vec2(0.5, -0.5) + 0.5, shadow_pos.z);
                                 if all(shadow_pos >= vec3<f32>()) && all(shadow_pos < vec3(1.0)) {
                                     return textureSampleCompareLevel(shadow_map, shadow_sampler, shadow_pos.xy, shadow_pos.z);
+                                }
+                            }
+                            if light_index == 1 {
+                                var shadow_pos = (sun_view_projection[1] * vec4(p, 1.0)).xyz;
+                                shadow_pos = vec3(shadow_pos.xy * vec2(0.5, -0.5) + 0.5, shadow_pos.z);
+                                if all(shadow_pos >= vec3<f32>()) && all(shadow_pos < vec3(1.0)) {
+                                    return textureSampleCompareLevel(shadow_map2, shadow_sampler, shadow_pos.xy, shadow_pos.z);
                                 }
                             }
                             return 1.0;
@@ -246,6 +272,13 @@
             if (useHgDrainePhase) {
                 skyAtmosphereConfigBase.mieHgDrainePhase = {
                     useConstantDropletDiameter: false,
+                };
+            }
+            if (useUniformParameterization) {
+                skyAtmosphereConfigBase.lookUpTables = {
+                    skyViewLut: {
+                        uniformParameterizationConfig: {}
+                    }
                 };
             }
             const computePassConfigBase = {
@@ -291,7 +324,7 @@
                         for (let skyLut = 0; skyLut < 2; ++skyLut) {
                             const existing = compute + colored + skyLut > 0 ? skyRenderers[inMeters][0][0][0] : undefined;
                             skyRenderers[inMeters][compute][colored].push(
-                                (compute === 1 ? 
+                                (compute === 1 ?
                                     SkyAtmosphereComputeRenderer.create(
                                         device,
                                         {
@@ -348,16 +381,16 @@
                     @group(0) @binding(3) var sky_view_lut: texture_2d<f32>;
                     @group(0) @binding(4) var aerial_perspective_lut: texture_3d<f32>;
                     @group(0) @binding(5) var backbuffer: texture_2d<f32>;
-                        
+
                     @vertex
                     fn vertex(@builtin(vertex_index) vertex_index: u32) -> @builtin(position) vec4<f32> {
                         return vec4(vec2(f32((vertex_index << 1) & 2), f32(vertex_index & 2)) * 2 - 1, 0, 1);
                     }
-                    
+
                     fn coords_in_rect(coords: vec2<u32>, rect_min: vec2<u32>, rect_max: vec2<u32>) -> bool {
                         return all(coords >= rect_min) && all(coords < rect_max);
                     }
-                    
+
                     fn tonemap(rgb: vec3<f32>) -> vec3<f32> {
                         let white_point = vec3(1.08241, 0.96756, 0.95003);
                         let exposure = 10.0;
@@ -379,7 +412,7 @@
                     @fragment
                     fn fragment(@builtin(position) coord: vec4<f32>) -> @location(0) vec4<f32> {
                         let texture_coords = vec2<u32>(floor(coord.xy));
-                        
+
                         let transmittance_lut_size = textureDimensions(transmittance_lut, 0);
                         let multi_scattering_lut_size = textureDimensions(multi_scattering_lut, 0);
                         let sky_view_lut_size = textureDimensions(sky_view_lut, 0);
@@ -390,7 +423,7 @@
                         let multi_scattering_lut_min_rect = transmittance_lut_min_rect + vec2<u32>(0, transmittance_lut_size.y);
                         let sky_view_lut_min_rect = multi_scattering_lut_min_rect + vec2<u32>(0, multi_scattering_lut_size.y);
                         let aerial_perspective_lut_min_rect = sky_view_lut_min_rect + vec2<u32>(0, sky_view_lut_size.y);
-                        
+
                         if config.show_transmittance_lut == 1 && coords_in_rect(texture_coords, transmittance_lut_min_rect, transmittance_lut_min_rect + transmittance_lut_size) {
                             return vec4(textureLoad(transmittance_lut, texture_coords, 0).rgb, 1.0);
                         } else if config.show_multi_scattering_lut == 1 && coords_in_rect(texture_coords, multi_scattering_lut_min_rect, multi_scattering_lut_min_rect + multi_scattering_lut_size) {
@@ -490,13 +523,15 @@
                 ],
             });
 
-            const dragonRenderer = makeDragonRenderer(device, backBuffer.format, depthBuffer.format, true, shadowMap);
+            const dragonRenderer = makeDragonRenderer(device, backBuffer.format, depthBuffer.format, true, shadowMap, shadowMap2);
 
             const sunProjection = mat4n.ortho(-80, 80, -80, 80, -200, 300);
+            const sun2Projection = mat4n.ortho(-80, 80, -80, 80, -200, 300);
 
             const sunProjectionMeters = mat4n.ortho(-80000, 80000, -80000, 80000, -200000, 300000);
+            const sun2ProjectionMeters = mat4n.ortho(-80000, 80000, -80000, 80000, -200000, 300000);
 
-            const params = makeUi(skyAtmosphereRenderer.resources.atmosphere, cameraController, timeStampQuery !== null, useHgDrainePhase);
+            const params = makeUi(skyAtmosphereRenderer.resources.atmosphere, cameraController, timeStampQuery !== null, useHgDrainePhase, useMoon);
 
             const resolutionDependentStuff = {
                 projection,
@@ -674,26 +709,26 @@
                             params.renderSettings.sun.illuminance.b,
                         ].map(c => c * params.renderSettings.sun.illuminanceFactor),
                         direction: vec3n.normalize([
-                            0.0,
+                            -Math.sin(params.renderSettings.sun.direction.azimuth * Math.PI / 180.0) * params.renderSettings.sun.direction.x,
                             params.renderSettings.sun.direction.y,
-                            params.renderSettings.sun.direction.x,
+                            Math.cos(params.renderSettings.sun.direction.azimuth * Math.PI / 180.0) * params.renderSettings.sun.direction.x,
                         ]),
                         diskLuminanceScale: params.renderSettings.sun.diskIlluminance,
                         diskAngularDiameter: params.renderSettings.sun.diskDiameter * Math.PI / 180.0,
                     },
                     moon: {
                         illuminance: [
-                            params.renderSettings.sun.illuminance.r,
-                            params.renderSettings.sun.illuminance.g,
-                            params.renderSettings.sun.illuminance.b,
-                        ].map(c => 0.0 * c * params.renderSettings.sun.illuminanceFactor / 100000),
+                            params.renderSettings.moon.illuminance.r,
+                            params.renderSettings.moon.illuminance.g,
+                            params.renderSettings.moon.illuminance.b,
+                        ].map(c => c * params.renderSettings.moon.illuminanceFactor),
                         direction: vec3n.normalize([
-                            0.0,
-                            -params.renderSettings.sun.direction.y,
-                            -params.renderSettings.sun.direction.x,
+                            -Math.sin(params.renderSettings.moon.direction.azimuth * Math.PI / 180.0) * params.renderSettings.moon.direction.x,
+                            params.renderSettings.moon.direction.y,
+                            Math.cos(params.renderSettings.moon.direction.azimuth * Math.PI / 180.0) * params.renderSettings.moon.direction.x,
                         ]),
-                        diskLuminanceScale: 0.26,
-                        diskAngularDiameter: 0.568 * Math.PI / 180.0,
+                        diskLuminanceScale: params.renderSettings.moon.diskIlluminance,
+                        diskAngularDiameter: params.renderSettings.moon.diskDiameter * Math.PI / 180.0,
                     },
                     screenResolution: resolution,
                     rayMarchMinSPP: params.renderSettings.rayMarchingMinSpp,
@@ -707,10 +742,16 @@
                     vec3n.fromValues(0, 0, 0),
                     vec3n.normalize(vec3n.fromValues(0, 0, 1))
                 );
+                const sun2View = mat4n.lookAt(
+                    config.moon.direction.map(c => c * params.scaleFromKilometers()),
+                    vec3n.fromValues(0, 0, 0),
+                    vec3n.normalize(vec3n.fromValues(0, 0, 1))
+                );
                 const sunViewProjection = mat4n.multiply(params.renderSettings.inMeters ? sunProjectionMeters : sunProjection, sunView);
+                const sun2ViewProjection = mat4n.multiply(params.renderSettings.inMeters ? sun2ProjectionMeters : sun2Projection, sun2View);
 
-                device.queue.writeBuffer(shadowBuffer, 0, new Float32Array(sunViewProjection));
-                
+                device.queue.writeBuffer(shadowBuffer, 0, new Float32Array([...sunViewProjection, ...sun2ViewProjection]));
+
                 dragonRenderer.update(
                     {view: cameraView, projection: resolutionDependentStuff.projection},
                     {model, normal: mat4n.transpose(mat4n.inverse(model))},
@@ -718,10 +759,16 @@
                         direction: config.sun.direction,
                         illuminance: config.sun.illuminance,
                         lightViewProjection: sunViewProjection,
+                        direction2: config.moon.direction,
+                        illuminance2: config.moon.illuminance,
+                        lightViewProjection2: sun2ViewProjection,
+                        numLights: useMoon ? 2 : 1,
                     },
                     {
                         sunView,
                         sunProjection: params.renderSettings.inMeters ? sunProjectionMeters : sunProjection,
+                        sun2View,
+                        sun2Projection: params.renderSettings.inMeters ? sun2ProjectionMeters : sun2Projection,
                     }
                 );
 
@@ -736,6 +783,20 @@
                 });
                 dragonRenderer.encodeShadow(shadowMapPass);
                 shadowMapPass.end();
+
+                if (useMoon) {
+                    const shadowMap2Pass = encoder.beginRenderPass({
+                        colorAttachments: [],
+                        depthStencilAttachment: {
+                            view: shadowMap2View,
+                            depthClearValue: 1.0,
+                            depthLoadOp: 'clear',
+                            depthStoreOp: 'store',
+                        },
+                    });
+                    dragonRenderer.encodeShadow2(shadowMap2Pass);
+                    shadowMap2Pass.end();
+                }
 
                 const geometryPass = encoder.beginRenderPass({
                     colorAttachments: [{
@@ -760,7 +821,7 @@
                     [+params.renderSettings.coloredTransmittance]
                     [+params.renderSettings.rayMarchDistantSky]
                 );
-                
+
                 if (timeStampQuery) {
                     skyRenderer.updateAtmosphere(params.atmosphere);
                     skyRenderer.updateUniforms(config);

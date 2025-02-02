@@ -2,10 +2,16 @@
 
 ## [Unreleased]
 
+### Added
+
+ - Add optional sky view LUT parameterization using a uniform longitude mapping across the full azimuthal range ([0,τ]).
+ - Add demo for two suns.
+ - Add azimuth sliders for suns in demo.
+
 ### Fixed
 
- - Fix typo in installation steps.
-
+ - Fix typos in installation steps and docs.
+ - Fix possible NaNs in sky view LUT parameterization.
 
 ## [1.1.0] - 2024-09-26
 

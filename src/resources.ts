@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Lukas Herzberger
+ * Copyright (c) 2024-2025 Lukas Herzberger
  * SPDX-License-Identifier: MIT
  */
 
@@ -66,10 +66,21 @@ export class SkyAtmosphereResources {
     readonly multiScatteringLut: LookUpTable;
 
     /**
-     * The sky view look up table.
-     * Stores the distant sky around the camera with respect to it's altitude within the atmosphere.
+     * The sky view lookup table.
+     * Stores the distant sky around the camera with respect to its altitude within the atmosphere.
      *
-     * Parameterized by the longitude in x (range: [0, 2π]) and latitude in y (range: [-π/2, π/2]).
+     * The lookup table is parameterized by a longitude mapping along the X-axis and a latitude mapping along the Y-axis.
+     * The latitude range is always [-π/2, π/2], where 0 represents the horizon.
+     * There are two supported longitude mappings:
+     *  - **Default (Sun-centric)**: Longitude is mapped with respect to the sun direction, assuming symmetric contributions.
+     *    This mapping uses a range of [0, π], where 0 is directly toward the sun and π is directly opposite.
+     *    This mode is optimized for scenes with a single dominant light source.
+     *  - **Uniform**: Longitude is uniformly mapped around the zenith with a full range of [0, 2π].
+     *    This mode supports multiple light sources but comes at the cost of angular resolution.
+     *
+     * To enable the uniform longitude mapping, {@link SkyViewLutConfig.uniformParameterizationConfig} must be defined.
+     * Note that this mapping assumes that light and view directions are given in a right-handed Y-up coordinate system. This is configured
+     * by {@link SkyViewUniformParameterizationConfig.isYUp} and {@link SkyViewUniformParameterizationConfig.isRightHanded}.
      */
     readonly skyViewLut: LookUpTable;
 

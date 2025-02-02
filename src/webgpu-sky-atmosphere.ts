@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Lukas Herzberger
+ * Copyright (c) 2024-2025 Lukas Herzberger
  * SPDX-License-Identifier: MIT
  */
 
@@ -32,6 +32,7 @@ import {
     SkyRendererRasterConfig,
     SkyAtmosphereRasterRendererConfig,
     SkyViewLutConfig,
+    SkyViewUniformParameterizationConfig,
     TransmittanceLutConfig,
 } from './config.js';
 
@@ -93,6 +94,7 @@ export {
     SkyRendererRasterConfig,
     SkyAtmosphereRasterRendererConfig,
     SkyViewLutConfig,
+    SkyViewUniformParameterizationConfig,
     TransmittanceLutConfig,
 };
 

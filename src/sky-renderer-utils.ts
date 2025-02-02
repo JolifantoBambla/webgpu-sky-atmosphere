@@ -1,11 +1,11 @@
 /*
- * Copyright (c) 2024 Lukas Herzberger
+ * Copyright (c) 2024-2025 Lukas Herzberger
  * SPDX-License-Identifier: MIT
  */
 
 import { SkyAtmosphereComputeRendererConfig, SkyAtmosphereRasterRendererConfig, SkyAtmosphereRendererConfig } from './config.js';
 import { SkyAtmosphereLutRenderer } from './lut-renderer.js';
-import { makeMiePhaseOverrides } from './pipelines.js';
+import { makeMiePhaseOverrides, makeSkyViewUniformParameterizationOverrides } from './pipelines.js';
 import { ATMOSPHERE_BUFFER_SIZE, SkyAtmosphereResources, UNIFORMS_BUFFER_SIZE } from './resources.js';
 
 export function makeSkyRendereringBaseLayoutEntries(config: SkyAtmosphereRendererConfig, resources: SkyAtmosphereResources, visibility: GPUShaderStageFlags): GPUBindGroupLayoutEntry[] {
@@ -210,11 +210,12 @@ export function makeWithLutsConstants(config: SkyAtmosphereComputeRendererConfig
         LIMB_DARKENING_ON_SUN: Number(config.lights?.applyLimbDarkeningOnSun ?? true),
         LIMB_DARKENING_ON_MOON: Number(config.lights?.applyLimbDarkeningOnMoon ?? false),
         USE_MOON: Number(config.lights?.useMoon ?? false),
+        ...makeSkyViewUniformParameterizationOverrides(config.lookUpTables?.skyViewLut?.uniformParameterizationConfig),
     };
 }
 
 export function makeRayMarchConstantsBase(config: SkyAtmosphereComputeRendererConfig | SkyAtmosphereRasterRendererConfig, lutRenderer: SkyAtmosphereLutRenderer, rayMarchDistantSky: boolean): Record<string, GPUPipelineConstantValue> {
-    const constants: Record<string, GPUPipelineConstantValue> = {
+    return {
         INV_DISTANCE_TO_MAX_SAMPLE_COUNT: 1.0 / (config.skyRenderer.distanceToMaxSampleCount ?? 100.0),
         RANDOMIZE_SAMPLE_OFFSET: Number(config.skyRenderer.rayMarch?.randomizeRayOffsets ?? true),
         MULTI_SCATTERING_LUT_RES_X: lutRenderer.resources.multiScatteringLut.texture.width,
@@ -227,10 +228,10 @@ export function makeRayMarchConstantsBase(config: SkyAtmosphereComputeRendererCo
         LIMB_DARKENING_ON_MOON: Number(config.lights?.applyLimbDarkeningOnMoon ?? false),
         USE_MOON: Number(config.lights?.useMoon ?? false),
         ...makeMiePhaseOverrides(config.mieHgDrainePhase),
+        ...(rayMarchDistantSky ? {} : {
+            SKY_VIEW_LUT_RES_X: lutRenderer.resources.skyViewLut.texture.width,
+            SKY_VIEW_LUT_RES_Y: lutRenderer.resources.skyViewLut.texture.height,
+            ...makeSkyViewUniformParameterizationOverrides(config.lookUpTables?.skyViewLut?.uniformParameterizationConfig),
+        }),
     };
-    if (!rayMarchDistantSky) {
-        constants['SKY_VIEW_LUT_RES_X'] = lutRenderer.resources.skyViewLut.texture.width;
-        constants['SKY_VIEW_LUT_RES_Y'] = lutRenderer.resources.skyViewLut.texture.height;
-    }
-    return constants;
 }

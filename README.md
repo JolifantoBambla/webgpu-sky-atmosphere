@@ -12,6 +12,8 @@ Or try the [demo](https://jolifantobambla.github.io/webgpu-sky-atmosphere/demo/)
 It comes in multiple flavors:
  - [Cornette-Shanks for Mie scattering](https://jolifantobambla.github.io/webgpu-sky-atmosphere/demo/)
  - [Henyey-Greenstein + Draine for Mie scattering](https://jolifantobambla.github.io/webgpu-sky-atmosphere/demo/?hg_draine)
+ - [Two suns, Cornette-Shanks](https://jolifantobambla.github.io/webgpu-sky-atmosphere/demo/?two_suns&uniform_sky_view)
+ - [Two suns, Henyey-Greenstein + Draine](https://jolifantobambla.github.io/webgpu-sky-atmosphere/demo/?two_suns&uniform_sky_view&hg_draine)
  - [Timings, Cornette-Shanks](https://jolifantobambla.github.io/webgpu-sky-atmosphere/demo/?timestamp_query)
  - [Timings, Henyey-Greenstein + Draine](https://jolifantobambla.github.io/webgpu-sky-atmosphere/demo/?timestamp_query&hg_draine)
 
@@ -359,7 +361,13 @@ const uniforms = {
 skyRenderer.renderLutsAndSky(passEncoder, uniforms);
 ```
 
-By default, only one light source is used. To also use the second one, use the `lights` property of the config:
+By default, only one light source is used. A second light source can be enabled via the config's `lights.useMoon` property.
+
+When using multiple light sources, it is recommended to change the default parameterization of the sky view lookup table.  
+The default parameterization assumes a single dominant light source with symmetric contributions and covers only one hemisphere.
+
+To cover the full azimuthal range, set `lookUpTables.skyViewLut.uniformParameterizationConfig`.  
+This allows multiple light directions to be fully represented but comes at the cost of reduced angular resolution for individual light sources.
 
 ```js
 const config = {
@@ -367,9 +375,16 @@ const config = {
     lights: {
         useMoon: true,
     },
+    lookUpTables: {
+        skyViewLut: {
+            uniformParameterizationConfig: {},
+        },
+    },
     ...
 }
 ```
+
+Check out this [demo with two suns](https://jolifantobambla.github.io/webgpu-sky-atmosphere/demo/?two_suns&uniform_sky_view) for an example.
 
 #### Sun disk rendering
 
