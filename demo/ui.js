@@ -23,7 +23,7 @@ export function makeUi(atmosphere, camera, showPerformanceGraph, useHgDrainePhas
             sun: {
                 illuminance: {r: 1.0, g: 1.0, b: 1.0},
                 illuminanceFactor: 1.0,
-                direction: {x: -0.76, y: 0.0, azimuth: 0.0},//{x: 0.0, y: 1.0, azimuth: 0.0},
+                direction: {x: 0.0, y: 1.0, azimuth: 0.0},
                 diskDiameter: 2.3,
                 diskIlluminance: 65.0,
             },
