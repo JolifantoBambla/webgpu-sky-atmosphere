@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.2.0] - 2025-04-06
+
 ### Added
 
  - Add optional sky view LUT parameterization using a uniform longitude mapping across the full azimuthal range ([0,τ]).
